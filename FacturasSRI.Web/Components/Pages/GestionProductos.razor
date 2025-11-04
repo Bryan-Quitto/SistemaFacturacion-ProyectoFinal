@@ -1,0 +1,176 @@
+@page "/gestion-productos"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+@rendermode InteractiveServer
+@using FacturasSRI.Application.Dtos.Productos
+@using FacturasSRI.Domain.Entities
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Gestión de Productos</h3>
+    <button class="btn btn-primary" @onclick="GoToCreatePage">
+        <span class="bi bi-plus-circle-fill me-2" aria-hidden="true"></span> Crear Nuevo Producto
+    </button>
+</div>
+
+<!-- ======================= BARRA DE BÚSQUEDA ======================= -->
+<div class="input-group mb-3">
+    <span class="input-group-text">
+        <span class="bi bi-search"></span>
+    </span>
+    <input type="text" class="form-control" placeholder="Buscar por código o nombre..." 
+           @bind="searchQuery" @bind:event="oninput" />
+</div>
+
+<!-- ======================= FORMULARIO DE EDICIÓN (SOLO APARECE AL EDITAR) ======================= -->
+@if (editingId.HasValue && productoModel != null)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            Editando Producto: <strong>@productoOriginal?.Nombre</strong>
+        </div>
+        <div class="card-body">
+            <EditForm Model="@productoModel" OnValidSubmit="HandleUpdate" FormName="edit-product-form">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="mb-3">
+                    <label class="form-label">Nombre</label>
+                    <InputText class="form-control" @bind-Value="productoModel.Nombre" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Descripción</label>
+                    <InputTextArea class="form-control" @bind-Value="productoModel.Descripcion" />
+                </div>
+                 <div class="mb-3">
+                    <label class="form-label">Precio de Venta</label>
+                    <InputNumber class="form-control" @bind-Value="productoModel.PrecioVentaUnitario" />
+                </div>
+                <button type="submit" class="btn btn-primary">Actualizar</button>
+                <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancelar</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<!-- ======================= TABLA DE PRODUCTOS ======================= -->
+@if (productos == null)
+{
+    <p><em>Cargando productos...</em></p>
+}
+else
+{
+    <table class="table table-striped table-hover shadow-sm">
+        <thead class="table-dark">
+            <tr>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Precio</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var producto in FilteredProducts)
+            {
+                <tr>
+                    <td>@producto.CodigoPrincipal</td>
+                    <td>@producto.Nombre</td>
+                    <td>@producto.PrecioVentaUnitario.ToString("C")</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(producto.Id)">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => Deactivate(producto.Id)">Desactivar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ProductoDto>? productos;
+    
+    // --- Variable para la búsqueda ---
+    private string searchQuery = string.Empty;
+
+    // --- Propiedad computada para filtrar la lista ---
+    private IEnumerable<ProductoDto> FilteredProducts
+    {
+        get
+        {
+            if (productos == null)
+            {
+                return Enumerable.Empty<ProductoDto>();
+            }
+
+            if (string.IsNullOrWhiteSpace(searchQuery))
+            {
+                return productos;
+            }
+
+            return productos.Where(p =>
+                p.CodigoPrincipal.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                p.Nombre.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
+            );
+        }
+    }
+
+    // --- Variables para la edición en línea ---
+    private Guid? editingId;
+    private UpdateProductoDto? productoModel;
+    private Producto? productoOriginal; 
+
+    // --- Métodos del Componente ---
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        productos = await Http.GetFromJsonAsync<List<ProductoDto>>("api/productos");
+    }
+
+    private async Task Deactivate(Guid id)
+    {
+        await Http.DeleteAsync($"api/productos/{id}");
+        await LoadProducts();
+    }
+
+    private async Task StartEdit(Guid id) 
+    {
+        productoOriginal = await Http.GetFromJsonAsync<Producto>($"api/productos/{id}");
+        if (productoOriginal != null)
+        {
+            productoModel = new UpdateProductoDto 
+            { 
+                Nombre = productoOriginal.Nombre, 
+                Descripcion = productoOriginal.Descripcion, 
+                PrecioVentaUnitario = productoOriginal.PrecioVentaUnitario 
+            };
+            editingId = id;
+        }
+    }
+    
+    private async Task HandleUpdate()
+    {
+        if (editingId.HasValue && productoModel != null)
+        {
+            await Http.PutAsJsonAsync($"api/productos/{editingId.Value}", productoModel);
+            await CancelEdit();
+            await LoadProducts();
+        }
+    }
+    
+    private Task CancelEdit()
+    {
+        editingId = null;
+        productoModel = null;
+        productoOriginal = null;
+        return Task.CompletedTask;
+    }
+    
+    private void GoToCreatePage()
+    {
+        Navigation.NavigateTo("/gestion-productos/crear");
+    }
+}

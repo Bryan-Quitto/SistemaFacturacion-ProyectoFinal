@@ -1,0 +1,53 @@
+@page "/gestion-productos/crear"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+@rendermode InteractiveServer
+@using FacturasSRI.Application.Dtos.Productos
+
+<h3>Nuevo Producto</h3>
+
+<EditForm Model="@productoModel" OnValidSubmit="HandleSubmit" FormName="create-product-form">
+    <DataAnnotationsValidator />
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <ValidationSummary />
+            <div class="mb-3">
+                <label class="form-label">Código Principal</label>
+                <InputText class="form-control" @bind-Value="productoModel.CodigoPrincipal" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Nombre</label>
+                <InputText class="form-control" @bind-Value="productoModel.Nombre" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Descripción</label>
+                <InputTextArea class="form-control" @bind-Value="productoModel.Descripcion" />
+            </div>
+             <div class="mb-3">
+                <label class="form-label">Precio de Venta</label>
+                <InputNumber class="form-control" @bind-Value="productoModel.PrecioVentaUnitario" />
+            </div>
+        </div>
+        <div class="card-footer bg-light">
+            <button type="submit" class="btn btn-primary">Guardar Producto</button>
+            <button type="button" class="btn btn-secondary" @onclick="GoBack">Cancelar</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    private CreateProductoDto productoModel = new();
+
+    private async Task HandleSubmit()
+    {
+        await Http.PostAsJsonAsync("api/productos", productoModel);
+        GoBack();
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/gestion-productos");
+    }
+}

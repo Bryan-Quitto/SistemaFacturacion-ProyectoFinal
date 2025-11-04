@@ -1,4 +1,3 @@
-// En: FacturasSRI.Api/Controllers/ProductosController.cs
 using FacturasSRI.Application.Dtos.Productos;
 using FacturasSRI.Application.Interfaces;
 using FacturasSRI.Domain.Entities;
@@ -13,7 +12,6 @@ namespace FacturasSRI.Api.Controllers
     {
         private readonly IProductoRepository _productoRepository;
 
-        // El controlador solo conoce la interfaz, no la implementación. ¡Esto es Arquitectura Cebolla!
         public ProductosController(IProductoRepository productoRepository)
         {
             _productoRepository = productoRepository;
@@ -79,14 +77,13 @@ namespace FacturasSRI.Api.Controllers
                 return NotFound();
             }
 
-            // Mapear los campos del DTO a la entidad existente
             productoExistente.Nombre = dto.Nombre;
             productoExistente.Descripcion = dto.Descripcion;
             productoExistente.PrecioVentaUnitario = dto.PrecioVentaUnitario;
 
             await _productoRepository.UpdateProductAsync(productoExistente);
 
-            return NoContent(); // Indica que la operación fue exitosa pero no hay nada que devolver.
+            return NoContent(); 
         }
 
         [HttpDelete("{id}")]
