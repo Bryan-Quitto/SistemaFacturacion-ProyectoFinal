@@ -1,0 +1,226 @@
+@page "/gestion-inventario/registrar-compra"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@using FacturasSRI.Application.Dtos.Productos
+@using FacturasSRI.Application.Dtos.Inventario
+
+@rendermode InteractiveServer
+
+<div class="container-fluid">
+    <h3 class="mb-4">Registrar Compra de Producto</h3>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <EditForm Model="@model" OnValidSubmit="HandleSubmit" FormName="registrar-compra-form">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <!-- Selector de Producto -->
+                        <div class="mb-3">
+                            <label class="form-label">Producto</label>
+                            @if (productos == null)
+                            {
+                                <div class="form-control bg-light">Cargando productos...</div>
+                            }
+                            else
+                            {
+                                <div class="input-group mb-2">
+                                    <input type="text" 
+                                        class="form-control" 
+                                        placeholder="Buscar producto..." 
+                                        @bind-value="searchQuery"
+                                        @bind-value:event="oninput"
+                                        @onfocus="ShowProductList"
+                                        autocomplete="off" />
+                                    @if (selectedProduct is not null)
+                                    {
+                                        <span class="input-group-text bg-light text-success">
+                                            <span class="bi bi-check2"></span>
+                                        </span>
+                                    }
+                                </div>
+
+                                @if (showProductList && filteredProducts?.Any() == true)
+                                {
+                                    <div class="list-group shadow-sm" style="max-height: 200px; overflow-y: auto; position: absolute; width: 94%; z-index: 1000;">
+                                        @foreach (var producto in filteredProducts)
+                                        {
+                                            <button type="button" 
+                                                class="list-group-item list-group-item-action"
+                                                @onclick="() => SelectProduct(producto)">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong>@producto.CodigoPrincipal</strong>
+                                                        <span class="ms-2">@producto.Nombre</span>
+                                                    </div>
+                                                    <small class="text-muted">@producto.PrecioVentaUnitario.ToString("C")</small>
+                                                </div>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                                else if (showProductList && !string.IsNullOrEmpty(searchQuery))
+                                {
+                                    <div class="text-muted small mt-1">No se encontraron productos.</div>
+                                }
+                            }
+                        </div>
+
+                        @if (selectedProduct is not null)
+                        {
+                            <div class="mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body py-2">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>@selectedProduct.Nombre</strong>
+                                                <small class="text-muted d-block">@selectedProduct.CodigoPrincipal</small>
+                                            </div>
+                                            <div class="text-end">
+                                                <small class="text-muted d-block">Precio de venta</small>
+                                                <strong>@selectedProduct.PrecioVentaUnitario.ToString("C")</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Cantidad y Precio -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Cantidad</label>
+                                    <InputNumber class="form-control" @bind-Value="model.Cantidad" min="1" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Precio de Compra Unitario</label>
+                                    <InputNumber class="form-control" @bind-Value="model.PrecioCompra" min="0" step="0.01" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fechas -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Fecha de Compra (opcional)</label>
+                                    <InputDate class="form-control" @bind-Value="model.FechaCompra" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Fecha de Caducidad (opcional)</label>
+                                    <InputDate class="form-control" @bind-Value="model.FechaCaducidad" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-secondary" @onclick="GoBack">
+                                <span class="bi bi-arrow-left me-1"></span>
+                                Volver
+                            </button>
+                            <button type="submit" class="btn btn-primary" disabled="@(!IsFormValid)">
+                                <span class="bi bi-plus-circle-fill me-1"></span>
+                                Registrar Compra
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ProductoDto>? productos;
+    private string searchQuery = string.Empty;
+    private bool showProductList = false;
+    private ProductoDto? selectedProduct;
+    private string? errorMessage;
+
+    // Modelo del formulario
+    private CreateLoteDto model = new()
+    {
+        FechaCompra = DateTime.UtcNow
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            productos = await Http.GetFromJsonAsync<List<ProductoDto>>("api/productos");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar los productos: {ex.Message}";
+        }
+    }
+
+    private IEnumerable<ProductoDto>? filteredProducts =>
+        string.IsNullOrWhiteSpace(searchQuery)
+            ? productos
+            : productos?.Where(p =>
+                p.CodigoPrincipal.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                p.Nombre.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+
+    private void ShowProductList() => showProductList = true;
+
+    private void SelectProduct(ProductoDto producto)
+    {
+        selectedProduct = producto;
+        model.ProductoId = producto.Id;
+        searchQuery = producto.Nombre;
+        showProductList = false;
+    }
+
+    private bool IsFormValid =>
+        selectedProduct is not null &&
+        model.Cantidad > 0 &&
+        model.PrecioCompra > 0;
+
+    private async Task HandleSubmit()
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/inventario/compra", model);
+            if (response.IsSuccessStatusCode)
+            {
+                Navigation.NavigateTo("/gestion-inventario");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error al registrar la compra: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al registrar la compra: {ex.Message}";
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/gestion-inventario");
+    }
+}

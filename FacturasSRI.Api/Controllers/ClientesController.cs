@@ -29,7 +29,7 @@ namespace FacturasSRI.Api.Controllers
                 clienteDtos.Add(new ClienteDto
                 {
                     Id = cliente.Id,
-                    TipoIdentificacion = cliente.TipoIdentificacion,
+                    TipoIdentificacion = (int)cliente.TipoIdentificacion,
                     NumeroIdentificacion = cliente.NumeroIdentificacion,
                     RazonSocial = cliente.RazonSocial,
                     Email = cliente.Email,
@@ -53,7 +53,7 @@ namespace FacturasSRI.Api.Controllers
             var clienteDto = new ClienteDto
             {
                 Id = cliente.Id,
-                TipoIdentificacion = cliente.TipoIdentificacion,
+                TipoIdentificacion = (int)cliente.TipoIdentificacion,
                 NumeroIdentificacion = cliente.NumeroIdentificacion,
                 RazonSocial = cliente.RazonSocial,
                 Email = cliente.Email,
@@ -70,12 +70,13 @@ namespace FacturasSRI.Api.Controllers
         {
             var cliente = new Cliente
             {
-                TipoIdentificacion = createClienteDto.TipoIdentificacion,
+                TipoIdentificacion = (Domain.Enums.TipoIdentificacion)createClienteDto.TipoIdentificacion,
                 NumeroIdentificacion = createClienteDto.NumeroIdentificacion,
                 RazonSocial = createClienteDto.RazonSocial,
-                Email = createClienteDto.Email,
-                Direccion = createClienteDto.Direccion,
-                Telefono = createClienteDto.Telefono,
+                // Domain `Cliente` properties are non-nullable strings; coalesce nullable DTO fields to empty string
+                Email = createClienteDto.Email ?? string.Empty,
+                Direccion = createClienteDto.Direccion ?? string.Empty,
+                Telefono = createClienteDto.Telefono ?? string.Empty,
                 UsuarioIdCreador = Guid.NewGuid()
             };
 
@@ -84,7 +85,7 @@ namespace FacturasSRI.Api.Controllers
             var clienteDto = new ClienteDto
             {
                 Id = nuevoCliente.Id,
-                TipoIdentificacion = nuevoCliente.TipoIdentificacion,
+                TipoIdentificacion = (int)nuevoCliente.TipoIdentificacion,
                 NumeroIdentificacion = nuevoCliente.NumeroIdentificacion,
                 RazonSocial = nuevoCliente.RazonSocial,
                 Email = nuevoCliente.Email,
@@ -106,12 +107,13 @@ namespace FacturasSRI.Api.Controllers
                 return NotFound();
             }
 
-            clienteExistente.TipoIdentificacion = updateClienteDto.TipoIdentificacion;
+            // Map and convert types safely
+            clienteExistente.TipoIdentificacion = (Domain.Enums.TipoIdentificacion)updateClienteDto.TipoIdentificacion;
             clienteExistente.NumeroIdentificacion = updateClienteDto.NumeroIdentificacion;
             clienteExistente.RazonSocial = updateClienteDto.RazonSocial;
-            clienteExistente.Email = updateClienteDto.Email;
-            clienteExistente.Direccion = updateClienteDto.Direccion;
-            clienteExistente.Telefono = updateClienteDto.Telefono;
+            clienteExistente.Email = updateClienteDto.Email ?? string.Empty;
+            clienteExistente.Direccion = updateClienteDto.Direccion ?? string.Empty;
+            clienteExistente.Telefono = updateClienteDto.Telefono ?? string.Empty;
 
             await _clienteRepository.UpdateAsync(clienteExistente);
 

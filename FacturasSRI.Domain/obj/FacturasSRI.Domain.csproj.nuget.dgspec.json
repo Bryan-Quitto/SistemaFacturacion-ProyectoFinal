@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Domain\\FacturasSRI.Domain.csproj": {}
+    "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Domain\\FacturasSRI.Domain.csproj": {}
   },
   "projects": {
-    "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Domain\\FacturasSRI.Domain.csproj": {
+    "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Domain\\FacturasSRI.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Domain\\FacturasSRI.Domain.csproj",
+        "projectUniqueName": "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Domain\\FacturasSRI.Domain.csproj",
         "projectName": "FacturasSRI.Domain",
-        "projectPath": "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Domain\\FacturasSRI.Domain.csproj",
-        "packagesPath": "C:\\Users\\THINKPAD\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Domain\\obj\\",
+        "projectPath": "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Domain\\FacturasSRI.Domain.csproj",
+        "packagesPath": "C:\\Users\\villa\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\THINKPAD\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\villa\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -54,20 +54,6 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.21, 8.0.21]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.21, 8.0.21]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.21, 8.0.21]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"

@@ -1,0 +1,133 @@
+@page "/gestion-inventario"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+@rendermode InteractiveServer
+@using FacturasSRI.Application.Dtos.Inventario
+@using FacturasSRI.Application.Dtos.Productos
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>Gestión de Inventario</h3>
+        <a href="/gestion-inventario/registrar-compra" class="btn btn-primary">
+            <span class="bi bi-plus-circle-fill me-1"></span>
+            Registrar Compra
+        </a>
+    </div>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @if (lotes == null)
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <p class="text-muted mb-0">
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    Cargando lotes...
+                </p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Cantidad Comprada</th>
+                                <th>Disponible</th>
+                                <th>Precio Compra</th>
+                                <th>Fecha Compra</th>
+                                <th>Fecha Caducidad</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var lote in lotes)
+                            {
+                                <tr>
+                                    <td>
+                                        @if (productos?.FirstOrDefault(p => p.Id == lote.ProductoId) is ProductoDto producto)
+                                        {
+                                            <div>
+                                                <strong>@producto.Nombre</strong>
+                                                <small class="text-muted d-block">@producto.CodigoPrincipal</small>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Producto no encontrado</span>
+                                        }
+                                    </td>
+                                    <td>@lote.CantidadComprada</td>
+                                    <td>@lote.CantidadDisponible</td>
+                                    <td>@lote.PrecioCompraUnitario.ToString("C")</td>
+                                    <td>@lote.FechaCompra.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                                    <td>
+                                        @if (lote.FechaCaducidad.HasValue)
+                                        {
+                                            @lote.FechaCaducidad.Value.ToLocalTime().ToString("dd/MM/yyyy")
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">N/A</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info" title="Ver detalles">
+                                            <span class="bi bi-eye"></span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<LoteDto>? lotes;
+    private List<ProductoDto>? productos;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadLotes(), LoadProducts());
+    }
+
+    private async Task LoadLotes()
+    {
+        try
+        {
+            lotes = await Http.GetFromJsonAsync<List<LoteDto>>("api/inventario/lotes");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar los lotes: {ex.Message}";
+        }
+    }
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            productos = await Http.GetFromJsonAsync<List<ProductoDto>>("api/productos");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar los productos: {ex.Message}";
+        }
+    }
+}

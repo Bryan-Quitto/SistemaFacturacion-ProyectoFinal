@@ -2955,19 +2955,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\THINKPAD\\.nuget\\packages\\": {}
+    "C:\\Users\\villa\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Infrastructure\\FacturasSRI.Infrastructure.csproj",
+      "projectUniqueName": "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Infrastructure\\FacturasSRI.Infrastructure.csproj",
       "projectName": "FacturasSRI.Infrastructure",
-      "projectPath": "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Infrastructure\\FacturasSRI.Infrastructure.csproj",
-      "packagesPath": "C:\\Users\\THINKPAD\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Infrastructure\\obj\\",
+      "projectPath": "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Infrastructure\\FacturasSRI.Infrastructure.csproj",
+      "packagesPath": "C:\\Users\\villa\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Infrastructure\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\THINKPAD\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\villa\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -2979,8 +2979,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Application\\FacturasSRI.Application.csproj": {
-              "projectPath": "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Application\\FacturasSRI.Application.csproj"
+            "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Application\\FacturasSRI.Application.csproj": {
+              "projectPath": "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Application\\FacturasSRI.Application.csproj"
             }
           }
         }
@@ -3027,20 +3027,6 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
-        "downloadDependencies": [
-          {
-            "name": "Microsoft.AspNetCore.App.Ref",
-            "version": "[8.0.21, 8.0.21]"
-          },
-          {
-            "name": "Microsoft.NETCore.App.Ref",
-            "version": "[8.0.21, 8.0.21]"
-          },
-          {
-            "name": "Microsoft.WindowsDesktop.App.Ref",
-            "version": "[8.0.21, 8.0.21]"
-          }
-        ],
         "frameworkReferences": {
           "Microsoft.NETCore.App": {
             "privateAssets": "all"

@@ -1,12 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "nMmD2sm2HAo=",
+  "dgSpecHash": "pgMQ+9LmMxQ=",
   "success": true,
-  "projectFilePath": "C:\\Users\\THINKPAD\\Desktop\\Metodologias\\FacturasSRI\\FacturasSRI.Application\\FacturasSRI.Application.csproj",
-  "expectedPackageFiles": [
-    "C:\\Users\\THINKPAD\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.21\\microsoft.netcore.app.ref.8.0.21.nupkg.sha512",
-    "C:\\Users\\THINKPAD\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.21\\microsoft.windowsdesktop.app.ref.8.0.21.nupkg.sha512",
-    "C:\\Users\\THINKPAD\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.21\\microsoft.aspnetcore.app.ref.8.0.21.nupkg.sha512"
-  ],
+  "projectFilePath": "C:\\Users\\villa\\Desktop\\FacturasSRI\\FacturasSRI.Application\\FacturasSRI.Application.csproj",
+  "expectedPackageFiles": [],
   "logs": []
 }

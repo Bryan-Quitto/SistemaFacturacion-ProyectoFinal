@@ -20,6 +20,24 @@ namespace FacturasSRI.Api.Controllers
             _loteRepository = loteRepository;
         }
 
+        [HttpGet("lotes")]
+        public async Task<IActionResult> GetAll()
+        {
+            var lotes = await _loteRepository.GetAllAsync();
+            var loteDtos = lotes.Select(l => new LoteDto
+            {
+                Id = l.Id,
+                ProductoId = l.ProductoId,
+                CantidadComprada = l.CantidadComprada,
+                CantidadDisponible = l.CantidadDisponible,
+                PrecioCompraUnitario = l.PrecioCompraUnitario,
+                FechaCompra = l.FechaCompra,
+                FechaCaducidad = l.FechaCaducidad
+            });
+
+            return Ok(loteDtos);
+        }
+
         // POST: /api/inventario/compra
         [HttpPost("compra")]
         public async Task<IActionResult> RegistrarCompra([FromBody] CreateLoteDto dto)

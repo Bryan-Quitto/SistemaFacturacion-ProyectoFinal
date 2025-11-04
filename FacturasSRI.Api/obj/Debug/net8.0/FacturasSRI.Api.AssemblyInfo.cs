@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FacturasSRI.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6d9a5e3282aa384441741aae51b5e155fba56004")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+417cd533caa831206117c81ed69d211ca874ec6e")]
 [assembly: System.Reflection.AssemblyProductAttribute("FacturasSRI.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FacturasSRI.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -16,6 +16,15 @@ namespace FacturasSRI.Infrastructure.Repositories
             _db = db;
         }
 
+        public async Task<IEnumerable<Lote>> GetAllAsync()
+        {
+            return await _db.Lotes
+                .AsNoTracking()
+                .Include(l => l.Producto)
+                .OrderByDescending(l => l.FechaCompra)
+                .ToListAsync();
+        }
+
         public async Task<Lote> AddAsync(Lote lote)
         {
             _db.Lotes.Add(lote);
