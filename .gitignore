@@ -58,3 +58,12 @@ Log/
 
 # Mac
 *.swp
+
+# Caches de .NET
+.dotnet/
+
+# Blazor / WebAssembly
+wwwroot/dist/
+
+# Archivos de registro
+*.log

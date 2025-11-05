@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FacturasSRI.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+417cd533caa831206117c81ed69d211ca874ec6e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9327dcd231063630138919cf5448c58c058d6efc")]
 [assembly: System.Reflection.AssemblyProductAttribute("FacturasSRI.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FacturasSRI.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
