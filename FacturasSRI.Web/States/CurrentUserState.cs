@@ -21,6 +21,7 @@ namespace FacturasSRI.Web.States
 
         public void SetUser(string token)
         {
+            Console.WriteLine("--- CurrentUserState: SetUser LLAMADO ---");
             Token = token;
             if (!string.IsNullOrEmpty(Token))
             {
@@ -31,11 +32,13 @@ namespace FacturasSRI.Web.States
                 FullName = claims.FirstOrDefault(c => c.Type == "name")?.Value ?? string.Empty;
             }
             IsLoading = false;
+            Console.WriteLine("--- CurrentUserState: SetUser finalizado. Disparando OnChange. ---");
             NotifyStateChanged();
         }
 
         public void Logout()
         {
+            Console.WriteLine("--- CurrentUserState: Logout LLAMADO ---");
             Token = null;
             UserId = Guid.Empty;
             Email = string.Empty;
@@ -47,11 +50,16 @@ namespace FacturasSRI.Web.States
         
         public void FinishLoading()
         {
+            Console.WriteLine("--- CurrentUserState: FinishLoading LLAMADO ---");
             IsLoading = false;
             NotifyStateChanged();
         }
 
-        private void NotifyStateChanged() => OnChange?.Invoke();
+        private void NotifyStateChanged() 
+        {
+            Console.WriteLine("--- CurrentUserState: OnChange DISPARADO ---");
+            OnChange?.Invoke();
+        }
 
         private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
         {

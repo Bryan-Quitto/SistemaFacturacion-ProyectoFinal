@@ -1,9 +1,11 @@
 @page "/gestion-productos"
 @inject HttpClient Http
 @inject NavigationManager Navigation
-
-@rendermode InteractiveServer
+@inject CurrentUserState CurrentUser
 @using FacturasSRI.Application.Dtos.Productos
+@using FacturasSRI.Application.Dtos.Inventario
+@using System.Net.Http.Headers
+@implements IDisposable
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h3>Gestión de Productos</h3>
@@ -48,9 +50,13 @@
     </div>
 }
 
-@if (productos == null)
+@if (isLoading)
 {
     <p><em>Cargando productos...</em></p>
+}
+else if (productos == null)
+{
+    <div class="alert alert-danger">Error al cargar productos.</div>
 }
 else
 {
@@ -60,6 +66,7 @@ else
                 <th>Código</th>
                 <th>Nombre</th>
                 <th>Precio</th>
+                <th>Estado</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -71,8 +78,21 @@ else
                     <td>@producto.Nombre</td>
                     <td>@producto.PrecioVentaUnitario.ToString("C")</td>
                     <td>
+                        <span class="badge @(producto.EstaActivo ? "bg-success" : "bg-danger")">
+                            @(producto.EstaActivo ? "Activo" : "Inactivo")
+                        </span>
+                    </td>
+                    <td>
                         <button class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(producto)">Editar</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => Deactivate(producto.Id)">Desactivar</button>
+                        <button class="btn btn-sm btn-outline-info" @onclick="() => ShowStockModal(producto)">Ver Stock</button>
+                        @if (producto.EstaActivo)
+                        {
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Deactivate(producto.Id)">Desactivar</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => Activate(producto.Id)">Activar</button>
+                        }
                     </td>
                 </tr>
             }
@@ -80,11 +100,71 @@ else
     </table>
 }
 
+@if (isStockModalVisible)
+{
+    <div class="modal fade show" tabindex="-1" style="display: block;" role="dialog">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Stock de: @selectedProductName</h5>
+                    <button type="button" class="btn-close" @onclick="CloseStockModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (isLoadingStock)
+                    {
+                        <p>Cargando stock...</p>
+                    }
+                    else if (lotesStock == null || !lotesStock.Any())
+                    {
+                        <p>No hay lotes registrados para este producto.</p>
+                    }
+                    else
+                    {
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Fecha Compra</th>
+                                    <th>Fecha Caducidad</th>
+                                    <th>Precio Compra</th>
+                                    <th>Comprada</th>
+                                    <th>Disponible</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var lote in lotesStock)
+                                {
+                                    <tr>
+                                        <td>@lote.FechaCompra.ToShortDateString()</td>
+                                        <td>@(lote.FechaCaducidad?.ToShortDateString() ?? "N/A")</td>
+                                        <td>@lote.PrecioCompraUnitario.ToString("C")</td>
+                                        <td>@lote.CantidadComprada</td>
+                                        <td><strong>@lote.CantidadDisponible</strong></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+
 @code {
     private List<ProductoDto>? productos;
     private string searchQuery = string.Empty;
     private Guid? editingId;
     private UpdateProductoDto? productoModel;
+    private bool isLoading = true;
+    private bool hasAttemptedLoad = false;
+    
+    // Estado del Modal de Stock (HU-08)
+    private bool isStockModalVisible = false;
+    private bool isLoadingStock = false;
+    private string selectedProductName = "";
+    private List<LoteDto>? lotesStock;
 
     private IEnumerable<ProductoDto> FilteredProducts =>
         productos?.Where(p =>
@@ -93,14 +173,47 @@ else
             p.Nombre.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
         ) ?? Enumerable.Empty<ProductoDto>();
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await LoadProducts();
+        CurrentUser.OnChange += HandleAuthStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadDataIfAuthenticated();
+        }
+    }
+
+    private async void HandleAuthStateChanged()
+    {
+        await LoadDataIfAuthenticated();
+    }
+
+    private async Task LoadDataIfAuthenticated()
+    {
+        if (CurrentUser.IsLoggedIn && !hasAttemptedLoad)
+        {
+            hasAttemptedLoad = true;
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CurrentUser.Token);
+            await LoadProducts();
+            StateHasChanged();
+        }
     }
 
     private async Task LoadProducts()
     {
-        productos = await Http.GetFromJsonAsync<List<ProductoDto>>("api/productos");
+        isLoading = true;
+        try
+        {
+            productos = await Http.GetFromJsonAsync<List<ProductoDto>>("api/productos");
+        }
+        catch (Exception)
+        {
+            productos = null;
+        }
+        isLoading = false;
     }
 
     private void StartEdit(ProductoDto producto) 
@@ -135,9 +248,47 @@ else
         await Http.PatchAsync($"api/productos/{id}/deactivate", null);
         await LoadProducts();
     }
+    
+    private async Task Activate(Guid id)
+    {
+        await Http.PatchAsync($"api/productos/{id}/activate", null);
+        await LoadProducts();
+    }
 
     private void GoToCreatePage()
     {
         Navigation.NavigateTo("/gestion-productos/crear");
+    }
+
+    // Métodos para el Modal de Stock (HU-08)
+    private async Task ShowStockModal(ProductoDto producto)
+    {
+        selectedProductName = producto.Nombre;
+        isStockModalVisible = true;
+        isLoadingStock = true;
+        lotesStock = null;
+
+        try
+        {
+            lotesStock = await Http.GetFromJsonAsync<List<LoteDto>>($"api/productos/{producto.Id}/stock");
+        }
+        catch (Exception)
+        {
+            lotesStock = null;
+        }
+        isLoadingStock = false;
+        StateHasChanged();
+    }
+
+    private void CloseStockModal()
+    {
+        isStockModalVisible = false;
+        lotesStock = null;
+        selectedProductName = "";
+    }
+
+    public void Dispose()
+    {
+        CurrentUser.OnChange -= HandleAuthStateChanged;
     }
 }

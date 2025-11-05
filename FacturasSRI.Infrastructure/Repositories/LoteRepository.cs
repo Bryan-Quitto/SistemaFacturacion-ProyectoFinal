@@ -3,6 +3,8 @@ using FacturasSRI.Domain.Entities;
 using FacturasSRI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace FacturasSRI.Infrastructure.Repositories
@@ -40,6 +42,15 @@ namespace FacturasSRI.Infrastructure.Repositories
         public async Task<bool> ProductoExistsAsync(Guid productoId)
         {
             return await _db.Productos.AsNoTracking().AnyAsync(p => p.Id == productoId);
+        }
+
+        public async Task<IEnumerable<Lote>> GetLotesByProductoIdAsync(Guid productoId)
+        {
+            return await _db.Lotes
+                .Where(l => l.ProductoId == productoId && l.CantidadDisponible > 0)
+                .AsNoTracking()
+                .OrderBy(l => l.FechaCaducidad)
+                .ToListAsync();
         }
     }
 }

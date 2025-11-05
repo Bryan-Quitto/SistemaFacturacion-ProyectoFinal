@@ -7,7 +7,7 @@
 {
     <div class="page">
         <main class="content px-4">
-            <p>Cargando...</p>
+            <p>Cargando sesión...</p>
         </main>
     </div>
 }
@@ -29,23 +29,40 @@ else if (CurrentUser.IsLoggedIn)
         </main>
     </div>
 }
+else
+{
+    <div class="page">
+        <main class="content px-4">
+            <p>No ha iniciado sesión. Redirigiendo al login...</p>
+        </main>
+    </div>
+}
 
 @code {
     protected override void OnInitialized()
     {
+        Console.WriteLine("--- MainLayout: OnInitialized (Suscrito a OnChange) ---");
         CurrentUser.OnChange += StateHasChanged;
     }
 
-    protected override void OnParametersSet()
+    protected override void OnAfterRender(bool firstRender)
     {
+        Console.WriteLine($"--- MainLayout: OnAfterRender (IsLoading: {CurrentUser.IsLoading}, IsLoggedIn: {CurrentUser.IsLoggedIn}) ---");
+
         if (CurrentUser.IsLoading)
         {
+            Console.WriteLine("--- MainLayout: Aún cargando, esperando... ---");
             return;
         }
 
         if (!CurrentUser.IsLoggedIn)
         {
-            Navigation.NavigateTo("/login");
+            var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+            if (uri.AbsolutePath != "/login")
+            {
+                Console.WriteLine("--- MainLayout: No logueado. REDIRIGIENDO a /login ---");
+                Navigation.NavigateTo("/login");
+            }
         }
     }
 

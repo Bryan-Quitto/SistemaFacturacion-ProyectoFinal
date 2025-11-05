@@ -1,8 +1,11 @@
 @page "/gestion-inventario/registrar-compra"
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject CurrentUserState CurrentUser
 @using FacturasSRI.Application.Dtos.Productos
 @using FacturasSRI.Application.Dtos.Inventario
+@using System.Net.Http.Headers
+@implements IDisposable
 
 @rendermode InteractiveServer
 
@@ -25,7 +28,6 @@
                         <DataAnnotationsValidator />
                         <ValidationSummary />
 
-                        <!-- Selector de Producto -->
                         <div class="mb-3">
                             <label class="form-label">Producto</label>
                             @if (productos == null)
@@ -36,12 +38,12 @@
                             {
                                 <div class="input-group mb-2">
                                     <input type="text" 
-                                        class="form-control" 
-                                        placeholder="Buscar producto..." 
-                                        @bind-value="searchQuery"
-                                        @bind-value:event="oninput"
-                                        @onfocus="ShowProductList"
-                                        autocomplete="off" />
+                                           class="form-control" 
+                                           placeholder="Buscar producto..." 
+                                           @bind-value="searchQuery"
+                                           @bind-value:event="oninput"
+                                           @onfocus="ShowProductList"
+                                           autocomplete="off" />
                                     @if (selectedProduct is not null)
                                     {
                                         <span class="input-group-text bg-light text-success">
@@ -56,8 +58,8 @@
                                         @foreach (var producto in filteredProducts)
                                         {
                                             <button type="button" 
-                                                class="list-group-item list-group-item-action"
-                                                @onclick="() => SelectProduct(producto)">
+                                                    class="list-group-item list-group-item-action"
+                                                    @onclick="() => SelectProduct(producto)">
                                                 <div class="d-flex justify-content-between align-items-center">
                                                     <div>
                                                         <strong>@producto.CodigoPrincipal</strong>
@@ -96,7 +98,6 @@
                             </div>
                         }
 
-                        <!-- Cantidad y Precio -->
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -112,7 +113,6 @@
                             </div>
                         </div>
 
-                        <!-- Fechas -->
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -128,7 +128,6 @@
                             </div>
                         </div>
 
-                        <!-- Botones -->
                         <div class="d-flex justify-content-between">
                             <button type="button" class="btn btn-secondary" @onclick="GoBack">
                                 <span class="bi bi-arrow-left me-1"></span>
@@ -152,16 +151,41 @@
     private bool showProductList = false;
     private ProductoDto? selectedProduct;
     private string? errorMessage;
+    private bool hasAttemptedLoad = false;
 
     // Modelo del formulario
     private CreateLoteDto model = new()
     {
         FechaCompra = DateTime.UtcNow
     };
-
-    protected override async Task OnInitializedAsync()
+    
+    protected override void OnInitialized()
     {
-        await LoadProducts();
+        CurrentUser.OnChange += HandleAuthStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadDataIfAuthenticated();
+        }
+    }
+
+    private async void HandleAuthStateChanged()
+    {
+        await LoadDataIfAuthenticated();
+    }
+
+    private async Task LoadDataIfAuthenticated()
+    {
+        if (CurrentUser.IsLoggedIn && !hasAttemptedLoad)
+        {
+            hasAttemptedLoad = true;
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CurrentUser.Token);
+            await LoadProducts();
+            StateHasChanged();
+        }
     }
 
     private async Task LoadProducts()
@@ -196,7 +220,7 @@
     private bool IsFormValid =>
         selectedProduct is not null &&
         model.Cantidad > 0 &&
-        model.PrecioCompra > 0;
+        model.PrecioCompra >= 0;
 
     private async Task HandleSubmit()
     {
@@ -222,5 +246,10 @@
     private void GoBack()
     {
         Navigation.NavigateTo("/gestion-inventario");
+    }
+    
+    public void Dispose()
+    {
+        CurrentUser.OnChange -= HandleAuthStateChanged;
     }
 }

@@ -1,0 +1,21 @@
+@page "/notfound"
+@inject NavigationManager Navigation
+
+<div class="container text-center mt-5 pt-5">
+    <h1 class="display-1 fw-bold">404</h1>
+    <h3 class="mb-3">Página No Encontrada</h3>
+    <p class="text-muted mb-4">
+        Lo sentimos, la página que estás buscando no existe o ha sido movida.
+    </p>
+    <button class="btn btn-primary" @onclick="GoHome">
+        <span class="bi bi-house-door-fill me-2" aria-hidden="true"></span>
+        Volver al Inicio
+    </button>
+</div>
+
+@code {
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+}

@@ -55,5 +55,15 @@ namespace FacturasSRI.Infrastructure.Repositories
                 await _context.SaveChangesAsync();
             }
         }
+        
+        public async Task ActivateProductAsync(Guid id)
+        {
+            var producto = await _context.Productos.FindAsync(id);
+            if (producto != null)
+            {
+                producto.EstaActivo = true;
+                await _context.SaveChangesAsync();
+            }
+        }
     }
 }

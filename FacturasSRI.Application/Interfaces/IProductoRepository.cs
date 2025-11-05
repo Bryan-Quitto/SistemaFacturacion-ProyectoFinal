@@ -13,5 +13,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<Producto> CreateProductAsync(Producto producto);
         Task UpdateProductAsync(Producto producto);
         Task DeactivateProductAsync(Guid id);
+        Task ActivateProductAsync(Guid id);
     }
 }

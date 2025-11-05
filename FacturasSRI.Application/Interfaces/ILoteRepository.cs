@@ -1,5 +1,6 @@
 using FacturasSRI.Domain.Entities;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FacturasSRI.Application.Interfaces
@@ -10,5 +11,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<Lote> AddAsync(Lote lote);
         Task<Lote?> GetByIdAsync(Guid id);
         Task<bool> ProductoExistsAsync(Guid productoId);
+        Task<IEnumerable<Lote>> GetLotesByProductoIdAsync(Guid productoId);
     }
 }
