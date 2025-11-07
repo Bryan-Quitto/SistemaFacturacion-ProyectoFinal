@@ -3,9 +3,7 @@
 
 @using System.Net.Http.Json
 @using FacturasSRI.Application.Dtos
-@using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Web.Services
-@inject IProductService ProductService
 @inject ApiClient ApiClient
 @inject NavigationManager Navigation
 
@@ -20,66 +18,76 @@
     </div>
 }
 
-<div class="mb-3">
-    <EditForm Model="@newPurchase" OnValidSubmit="@HandleAddPurchase">
-        <DataAnnotationsValidator />
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="product" class="form-label">Producto</label>
-                    <InputSelect id="product" class="form-select" @bind-Value="newPurchase.ProductoId" disabled="@isSubmitting">
-                        <option value="">Seleccione un producto</option>
-                        @foreach (var product in products)
-                        {
-                            <option value="@product.Id">@product.Nombre</option>
-                        }
-                    </InputSelect>
-                    <ValidationMessage For="@(() => newPurchase.ProductoId)" />
+@if (products == null && !string.IsNullOrEmpty(statusMessage))
+{
+    <p><em>Cargando productos...</em></p>
+}
+else
+{
+    <div class="mb-3">
+        <EditForm Model="@newPurchase" OnValidSubmit="@HandleAddPurchase">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="product" class="form-label">Producto</label>
+                        <InputSelect id="product" class="form-select" @bind-Value="newPurchase.ProductoId" disabled="@isSubmitting">
+                            <option value="">Seleccione un producto</option>
+                            @if (products != null)
+                            {
+                                @foreach (var product in products)
+                                {
+                                    <option value="@product.Id">@product.Nombre</option>
+                                }
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => newPurchase.ProductoId)" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="cantidad" class="form-label">Cantidad</label>
+                        <InputNumber id="cantidad" class="form-control" @bind-Value="newPurchase.Cantidad" disabled="@isSubmitting" />
+                        <ValidationMessage For="@(() => newPurchase.Cantidad)" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="precioCosto" class="form-label">Precio de Costo</label>
+                        <InputNumber id="precioCosto" class="form-control" @bind-Value="newPurchase.PrecioCosto" disabled="@isSubmitting" />
+                        <ValidationMessage For="@(() => newPurchase.PrecioCosto)" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="fechaCaducidad" class="form-label">Fecha de Caducidad</label>
+                        <InputDate id="fechaCaducidad" class="form-control" @bind-Value="newPurchase.FechaCaducidad" disabled="@isSubmitting" />
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label for="cantidad" class="form-label">Cantidad</label>
-                    <InputNumber id="cantidad" class="form-control" @bind-Value="newPurchase.Cantidad" disabled="@isSubmitting" />
-                    <ValidationMessage For="@(() => newPurchase.Cantidad)" />
-                </div>
-                <div class="mb-3">
-                    <label for="precioCosto" class="form-label">Precio de Costo</label>
-                    <InputNumber id="precioCosto" class="form-control" @bind-Value="newPurchase.PrecioCosto" disabled="@isSubmitting" />
-                    <ValidationMessage For="@(() => newPurchase.PrecioCosto)" />
-                </div>
-                <div class="mb-3">
-                    <label for="fechaCaducidad" class="form-label">Fecha de Caducidad</label>
-                    <InputDate id="fechaCaducidad" class="form-control" @bind-Value="newPurchase.FechaCaducidad" disabled="@isSubmitting" />
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="proveedor" class="form-label">Proveedor</label>
+                        <InputText id="proveedor" class="form-control" @bind-Value="newPurchase.Proveedor" disabled="@isSubmitting" />
+                        <ValidationMessage For="@(() => newPurchase.Proveedor)" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="numeroFactura" class="form-label">Número de Factura</label>
+                        <InputText id="numeroFactura" class="form-control" @bind-Value="newPurchase.NumeroFactura" disabled="@isSubmitting" />
+                        <ValidationMessage For="@(() => newPurchase.NumeroFactura)" />
+                    </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="proveedor" class="form-label">Proveedor</label>
-                    <InputText id="proveedor" class="form-control" @bind-Value="newPurchase.Proveedor" disabled="@isSubmitting" />
-                    <ValidationMessage For="@(() => newPurchase.Proveedor)" />
-                </div>
-                <div class="mb-3">
-                    <label for="numeroFactura" class="form-label">Número de Factura</label>
-                    <InputText id="numeroFactura" class="form-control" @bind-Value="newPurchase.NumeroFactura" disabled="@isSubmitting" />
-                    <ValidationMessage For="@(() => newPurchase.NumeroFactura)" />
-                </div>
-            </div>
-        </div>
-        <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
-            @if (isSubmitting)
-            {
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                <span> Registrando...</span>
-            }
-            else
-            {
-                <span>Registrar Compra</span>
-            }
-        </button>
-    </EditForm>
-</div>
+            <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                @if (isSubmitting)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span> Registrando...</span>
+                }
+                else
+                {
+                    <span>Registrar Compra</span>
+                }
+            </button>
+        </EditForm>
+    </div>
+}
 
 @code {
-    private List<ProductDto> products = new();
+    private List<ProductDto>? products;
     private PurchaseDto newPurchase = new();
     private string? statusMessage;
     private bool isSuccess;
@@ -89,7 +97,8 @@
     {
         try
         {
-            products = await ProductService.GetProductsAsync();
+            var http = await ApiClient.GetHttpClientAsync();
+            products = await http.GetFromJsonAsync<List<ProductDto>>("api/products");
         }
         catch (Exception)
         {
@@ -118,13 +127,14 @@
             else
             {
                 isSuccess = false;
-                statusMessage = "Error al registrar la compra. Por favor, intente de nuevo.";
+                var errorContent = await response.Content.ReadAsStringAsync();
+                statusMessage = $"Error al registrar la compra: {errorContent}";
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             isSuccess = false;
-            statusMessage = "Ocurrió un error de red. Verifique su conexión.";
+            statusMessage = $"Ocurrió un error de red: {ex.Message}";
         }
         finally
         {

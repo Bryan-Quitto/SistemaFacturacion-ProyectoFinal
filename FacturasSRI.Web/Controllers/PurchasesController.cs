@@ -1,5 +1,6 @@
 using FacturasSRI.Application.Dtos;
 using FacturasSRI.Application.Interfaces;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -10,7 +11,7 @@ namespace FacturasSRI.Web.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public class PurchasesController : ControllerBase
     {
         private readonly IPurchaseService _purchaseService;

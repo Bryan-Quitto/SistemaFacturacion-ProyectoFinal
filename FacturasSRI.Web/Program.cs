@@ -75,7 +75,12 @@ builder.Services.AddAuthentication("Cookies")
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminPolicy", policy => policy.RequireRole("Administrador"));
+    options.AddPolicy("VendedorPolicy", policy => policy.RequireRole("Vendedor", "Administrador"));
+    options.AddPolicy("BodegueroPolicy", policy => policy.RequireRole("Bodeguero", "Administrador"));
+});
 
 var app = builder.Build();
 
@@ -91,8 +96,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapStaticAssets();
 
+app.MapControllers();
+
 app.MapRazorComponents<App>()
    .AddInteractiveServerRenderMode();
     
-app.MapControllers();
 app.Run();

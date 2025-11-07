@@ -1,0 +1,104 @@
+@using System.Net.Http.Json
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Web.Services
+@inject ApiClient ApiClient
+
+@if (IsVisible && Product != null)
+{
+    <div class="modal fade show" style="display:block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Producto: @Product.Nombre</h5>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@Product" OnValidSubmit="HandleUpdateProduct">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label">Nombre</label>
+                            <InputText class="form-control" @bind-Value="Product.Nombre" />
+                            <ValidationMessage For="@(() => Product.Nombre)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Código Principal</label>
+                            <InputText class="form-control" @bind-Value="Product.CodigoPrincipal" />
+                            <ValidationMessage For="@(() => Product.CodigoPrincipal)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción</label>
+                            <InputText class="form-control" @bind-Value="Product.Descripcion" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Precio de Venta</label>
+                            <InputNumber class="form-control" @bind-Value="Product.PrecioVentaUnitario" />
+                             <ValidationMessage For="@(() => Product.PrecioVentaUnitario)" />
+                        </div>
+                        <div class="mb-3 form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="Product.ManejaInventario" />
+                            <label class="form-check-label">Maneja Inventario</label>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="Product.ManejaLotes" />
+                            <label class="form-check-label">Maneja Lotes</label>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger">@errorMessage</div>
+                        }
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public ProductDto? Product { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private string? errorMessage;
+
+    private async Task HandleUpdateProduct()
+    {
+        errorMessage = null;
+        if (Product == null) return;
+
+        try
+        {
+            var http = await ApiClient.GetHttpClientAsync();
+            var response = await http.PutAsJsonAsync($"api/products/{Product.Id}", Product);
+
+            if (response.IsSuccessStatusCode)
+            {
+                await Close();
+            }
+            else
+            {
+                errorMessage = "Error al actualizar el producto.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error de red: {ex.Message}";
+        }
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+}

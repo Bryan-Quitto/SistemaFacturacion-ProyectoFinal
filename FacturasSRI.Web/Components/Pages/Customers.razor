@@ -1,5 +1,5 @@
 @page "/customers"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "VendedorPolicy")]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @inject ICustomerService CustomerService
@@ -63,6 +63,7 @@
                 <td>@customer.NumeroIdentificacion</td>
                 <td>@customer.Email</td>
                 <td>
+                    <button class="btn btn-sm btn-secondary" @onclick="() => OpenEditModal(customer)">Editar</button>
                     <button class="btn btn-sm btn-danger" @onclick="() => HandleDeleteCustomer(customer.Id)">Desactivar</button>
                 </td>
             </tr>
@@ -70,11 +71,25 @@
     </tbody>
 </table>
 
+@if (customerToEdit != null)
+{
+    <EditCustomerModal Customer="customerToEdit" IsVisible="isEditModalVisible" OnSave="HandleUpdateCustomer" OnClose="CloseEditModal" />
+}
+
+
 @code {
     private List<CustomerDto> customers = new();
     private CustomerDto newCustomer = new();
 
+    private CustomerDto? customerToEdit;
+    private bool isEditModalVisible = false;
+
     protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+    
+    private async Task LoadCustomers()
     {
         customers = await CustomerService.GetCustomersAsync();
     }
@@ -83,12 +98,42 @@
     {
         await CustomerService.CreateCustomerAsync(newCustomer);
         newCustomer = new();
-        customers = await CustomerService.GetCustomersAsync();
+        await LoadCustomers();
     }
 
     private async Task HandleDeleteCustomer(Guid id)
     {
         await CustomerService.DeleteCustomerAsync(id);
-        customers = await CustomerService.GetCustomersAsync();
+        await LoadCustomers();
+    }
+
+    private async Task HandleUpdateCustomer(CustomerDto customer)
+    {
+        await CustomerService.UpdateCustomerAsync(customer);
+        isEditModalVisible = false;
+        customerToEdit = null;
+        await LoadCustomers();
+    }
+
+    private void OpenEditModal(CustomerDto customer)
+    {
+        customerToEdit = new CustomerDto
+        {
+            Id = customer.Id,
+            RazonSocial = customer.RazonSocial,
+            NumeroIdentificacion = customer.NumeroIdentificacion,
+            Email = customer.Email,
+            Direccion = customer.Direccion,
+            Telefono = customer.Telefono,
+            TipoIdentificacion = customer.TipoIdentificacion,
+            EstaActivo = customer.EstaActivo
+        };
+        isEditModalVisible = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalVisible = false;
+        customerToEdit = null;
     }
 }

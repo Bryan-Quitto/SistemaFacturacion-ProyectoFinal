@@ -9,8 +9,6 @@ namespace FacturasSRI.Application.Interfaces
     {
         Task<List<InvoiceDto>> GetInvoicesAsync();
         Task<InvoiceDto?> GetInvoiceByIdAsync(Guid id);
-        Task<InvoiceDto> CreateInvoiceAsync(InvoiceDto invoice);
-        Task UpdateInvoiceAsync(InvoiceDto invoice);
-        Task DeleteInvoiceAsync(Guid id);
+        Task<InvoiceDto> CreateInvoiceAsync(CreateInvoiceDto invoiceDto);
     }
 }

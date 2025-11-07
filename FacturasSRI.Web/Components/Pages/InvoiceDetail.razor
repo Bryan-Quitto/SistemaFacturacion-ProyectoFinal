@@ -1,0 +1,110 @@
+@page "/invoices/{InvoiceId:guid}"
+@attribute [Authorize]
+
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@inject IInvoiceService InvoiceService
+@inject ICustomerService CustomerService
+@inject IProductService ProductService
+@inject NavigationManager Navigation
+
+<PageTitle>Detalle de Factura</PageTitle>
+
+@if (invoice == null && !string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (invoice == null)
+{
+    <p><em>Cargando detalles de la factura...</em></p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Detalle de Factura: @invoice.NumeroFactura</h3>
+        <button class="btn btn-secondary" @onclick="GoBack">
+            <i class="bi bi-arrow-left-circle me-2"></i>Volver a la Lista
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            Información General
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Cliente:</strong> @(customers.FirstOrDefault(c => c.Id == invoice.ClienteId)?.RazonSocial ?? "N/A")</p>
+                    <p><strong>RUC/CI:</strong> @(customers.FirstOrDefault(c => c.Id == invoice.ClienteId)?.NumeroIdentificacion ?? "N/A")</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Fecha de Emisión:</strong> @invoice.FechaEmision.ToString("dd/MM/yyyy")</p>
+                    <p><strong>Número de Factura:</strong> @invoice.NumeroFactura</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4 class="mt-4">Productos</h4>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio Unit.</th>
+                <th>Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var detail in invoice.Detalles)
+            {
+                <tr>
+                    <td>@(products.FirstOrDefault(p => p.Id == detail.ProductoId)?.Nombre ?? "Producto no encontrado")</td>
+                    <td>@detail.Cantidad</td>
+                    <td>@detail.PrecioVentaUnitario.ToString("C")</td>
+                    <td>@detail.Subtotal.ToString("C")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    
+    <div class="text-end mt-3">
+        <h5>Subtotal: @invoice.SubtotalSinImpuestos.ToString("C")</h5>
+        <h5>IVA: @invoice.TotalIVA.ToString("C")</h5>
+        <h4><strong>Total: @invoice.Total.ToString("C")</strong></h4>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid InvoiceId { get; set; }
+
+    private InvoiceDto? invoice;
+    private List<CustomerDto> customers = new();
+    private List<ProductDto> products = new();
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+{
+    try
+    {
+        customers = await CustomerService.GetCustomersAsync() ?? new();
+        products = await ProductService.GetProductsAsync() ?? new();
+        invoice = await InvoiceService.GetInvoiceByIdAsync(InvoiceId);
+
+        if (invoice == null)
+        {
+            errorMessage = "No se encontró la factura solicitada.";
+        }
+    }
+    catch (Exception ex)
+    {
+        errorMessage = $"Error al cargar los detalles: {ex.Message}";
+    }
+}
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/invoices");
+    }
+}

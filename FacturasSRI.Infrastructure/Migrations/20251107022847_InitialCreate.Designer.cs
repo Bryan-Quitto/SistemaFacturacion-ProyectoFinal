@@ -3,6 +3,7 @@ using System;
 using FacturasSRI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FacturasSRI.Infrastructure.Migrations
 {
     [DbContext(typeof(FacturasSRIDbContext))]
-    partial class FacturasSRIDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251107022847_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -51,7 +54,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("LoteId");
 
-                    b.ToTable("AjustesInventario", (string)null);
+                    b.ToTable("AjustesInventario");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Cliente", b =>
@@ -94,7 +97,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Clientes", (string)null);
+                    b.ToTable("Clientes");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.CuentaPorPagar", b =>
@@ -139,7 +142,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("LoteId");
 
-                    b.ToTable("CuentasPorPagar", (string)null);
+                    b.ToTable("CuentasPorPagar");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Empresa", b =>
@@ -179,7 +182,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Empresas", (string)null);
+                    b.ToTable("Empresas");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Establecimiento", b =>
@@ -210,7 +213,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("EmpresaId");
 
-                    b.ToTable("Establecimientos", (string)null);
+                    b.ToTable("Establecimientos");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Factura", b =>
@@ -254,7 +257,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("ClienteId");
 
-                    b.ToTable("Facturas", (string)null);
+                    b.ToTable("Facturas");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.FacturaDetalle", b =>
@@ -293,7 +296,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("ProductoId");
 
-                    b.ToTable("FacturaDetalles", (string)null);
+                    b.ToTable("FacturaDetalles");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.FacturaDetalleConsumoLote", b =>
@@ -317,7 +320,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("LoteId");
 
-                    b.ToTable("FacturaDetalleConsumoLotes", (string)null);
+                    b.ToTable("FacturaDetalleConsumoLotes");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.FacturaSRI", b =>
@@ -373,7 +376,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Impuestos", (string)null);
+                    b.ToTable("Impuestos");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Lote", b =>
@@ -410,7 +413,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("ProductoId");
 
-                    b.ToTable("Lotes", (string)null);
+                    b.ToTable("Lotes");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.NotaDeCredito", b =>
@@ -460,7 +463,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("FacturaId");
 
-                    b.ToTable("NotasDeCredito", (string)null);
+                    b.ToTable("NotasDeCredito");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.NotaDeCreditoDetalle", b =>
@@ -496,7 +499,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("ProductoId");
 
-                    b.ToTable("NotaDeCreditoDetalles", (string)null);
+                    b.ToTable("NotaDeCreditoDetalles");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.NotaDeCreditoSRI", b =>
@@ -546,39 +549,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Permisos", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("01f6f2c8-2a1e-4c74-8a8f-b9d5c6a1b2d3"),
-                            Descripcion = "Acceso a la gestión de clientes",
-                            Nombre = "gestionar-clientes"
-                        },
-                        new
-                        {
-                            Id = new Guid("b2d0b8c0-3e7a-4f5c-8b1d-9e6a0c7f1a2b"),
-                            Descripcion = "Acceso a la creación de facturas",
-                            Nombre = "crear-facturas"
-                        },
-                        new
-                        {
-                            Id = new Guid("c3e1a9d0-4b8f-4e6c-9a1d-8f7b0c6e2d1a"),
-                            Descripcion = "Acceso para ver productos",
-                            Nombre = "ver-productos"
-                        },
-                        new
-                        {
-                            Id = new Guid("d4f2b8a1-5c9e-4a6b-8c1d-7e6f0a5b3c2d"),
-                            Descripcion = "Acceso a la gestión de inventario y lotes",
-                            Nombre = "gestionar-inventario"
-                        },
-                        new
-                        {
-                            Id = new Guid("e5a3c7b2-6d0f-4b8a-9d2e-6f5b1c4a3e1f"),
-                            Descripcion = "Acceso a la gestión de productos",
-                            Nombre = "gestionar-productos"
-                        });
+                    b.ToTable("Permisos");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.PrecioEspecial", b =>
@@ -598,7 +569,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PreciosEspeciales", (string)null);
+                    b.ToTable("PreciosEspeciales");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Producto", b =>
@@ -642,7 +613,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Productos", (string)null);
+                    b.ToTable("Productos");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.ProductoComponente", b =>
@@ -710,7 +681,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("EstablecimientoId");
 
-                    b.ToTable("PuntosEmision", (string)null);
+                    b.ToTable("PuntosEmision");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Rol", b =>
@@ -732,7 +703,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Roles", (string)null);
+                    b.ToTable("Roles");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Usuario", b =>
@@ -768,7 +739,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Usuarios", (string)null);
+                    b.ToTable("Usuarios");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.UsuarioRol", b =>
@@ -786,7 +757,7 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.ToTable("UsuarioRoles");
                 });
 
-            modelBuilder.Entity("RolPermisos", b =>
+            modelBuilder.Entity("PermisoRol", b =>
                 {
                     b.Property<Guid>("PermisosId")
                         .HasColumnType("uuid");
@@ -798,39 +769,7 @@ namespace FacturasSRI.Infrastructure.Migrations
 
                     b.HasIndex("RolesId");
 
-                    b.ToTable("RolPermisos");
-
-                    b.HasData(
-                        new
-                        {
-                            PermisosId = new Guid("01f6f2c8-2a1e-4c74-8a8f-b9d5c6a1b2d3"),
-                            RolesId = new Guid("e2a87c46-e5b3-4f9e-8c6e-1f2a3b4c5d6e")
-                        },
-                        new
-                        {
-                            PermisosId = new Guid("b2d0b8c0-3e7a-4f5c-8b1d-9e6a0c7f1a2b"),
-                            RolesId = new Guid("e2a87c46-e5b3-4f9e-8c6e-1f2a3b4c5d6e")
-                        },
-                        new
-                        {
-                            PermisosId = new Guid("c3e1a9d0-4b8f-4e6c-9a1d-8f7b0c6e2d1a"),
-                            RolesId = new Guid("e2a87c46-e5b3-4f9e-8c6e-1f2a3b4c5d6e")
-                        },
-                        new
-                        {
-                            PermisosId = new Guid("d4f2b8a1-5c9e-4a6b-8c1d-7e6f0a5b3c2d"),
-                            RolesId = new Guid("f5b8c9d0-1a2b-3c4d-5e6f-7a8b9c0d1e2f")
-                        },
-                        new
-                        {
-                            PermisosId = new Guid("e5a3c7b2-6d0f-4b8a-9d2e-6f5b1c4a3e1f"),
-                            RolesId = new Guid("f5b8c9d0-1a2b-3c4d-5e6f-7a8b9c0d1e2f")
-                        },
-                        new
-                        {
-                            PermisosId = new Guid("c3e1a9d0-4b8f-4e6c-9a1d-8f7b0c6e2d1a"),
-                            RolesId = new Guid("f5b8c9d0-1a2b-3c4d-5e6f-7a8b9c0d1e2f")
-                        });
+                    b.ToTable("PermisoRol");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.AjusteInventario", b =>
@@ -1052,7 +991,7 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.Navigation("Usuario");
                 });
 
-            modelBuilder.Entity("RolPermisos", b =>
+            modelBuilder.Entity("PermisoRol", b =>
                 {
                     b.HasOne("FacturasSRI.Domain.Entities.Permiso", null)
                         .WithMany()

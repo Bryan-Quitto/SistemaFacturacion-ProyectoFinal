@@ -19,7 +19,7 @@ namespace FacturasSRI.Infrastructure.Services
             _context = context;
         }
 
-        public async Task<ProductDto> CreateProductAsync(ProductDto productDto)
+        public async Task<ProductDto> CreateProductAsync(ProductDto productDto, Guid userId)
         {
             var product = new Producto
             {
@@ -30,6 +30,7 @@ namespace FacturasSRI.Infrastructure.Services
                 PrecioVentaUnitario = productDto.PrecioVentaUnitario,
                 ManejaInventario = productDto.ManejaInventario,
                 ManejaLotes = productDto.ManejaLotes,
+                UsuarioIdCreador = userId,
                 FechaCreacion = DateTime.UtcNow
             };
             _context.Productos.Add(product);
@@ -109,5 +110,37 @@ namespace FacturasSRI.Infrastructure.Services
                 await _context.SaveChangesAsync();
             }
         }
+
+        public async Task<ProductStockDto?> GetProductStockDetailsAsync(Guid productId)
+            {
+                var product = await _context.Productos
+                    .Include(p => p.Lotes)
+                    .FirstOrDefaultAsync(p => p.Id == productId);
+
+                if (product == null)
+                {
+                    return null;
+                }
+
+                var lotesActivos = product.Lotes.Where(l => l.CantidadDisponible > 0).ToList();
+
+                var stockDetails = new ProductStockDto
+                {
+                    ProductId = product.Id,
+                    ProductName = product.Nombre,
+                    TotalStock = lotesActivos.Sum(l => l.CantidadDisponible),
+                    Lotes = lotesActivos.Select(l => new LoteDto
+                    {
+                        Id = l.Id,
+                        CantidadDisponible = l.CantidadDisponible,
+                        PrecioCompraUnitario = l.PrecioCompraUnitario,
+                        FechaCaducidad = l.FechaCaducidad
+                    }).ToList()
+                };
+
+                return stockDetails;
+            }
+
     }
+    
 }

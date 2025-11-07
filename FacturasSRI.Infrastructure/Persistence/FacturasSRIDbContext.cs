@@ -38,6 +38,26 @@ namespace FacturasSRI.Infrastructure.Persistence
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            
+            modelBuilder.Entity<AjusteInventario>().ToTable("AjustesInventario");
+            modelBuilder.Entity<Cliente>().ToTable("Clientes");
+            modelBuilder.Entity<CuentaPorPagar>().ToTable("CuentasPorPagar");
+            modelBuilder.Entity<Empresa>().ToTable("Empresas");
+            modelBuilder.Entity<Establecimiento>().ToTable("Establecimientos");
+            modelBuilder.Entity<Factura>().ToTable("Facturas");
+            modelBuilder.Entity<FacturaDetalle>().ToTable("FacturaDetalles");
+            modelBuilder.Entity<FacturaDetalleConsumoLote>().ToTable("FacturaDetalleConsumoLotes");
+            modelBuilder.Entity<Impuesto>().ToTable("Impuestos");
+            modelBuilder.Entity<Lote>().ToTable("Lotes");
+            modelBuilder.Entity<NotaDeCredito>().ToTable("NotasDeCredito");
+            modelBuilder.Entity<NotaDeCreditoDetalle>().ToTable("NotaDeCreditoDetalles");
+            modelBuilder.Entity<Permiso>().ToTable("Permisos");
+            modelBuilder.Entity<PrecioEspecial>().ToTable("PreciosEspeciales");
+            modelBuilder.Entity<Producto>().ToTable("Productos");
+            modelBuilder.Entity<PuntoEmision>().ToTable("PuntosEmision");
+            modelBuilder.Entity<Rol>().ToTable("Roles");
+            modelBuilder.Entity<Usuario>().ToTable("Usuarios");
+
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(FacturasSRIDbContext).Assembly);
 
             var rolVendedorId = Guid.Parse("e2a87c46-e5b3-4f9e-8c6e-1f2a3b4c5d6e");

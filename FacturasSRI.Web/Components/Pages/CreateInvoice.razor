@@ -1,0 +1,284 @@
+@page "/invoices/create"
+@attribute [Authorize]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@inject IInvoiceService InvoiceService
+@inject ICustomerService CustomerService
+@inject IProductService ProductService
+@inject NavigationManager Navigation
+
+<PageTitle>Crear Factura</PageTitle>
+
+<h3>Crear Nueva Factura</h3>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<div class="card">
+    <div class="card-body">
+        
+        <div class="mb-3">
+            <label class="form-label"><b>1. Buscar Cliente</b></label>
+            <input type="text" class="form-control" placeholder="Escriba para buscar cliente por nombre o RUC..." 
+                   @bind="customerSearchTerm" @bind:event="oninput" @onkeyup="SearchCustomers" />
+
+            @if (customerSearchResults.Any())
+            {
+                <ul class="list-group">
+                    @foreach (var customer in customerSearchResults)
+                    {
+                        <li class="list-group-item list-group-item-action" @onclick="() => SelectCustomer(customer)">
+                            @customer.RazonSocial (@customer.NumeroIdentificacion)
+                        </li>
+                    }
+                </ul>
+            }
+
+            @if (selectedCustomer != null)
+            {
+                <div class="alert alert-success mt-2">
+                    <b>Cliente Seleccionado:</b> @selectedCustomer.RazonSocial<br/>
+                    <b>RUC/CI:</b> @selectedCustomer.NumeroIdentificacion<br/>
+                    <b>Email:</b> @selectedCustomer.Email
+                </div>
+            }
+        </div>
+
+        <hr/>
+
+        <div class="mb-3">
+            <label class="form-label"><b>2. Añadir Productos</b></label>
+            <input type="text" class="form-control" placeholder="Escriba para buscar producto por nombre o código..." 
+                   @bind="productSearchTerm" @bind:event="oninput" @onkeyup="SearchProducts" disabled="@(selectedCustomer == null)"/>
+
+            @if (productSearchResults.Any())
+            {
+                 <ul class="list-group">
+                    @foreach (var product in productSearchResults)
+                    {
+                        <li class="list-group-item list-group-item-action" @onclick="() => AddItem(product)">
+                            @product.Nombre (@product.CodigoPrincipal) - Precio: @product.PrecioVentaUnitario.ToString("C")
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+        
+        @if (invoiceItems.Any())
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th style="width: 120px;">Cantidad</th>
+                        <th>Precio Unit.</th>
+                        <th>Subtotal</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in invoiceItems)
+                    {
+                        <tr>
+                            <td>@item.ProductName</td>
+                            <td>
+                                <InputNumber class="form-control" @bind-Value="item.Cantidad" @oninput="UpdateTotals" />
+                            </td>
+                            <td>@item.PrecioVentaUnitario.ToString("C")</td>
+                            <td>@((item.Cantidad * item.PrecioVentaUnitario).ToString("C"))</td>
+                            <td>
+                                <button class="btn btn-sm btn-danger" @onclick="() => RemoveItem(item.ProductoId)">
+                                    <i class="bi bi-trash-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <div class="text-end">
+                <h4>Subtotal: @subtotal.ToString("C")</h4>
+                <h4>IVA: @iva.ToString("C")</h4>
+                <h3><b>Total: @total.ToString("C")</b></h3>
+            </div>
+        }
+        
+        <hr/>
+
+        <div class="d-flex justify-content-end">
+            <button class="btn btn-secondary me-2" @onclick='() => Navigation.NavigateTo("/invoices")'>Cancelar</button>
+            <button class="btn btn-primary" @onclick="HandleCreateInvoice" disabled="@(!invoiceItems.Any() || selectedCustomer == null || isSubmitting)">
+                 @if (isSubmitting)
+                {
+                    <span class="spinner-border spinner-border-sm"></span> <span>Generando...</span>
+                }
+                else
+                {
+                    <span>Generar Factura</span>
+                }
+            </button>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private string? errorMessage;
+    private bool isSubmitting = false;
+
+    private List<CustomerDto> allCustomers = new();
+    private List<ProductDto> allProducts = new();
+
+    private string customerSearchTerm = string.Empty;
+    private List<CustomerDto> customerSearchResults = new();
+    private CustomerDto? selectedCustomer;
+
+    private string productSearchTerm = string.Empty;
+    private List<ProductDto> productSearchResults = new();
+
+    private List<InvoiceItemViewModel> invoiceItems = new();
+    
+    private decimal subtotal = 0;
+    private decimal iva = 0;
+    private decimal total = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allCustomers = await CustomerService.GetCustomersAsync();
+            allProducts = await ProductService.GetProductsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar datos iniciales: {ex.Message}";
+        }
+    }
+
+    private void SearchCustomers()
+    {
+        if (string.IsNullOrWhiteSpace(customerSearchTerm))
+        {
+            customerSearchResults.Clear();
+            return;
+        }
+        customerSearchResults = allCustomers
+            .Where(c => c.RazonSocial.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) || 
+                        c.NumeroIdentificacion.Contains(customerSearchTerm))
+            .Take(5)
+            .ToList();
+    }
+
+    private void SelectCustomer(CustomerDto customer)
+    {
+        selectedCustomer = customer;
+        customerSearchTerm = string.Empty;
+        customerSearchResults.Clear();
+    }
+
+    private void SearchProducts()
+    {
+        if (string.IsNullOrWhiteSpace(productSearchTerm))
+        {
+            productSearchResults.Clear();
+            return;
+        }
+        productSearchResults = allProducts
+            .Where(p => p.Nombre.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase) || 
+                        p.CodigoPrincipal.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase))
+            .Take(5)
+            .ToList();
+    }
+
+    private void AddItem(ProductDto product)
+    {
+        var existingItem = invoiceItems.FirstOrDefault(i => i.ProductoId == product.Id);
+        if (existingItem != null)
+        {
+            existingItem.Cantidad++;
+        }
+        else
+        {
+            invoiceItems.Add(new InvoiceItemViewModel
+            {
+                ProductoId = product.Id,
+                ProductName = product.Nombre,
+                Cantidad = 1,
+                PrecioVentaUnitario = product.PrecioVentaUnitario
+            });
+        }
+        
+        productSearchTerm = string.Empty;
+        productSearchResults.Clear();
+        UpdateTotals();
+    }
+    
+    private void RemoveItem(Guid productId)
+    {
+        var item = invoiceItems.FirstOrDefault(i => i.ProductoId == productId);
+        if (item != null)
+        {
+            invoiceItems.Remove(item);
+            UpdateTotals();
+        }
+    }
+
+    private void UpdateTotals()
+    {
+        subtotal = invoiceItems.Sum(i => i.Cantidad * i.PrecioVentaUnitario);
+        
+        iva = 0; // Recalculate IVA
+        // This is a simplified IVA calculation. A real implementation would check each product.
+        iva = subtotal * 0.12m;
+
+        total = subtotal + iva;
+        StateHasChanged();
+    }
+
+    private async Task HandleCreateInvoice()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+
+        if (selectedCustomer == null || !invoiceItems.Any())
+        {
+            errorMessage = "Debe seleccionar un cliente y añadir al menos un producto.";
+            isSubmitting = false;
+            return;
+        }
+
+        var createDto = new CreateInvoiceDto
+        {
+            ClienteId = selectedCustomer.Id,
+            Items = invoiceItems.Select(i => new InvoiceItemDto
+            {
+                ProductoId = i.ProductoId,
+                Cantidad = i.Cantidad
+            }).ToList()
+        };
+
+        try
+        {
+            await InvoiceService.CreateInvoiceAsync(createDto);
+            Navigation.NavigateTo("/invoices");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al generar la factura: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    public class InvoiceItemViewModel
+    {
+        public Guid ProductoId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public int Cantidad { get; set; }
+        public decimal PrecioVentaUnitario { get; set; }
+    }
+}

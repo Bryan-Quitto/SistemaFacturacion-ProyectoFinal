@@ -1,10 +1,11 @@
 using FacturasSRI.Application.Dtos;
+using System;
 using System.Threading.Tasks;
 
 namespace FacturasSRI.Application.Interfaces
 {
     public interface IPurchaseService
     {
-        Task CreatePurchaseAsync(PurchaseDto purchase);
+        Task<bool> CreatePurchaseAsync(PurchaseDto purchase, Guid userId);
     }
 }

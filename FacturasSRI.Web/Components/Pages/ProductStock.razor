@@ -1,6 +1,80 @@
-@page "/productstock"
+@page "/stock/{ProductId:guid}"
 @attribute [Authorize]
 
-<PageTitle>Stock de Productos</PageTitle>
+@using System.Net.Http.Json
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Web.Services
+@inject ApiClient ApiClient
+@inject NavigationManager Navigation
 
-<h1>Stock de Productos</h1>
+<PageTitle>Stock de Producto</PageTitle>
+
+@if (stockDetails == null && !string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (stockDetails == null)
+{
+    <p><em>Cargando detalles del stock...</em></p>
+}
+else
+{
+    <h1>Stock de: @stockDetails.ProductName</h1>
+    
+    <div class="card my-4">
+        <div class="card-body">
+            <h5 class="card-title">Stock Total Disponible</h5>
+            <p class="card-text display-4">@stockDetails.TotalStock</p>
+        </div>
+    </div>
+
+    <h3>Detalle de Lotes</h3>
+
+    @if (!stockDetails.Lotes.Any())
+    {
+        <div class="alert alert-info">No hay lotes con stock disponible para este producto.</div>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Cantidad Disponible</th>
+                    <th>Precio de Costo</th>
+                    <th>Fecha de Caducidad</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var lote in stockDetails.Lotes)
+                {
+                    <tr>
+                        <td>@lote.CantidadDisponible</td>
+                        <td>@lote.PrecioCompraUnitario.ToString("C")</td>
+                        <td>@(lote.FechaCaducidad?.ToString("dd/MM/yyyy") ?? "N/A")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid ProductId { get; set; }
+
+    private ProductStockDto? stockDetails;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var http = await ApiClient.GetHttpClientAsync();
+            stockDetails = await http.GetFromJsonAsync<ProductStockDto>($"api/products/{ProductId}/stock");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar el stock: {ex.Message}";
+        }
+    }
+}

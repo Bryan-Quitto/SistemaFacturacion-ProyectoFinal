@@ -4,153 +4,79 @@
 @using FacturasSRI.Application.Interfaces
 @inject IInvoiceService InvoiceService
 @inject ICustomerService CustomerService
-@inject IProductService ProductService
+@inject NavigationManager Navigation
 
 <PageTitle>Facturas</PageTitle>
 
-<h1>Facturas</h1>
-
-<div class="mb-3">
-    <EditForm Model="@newInvoice" OnValidSubmit="@HandleAddInvoice">
-        <DataAnnotationsValidator />
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="customer" class="form-label">Cliente</label>
-                    <InputSelect id="customer" class="form-select" @bind-Value="newInvoice.ClienteId">
-                        <option value="">Seleccione un cliente</option>
-                        @foreach (var customer in customers)
-                        {
-                            <option value="@customer.Id">@customer.RazonSocial</option>
-                        }
-                    </InputSelect>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="numeroFactura" class="form-label">Número de Factura</label>
-                    <InputText id="numeroFactura" class="form-control" @bind-Value="newInvoice.NumeroFactura" />
-                </div>
-            </div>
-        </div>
-
-        <hr />
-
-        <h4>Detalles de la Factura</h4>
-
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <label for="product" class="form-label">Producto</label>
-                <InputSelect id="product" class="form-select" @bind-Value="newInvoiceDetail.ProductoId">
-                    <option value="">Seleccione un producto</option>
-                    @foreach (var product in products)
-                    {
-                        <option value="@product.Id">@product.Nombre</option>
-                    }
-                </InputSelect>
-            </div>
-            <div class="col-md-2">
-                <label for="cantidad" class="form-label">Cantidad</label>
-                <InputNumber id="cantidad" class="form-control" @bind-Value="newInvoiceDetail.Cantidad" />
-            </div>
-            <div class="col-md-2">
-                <label for="precio" class="form-label">Precio</label>
-                <InputNumber id="precio" class="form-control" @bind-Value="newInvoiceDetail.PrecioVentaUnitario" />
-            </div>
-            <div class="col-md-2">
-                <button type="button" class="btn btn-secondary" @onclick="HandleAddDetail">Añadir Detalle</button>
-            </div>
-        </div>
-
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Producto</th>
-                    <th>Cantidad</th>
-                    <th>Precio</th>
-                    <th>Subtotal</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var detail in newInvoice.Detalles)
-                {
-                    <tr>
-                        <td>@products.FirstOrDefault(p => p.Id == detail.ProductoId)?.Nombre</td>
-                        <td>@detail.Cantidad</td>
-                        <td>@detail.PrecioVentaUnitario</td>
-                        <td>@detail.Subtotal</td>
-                        <td><button type="button" class="btn btn-sm btn-danger" @onclick="() => newInvoice.Detalles.Remove(detail)">Eliminar</button></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-
-        <button type="submit" class="btn btn-primary">Crear Factura</button>
-    </EditForm>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Facturas</h1>
+    <button class="btn btn-primary" @onclick="GoToCreateInvoice">
+        <i class="bi bi-plus-circle-fill me-2"></i>Crear Nueva Factura
+    </button>
 </div>
 
-<hr />
 
-<h2>Facturas Existentes</h2>
-<table class="table">
-    <thead>
-        <tr>
-            <th>Número de Factura</th>
-            <th>Cliente</th>
-            <th>Total</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var invoice in invoices)
-        {
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (invoices == null)
+{
+    <p><em>Cargando facturas...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
             <tr>
-                <td>@invoice.NumeroFactura</td>
-                <td>@customers.FirstOrDefault(c => c.Id == invoice.ClienteId)?.RazonSocial</td>
-                <td>@invoice.Total</td>
-                <td>
-                    <button class="btn btn-sm btn-danger" @onclick="() => HandleDeleteInvoice(invoice.Id)">Eliminar</button>
-                </td>
+                <th>Número de Factura</th>
+                <th>Cliente</th>
+                <th>Fecha de Emisión</th>
+                <th>Total</th>
+                <th>Acciones</th>
             </tr>
-        }
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+            @foreach (var invoice in invoices)
+            {
+                <tr>
+                    <td>@invoice.NumeroFactura</td>
+                    <td>@(customers.FirstOrDefault(c => c.Id == invoice.ClienteId)?.RazonSocial ?? "N/A")</td>
+                    <td>@invoice.FechaEmision.ToString("dd/MM/yyyy")</td>
+                    <td>@invoice.Total.ToString("C")</td>
+                    <td>
+                        <td>
+                            <td>
+                                <a href="@($"invoices/{invoice.Id}")" class="btn btn-sm btn-info">Ver Detalles</a>
+                            </td>
+                        </td>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
 
 @code {
-    private List<InvoiceDto> invoices = new();
+    private List<InvoiceDto>? invoices;
     private List<CustomerDto> customers = new();
-    private List<ProductDto> products = new();
-    private InvoiceDto newInvoice = new();
-    private InvoiceDetailDto newInvoiceDetail = new();
+    private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        invoices = await InvoiceService.GetInvoicesAsync();
-        customers = await CustomerService.GetCustomersAsync();
-        products = await ProductService.GetProductsAsync();
+        try
+        {
+            invoices = await InvoiceService.GetInvoicesAsync();
+            customers = await CustomerService.GetCustomersAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar los datos: {ex.Message}";
+        }
     }
 
-    private void HandleAddDetail()
+    private void GoToCreateInvoice()
     {
-        newInvoiceDetail.Subtotal = newInvoiceDetail.Cantidad * newInvoiceDetail.PrecioVentaUnitario;
-        newInvoice.Detalles.Add(newInvoiceDetail);
-        newInvoiceDetail = new();
-    }
-
-    private async Task HandleAddInvoice()
-    {
-        newInvoice.FechaEmision = DateTime.Now;
-        newInvoice.SubtotalSinImpuestos = newInvoice.Detalles.Sum(d => d.Subtotal);
-        newInvoice.Total = newInvoice.SubtotalSinImpuestos; // Simplified for now
-        await InvoiceService.CreateInvoiceAsync(newInvoice);
-        newInvoice = new();
-        invoices = await InvoiceService.GetInvoicesAsync();
-    }
-
-    private async Task HandleDeleteInvoice(Guid id)
-    {
-        await InvoiceService.DeleteInvoiceAsync(id);
-        invoices = await InvoiceService.GetInvoicesAsync();
+        Navigation.NavigateTo("/invoices/create");
     }
 }

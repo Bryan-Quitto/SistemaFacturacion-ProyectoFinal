@@ -1,49 +1,60 @@
-.NET Core
-
-Archivos y carpetas de compilación
-
+# Archivos y carpetas de compilación de .NET
 **/[Bb]in/
 **/[Oo]bj/
+**/[Rr]elease/
+**/[Dd]ebug/
 
-Excluir archivos generados
+# Archivos de publicación
+**/publish/
+**/bin/Release/
+**/bin/Debug/
+*.publish.xml
+*.pubxml
 
-*.generated.cs
-*.generated.props
-*.designer.cs
-
-Visual Studio
-
-Archivos específicos del usuario de Visual Studio
-
+# Archivos específicos del usuario de Visual Studio
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
 
-Archivos del editor de Visual Studio
-
+# Archivos de caché y configuración de editores
 .vs/
-
-VS Code
-
 .vscode/
-
-Rider
-
 .idea/
 *.sln.DotSettings.user
 
-Mac/Linux
-
+# Mac, Linux, Windows
 .DS_Store
 Thumbs.db
 
-Archivos de registro
-
+# Archivos de registro y temporales
 *.log
+*.tmp
+*.temp
 
-Archivos de entorno
-
+# Archivos de entorno (nunca subir secretos)
 .env
 .env.*
 !.env.example
+secrets.json
+appsettings.Development.json
+
+# Paquetes y dependencias
+**/node_modules/
+**/packages/
+*.nupkg
+
+# Específico de Blazor
+**/wwwroot/dist/
+
+# Archivos de User Secrets
+**/Properties/launchSettings.json
+secrets.json
+appsettings*.json
+!appsettings.template.json
+
+# Archivos generados por EF Core (a menudo se prefiere mantenerlos, pero se pueden excluir si se regeneran en CI)
+# **/Migrations/*
+
+# Archivos del sistema operativo
+desktop.ini

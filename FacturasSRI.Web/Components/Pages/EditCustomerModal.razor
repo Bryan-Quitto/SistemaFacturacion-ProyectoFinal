@@ -1,0 +1,75 @@
+@using FacturasSRI.Application.Dtos
+
+@if (IsVisible && Customer != null)
+{
+    <div class="modal fade show" style="display:block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Cliente: @Customer.RazonSocial</h5>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@Customer" OnValidSubmit="SaveChanges">
+                        <DataAnnotationsValidator />
+                         <div class="mb-3">
+                            <label class="form-label">Razón Social</label>
+                            <InputText class="form-control" @bind-Value="Customer.RazonSocial" />
+                            <ValidationMessage For="@(() => Customer.RazonSocial)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Número de Identificación</label>
+                            <InputText class="form-control" @bind-Value="Customer.NumeroIdentificacion" />
+                            <ValidationMessage For="@(() => Customer.NumeroIdentificacion)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Correo Electrónico</label>
+                            <InputText class="form-control" @bind-Value="Customer.Email" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Dirección</label>
+                            <InputText class="form-control" @bind-Value="Customer.Direccion" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Teléfono</label>
+                            <InputText class="form-control" @bind-Value="Customer.Telefono" />
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public CustomerDto? Customer { get; set; }
+
+    [Parameter]
+    public EventCallback<CustomerDto> OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private async Task SaveChanges()
+    {
+        if (Customer != null)
+        {
+            await OnSave.InvokeAsync(Customer);
+        }
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+}

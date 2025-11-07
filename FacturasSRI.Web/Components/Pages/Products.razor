@@ -1,12 +1,19 @@
 @page "/products"
 @attribute [Authorize]
+
+@using System.Net.Http.Json
 @using FacturasSRI.Application.Dtos
-@using FacturasSRI.Application.Interfaces
-@inject IProductService ProductService
+@using FacturasSRI.Web.Services
+@inject ApiClient ApiClient
 
 <PageTitle>Productos</PageTitle>
 
 <h1>Productos</h1>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
 
 <div class="mb-3">
     <EditForm Model="@newProduct" OnValidSubmit="@HandleAddProduct">
@@ -28,7 +35,6 @@
                 <div class="mb-3">
                     <label for="descripcion" class="form-label">Descripción</label>
                     <InputText id="descripcion" class="form-control" @bind-Value="newProduct.Descripcion" />
-                    <ValidationMessage For="@(() => newProduct.Descripcion)" />
                 </div>
                 <div class="mb-3">
                     <label for="precioVentaUnitario" class="form-label">Precio de Venta Unitario</label>
@@ -49,30 +55,44 @@
     </EditForm>
 </div>
 
-<table class="table">
-    <thead>
-        <tr>
-            <th>Nombre</th>
-            <th>Código Principal</th>
-            <th>Precio de Venta Unitario</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var product in products)
-        {
+@if (products == null)
+{
+    <p><em>Cargando...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
             <tr>
-                <td>@product.Nombre</td>
-                <td>@product.CodigoPrincipal</td>
-                <td>@product.PrecioVentaUnitario</td>
-                <td>
-                    <button class="btn btn-sm btn-primary" @onclick="() => OpenAssignTaxesModal(product)">Administrar Impuestos</button>
-                    <button class="btn btn-sm btn-danger" @onclick="() => HandleDeleteProduct(product.Id)">Desactivar</button>
-                </td>
+                <th>Nombre</th>
+                <th>Código Principal</th>
+                <th>Precio de Venta Unitario</th>
+                <th>Acciones</th>
             </tr>
-        }
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+            @foreach (var product in products)
+            {
+                <tr>
+                    <td>@product.Nombre</td>
+                    <td>@product.CodigoPrincipal</td>
+                    <td>@product.PrecioVentaUnitario</td>
+                    <td>
+                        <a href="@($"stock/{product.Id}")" class="btn btn-sm btn-info">Ver Stock</a>
+                        <button class="btn btn-sm btn-secondary" @onclick="() => OpenEditModal(product)">Editar</button>
+                        <button class="btn btn-sm btn-primary" @onclick="() => OpenAssignTaxesModal(product)">Administrar Impuestos</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => HandleDeleteProduct(product.Id)">Desactivar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (productToEdit != null)
+{
+    <EditProductModal Product="productToEdit" IsVisible="isEditModalVisible" OnClose="CloseEditModal" />
+}
 
 @if (selectedProduct != null)
 {
@@ -80,27 +100,77 @@
 }
 
 @code {
-    private List<ProductDto> products = new();
+    private List<ProductDto>? products;
     private ProductDto newProduct = new();
     private ProductDto? selectedProduct;
     private bool isAssignTaxesModalVisible = false;
+    private string? errorMessage;
+
+    private ProductDto? productToEdit;
+    private bool isEditModalVisible = false;
 
     protected override async Task OnInitializedAsync()
     {
-        products = await ProductService.GetProductsAsync();
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        errorMessage = null;
+        try
+        {
+            var http = await ApiClient.GetHttpClientAsync();
+            products = await http.GetFromJsonAsync<List<ProductDto>>("api/products");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar productos: {ex.Message}";
+        }
     }
 
     private async Task HandleAddProduct()
     {
-        await ProductService.CreateProductAsync(newProduct);
-        newProduct = new();
-        products = await ProductService.GetProductsAsync();
+        errorMessage = null;
+        try
+        {
+            var http = await ApiClient.GetHttpClientAsync();
+            var response = await http.PostAsJsonAsync("api/products", newProduct);
+            if (response.IsSuccessStatusCode)
+            {
+                newProduct = new();
+                await LoadProducts();
+            }
+            else
+            {
+                errorMessage = "Error al crear el producto.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al crear producto: {ex.Message}";
+        }
     }
 
     private async Task HandleDeleteProduct(Guid id)
     {
-        await ProductService.DeleteProductAsync(id);
-        products = await ProductService.GetProductsAsync();
+        errorMessage = null;
+        try
+        {
+            var http = await ApiClient.GetHttpClientAsync();
+            var response = await http.DeleteAsync($"api/products/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadProducts();
+            }
+            else
+            {
+                errorMessage = "Error al desactivar el producto.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al desactivar producto: {ex.Message}";
+        }
     }
 
     private void OpenAssignTaxesModal(ProductDto product)
@@ -113,5 +183,28 @@
     {
         isAssignTaxesModalVisible = false;
         selectedProduct = null;
+    }
+
+    private void OpenEditModal(ProductDto product)
+    {
+        productToEdit = new ProductDto
+        {
+            Id = product.Id,
+            Nombre = product.Nombre,
+            CodigoPrincipal = product.CodigoPrincipal,
+            Descripcion = product.Descripcion,
+            PrecioVentaUnitario = product.PrecioVentaUnitario,
+            ManejaInventario = product.ManejaInventario,
+            ManejaLotes = product.ManejaLotes
+        };
+        isEditModalVisible = true;
+    }
+
+    private async Task CloseEditModal()
+    {
+        isEditModalVisible = false;
+        productToEdit = null;
+        await LoadProducts();
+        StateHasChanged();
     }
 }
