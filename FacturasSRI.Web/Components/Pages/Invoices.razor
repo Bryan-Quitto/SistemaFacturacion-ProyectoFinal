@@ -8,54 +8,62 @@
 
 <PageTitle>Facturas</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>Facturas</h1>
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1>Facturas Emitidas</h1>
+        <p>Consulta el historial de facturas generadas.</p>
+    </div>
     <button class="btn btn-primary" @onclick="GoToCreateInvoice">
         <i class="bi bi-plus-circle-fill me-2"></i>Crear Nueva Factura
     </button>
 </div>
 
-
 @if (errorMessage != null)
 {
     <div class="alert alert-danger">@errorMessage</div>
 }
-else if (invoices == null)
-{
-    <p><em>Cargando facturas...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Número de Factura</th>
-                <th>Cliente</th>
-                <th>Fecha de Emisión</th>
-                <th>Total</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var invoice in invoices)
-            {
-                <tr>
-                    <td>@invoice.NumeroFactura</td>
-                    <td>@(customers.FirstOrDefault(c => c.Id == invoice.ClienteId)?.RazonSocial ?? "N/A")</td>
-                    <td>@invoice.FechaEmision.ToString("dd/MM/yyyy")</td>
-                    <td>@invoice.Total.ToString("C")</td>
-                    <td>
-                        <td>
-                            <td>
-                                <a href="@($"invoices/{invoice.Id}")" class="btn btn-sm btn-info">Ver Detalles</a>
-                            </td>
-                        </td>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+
+<div class="card">
+    <div class="card-body">
+        @if (invoices == null)
+        {
+            <p><em>Cargando facturas...</em></p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Número de Factura</th>
+                            <th>Cliente</th>
+                            <th>Fecha de Emisión</th>
+                            <th class="text-end">Total</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var invoice in invoices)
+                        {
+                            <tr>
+                                <td><strong>@invoice.NumeroFactura</strong></td>
+                                <td>@(customers.FirstOrDefault(c => c.Id == invoice.ClienteId)?.RazonSocial ?? "N/A")</td>
+                                <td>@invoice.FechaEmision.ToString("dd/MM/yyyy")</td>
+                                <td class="text-end">@invoice.Total.ToString("C")</td>
+                                <td class="text-center">
+                                    <a href="@($"invoices/{invoice.Id}")" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye-fill"></i> Ver Detalles
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
 
 @code {
     private List<InvoiceDto>? invoices;

@@ -55,9 +55,11 @@ namespace FacturasSRI.Web.Services
     NotifyAuthenticationStateChanged(authState);
 }
 
-public void MarkUserAsLoggedOut()
+public async Task MarkUserAsLoggedOut()
 {
     _logger.LogInformation("MarkUserAsLoggedOut llamado. Notificando al sistema para que re-evalúe.");
+
+    await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
 
     var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
     var authState = Task.FromResult(new AuthenticationState(anonymousUser));
@@ -73,17 +75,6 @@ public void MarkUserAsLoggedOut()
             var jsonBytes = ParseBase64WithoutPadding(payload);
             var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
 
-            if (keyValuePairs == null)
-            {
-                _logger.LogWarning("Payload del JWT es nulo o no se pudo deserializar.");
-                return claims;
-            }
-
-            foreach (var kvp in keyValuePairs)
-            {
-                _logger.LogInformation($"Claim encontrado en Token -> Tipo: [{kvp.Key}], Valor: [{kvp.Value}]");
-            }
-
             if (keyValuePairs.TryGetValue(ClaimTypes.Email, out var email) && email != null)
             {
                 claims.Add(new Claim(ClaimTypes.Email, email.ToString()));
@@ -92,9 +83,14 @@ public void MarkUserAsLoggedOut()
             {
                 claims.Add(new Claim(ClaimTypes.NameIdentifier, sub.ToString()));
             }
+            if (keyValuePairs.TryGetValue(ClaimTypes.Name, out var name) && name != null)
+            {
+                claims.Add(new Claim(ClaimTypes.Name, name.ToString()));
+            }
 
             if (keyValuePairs.TryGetValue("role", out var roles) || 
                 keyValuePairs.TryGetValue(ClaimTypes.Role, out roles))
+                
             {
                 _logger.LogInformation("Se encontró un claim de Rol.");
                 if (roles is JsonElement rolesElement && rolesElement.ValueKind == JsonValueKind.Array)

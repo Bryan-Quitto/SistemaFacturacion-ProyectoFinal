@@ -1,0 +1,23 @@
+.page-header {
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-weight: 700;
+    margin: 0;
+}
+
+.page-header p {
+    color: var(--text-color-light);
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.table th {
+    white-space: nowrap;
+}

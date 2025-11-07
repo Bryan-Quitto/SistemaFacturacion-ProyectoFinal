@@ -78,11 +78,12 @@ namespace FacturasSRI.Web.Controllers
             _logger.LogInformation("Resultado: Contraseña CORRECTA. Generando sesión y token.");
 
             var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Email),
-                new Claim(ClaimTypes.Email, user.Email),
-            };
+{
+    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+    new Claim(ClaimTypes.Name, user.PrimerNombre),
+    new Claim(ClaimTypes.Email, user.Email),
+};
+
 
             foreach (var usuarioRol in user.UsuarioRoles)
             {

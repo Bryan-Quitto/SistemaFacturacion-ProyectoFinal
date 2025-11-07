@@ -1,21 +1,54 @@
 ﻿@using FacturasSRI.Web.Services
 @inherits LayoutComponentBase
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
 
-<div class="d-flex">
+<div class="page">
     <AuthorizeView>
         <Authorized>
-            <div class="sidebar vh-100">
+            <div class="sidebar">
                 <NavMenu />
             </div>
         </Authorized>
     </AuthorizeView>
 
-    <main class="main-content flex-grow-1">
+    <main class="main-content">
+        <div class="top-bar">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="dropdown">
+                        <a href="#" class="btn btn-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-fill me-2"></i>
+                            Hola, @context.User.Identity?.Name
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><button class="dropdown-item" @onclick="HandleLogout">Cerrar Sesión</button></li>
+                        </ul>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login" class="btn btn-link">Iniciar Sesión</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+        
         <article class="content px-4">
-            @Body
+            <div class="container-fluid">
+                
+                <ErrorBoundary>
+                    <ChildContent>
+                        @Body
+                    </ChildContent>
+                    <ErrorContent>
+                        <div class="alert alert-danger">
+                            <h4>Error en el contenido de la página:</h4>
+                            <p>@context.Message</p>
+                            <pre>@context.StackTrace</pre>
+                        </div>
+                    </ErrorContent>
+                </ErrorBoundary>
+
+            </div>
         </article>
     </main>
 </div>
@@ -29,8 +62,8 @@
 @code {
     private async Task HandleLogout()
     {
-        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
-        ((ApiAuthenticationStateProvider)AuthenticationStateProvider).MarkUserAsLoggedOut();
+        var apiStateProvider = (ApiAuthenticationStateProvider)AuthenticationStateProvider;
+        await apiStateProvider.MarkUserAsLoggedOut();
         Navigation.NavigateTo("/login");
     }
 }

@@ -18,7 +18,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddControllers();
 
-builder.Services.AddDbContext<FacturasSRIDbContext>(options =>
+builder.Services.AddDbContextFactory<FacturasSRIDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
            .LogTo(Console.WriteLine, LogLevel.Information));
 

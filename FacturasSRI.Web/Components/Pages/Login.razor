@@ -1,4 +1,5 @@
 @page "/login"
+@layout EmptyLayout
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 
 @using System.Net.Http
@@ -13,58 +14,71 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILogger<Login> Logger
 
-<PageTitle>Login</PageTitle>
+<PageTitle>Iniciar Sesión</PageTitle>
 
-<h1>Login</h1>
+<div class="login-container">
+    <div class="card login-card">
+        <div class="card-body">
+            <div class="text-center mb-4">
+                <i class="bi bi-receipt-cutoff login-logo"></i>
+                <h1 class="h3 mb-3 fw-normal">Iniciar Sesión</h1>
+                <p class="text-muted">Bienvenido a FacturasSRI</p>
+            </div>
 
-<div class="row">
-    <div class="col-md-4">
-        <EditForm Model="@loginRequest" OnValidSubmit="@HandleLogin" FormName="loginForm">
-            <DataAnnotationsValidator />
-            
-            @if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <div class="alert alert-danger" role="alert">
-                    @errorMessage
+            <EditForm Model="@loginRequest" OnValidSubmit="@HandleLogin" FormName="loginForm">
+                <DataAnnotationsValidator />
+                
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">
+                        @errorMessage
+                    </div>
+                }
+
+                <div class="form-floating mb-3">
+                    <InputText id="email" class="form-control" @bind-Value="loginRequest.Email" placeholder="correo@ejemplo.com" />
+                    <label for="email">Correo Electrónico</label>
+                    <ValidationMessage For="@(() => loginRequest.Email)" />
                 </div>
-            }
-
-            <div class="mb-3">
-                <label for="email" class="form-label">Email</label>
-                <InputText id="email" class="form-control" @bind-Value="loginRequest.Email" />
-                <ValidationMessage For="@(() => loginRequest.Email)" />
-            </div>
-            <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
-                <InputText id="password" type="password" class="form-control" @bind-Value="loginRequest.Password" />
-                <ValidationMessage For="@(() => loginRequest.Password)" />
-            </div>
-            <button type="submit" class="btn btn-primary">Login</button>
-        </EditForm>
+                <div class="form-floating mb-3">
+                    <InputText id="password" type="password" class="form-control" @bind-Value="loginRequest.Password" placeholder="Contraseña" />
+                    <label for="password">Contraseña</label>
+                    <ValidationMessage For="@(() => loginRequest.Password)" />
+                </div>
+                
+                <button class="w-100 btn btn-lg btn-primary" type="submit">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm"></span>
+                    }
+                    else
+                    {
+                        <span>Ingresar</span>
+                    }
+                </button>
+            </EditForm>
+        </div>
     </div>
 </div>
+
 
 @code {
     private LoginRequestDto loginRequest = new();
     private string? errorMessage;
+    private bool isSubmitting = false;
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         if (authState.User.Identity != null && authState.User.Identity.IsAuthenticated)
         {
-            Logger.LogInformation("LOGIN.RAZOR (OnInitializedAsync): Usuario ya autenticado. Redirigiendo a '/'.");
             Navigation.NavigateTo(uri: "/");
-        }
-        else
-        {
-            Logger.LogInformation("LOGIN.RAZOR (OnInitializedAsync): Usuario no autenticado. Mostrando formulario de login.");
         }
     }
 
     private async Task HandleLogin()
     {
-        Logger.LogInformation("LOGIN.RAZOR (HandleLogin): Inicio del proceso de login.");
+        isSubmitting = true;
         errorMessage = null; 
         HttpClient? http = null;
 
@@ -75,11 +89,9 @@
         catch (Exception ex)
         {
             errorMessage = "Error al preparar la conexión. " + ex.Message;
-            Logger.LogError(ex, "LOGIN.RAZOR (HandleLogin): Excepción en GetHttpClientAsync.");
+            isSubmitting = false;
             return;
         }
-
-        Logger.LogInformation("LOGIN.RAZOR (HandleLogin): Cliente HTTP obtenido. Realizando POST a 'api/auth/login'.");
 
         try
         {
@@ -87,45 +99,31 @@
             
             if (response.IsSuccessStatusCode)
             {
-                Logger.LogInformation("LOGIN.RAZOR (HandleLogin): Respuesta de API exitosa (código 2xx).");
                 var result = await response.Content.ReadFromJsonAsync<LoginResult>();
                 
                 if (result != null && !string.IsNullOrEmpty(result.Token))
                 {
-                    Logger.LogInformation("LOGIN.RAZOR (HandleLogin): Token recibido de la API correctamente.");
-                    
-                    await JSRuntime.InvokeVoidAsync("console.log", "CLIENTE (Login.razor): [1] Intentando guardar token en localStorage.");
                     await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", result.Token);
-                    await JSRuntime.InvokeVoidAsync("console.log", "CLIENTE (Login.razor): [2] Token guardado. Notificando al servidor...");
-                    
-                    Logger.LogInformation("LOGIN.RAZOR (HandleLogin): [A] Llamando a MarkUserAsAuthenticated en el servidor.");
                     ((ApiAuthenticationStateProvider)AuthenticationStateProvider).MarkUserAsAuthenticated(result.Token);
-                    Logger.LogInformation("LOGIN.RAZOR (HandleLogin): [B] Llamada a MarkUserAsAuthenticated completada.");
-                    
-                    Logger.LogInformation("LOGIN.RAZOR (HandleLogin): [C] Esperando 50ms...");
-                    await Task.Delay(50);
-                    Logger.LogInformation("LOGIN.RAZOR (HandleLogin): [D] Espera completada. Intentando navegar a '/'.");
-                    
-                    await JSRuntime.InvokeVoidAsync("console.log", "CLIENTE (Login.razor): [3] Intentando navegar a '/' desde el cliente...");
                     Navigation.NavigateTo("/");
-                    Logger.LogInformation("LOGIN.RAZOR (HandleLogin): [E] Llamada a Navigation.NavigateTo('/') ejecutada. Proceso finalizado.");
                 }
                 else
                 {
                     errorMessage = "La respuesta del servidor no contenía un token válido.";
-                    Logger.LogWarning("LOGIN.RAZOR (HandleLogin): El token de la API era nulo o vacío.");
                 }
             }
             else
             {
-                errorMessage = $"Error del servidor: {response.StatusCode}";
-                Logger.LogWarning($"LOGIN.RAZOR (HandleLogin): La API devolvió un código de error: {response.StatusCode}");
+                errorMessage = "Credenciales incorrectas. Por favor, intente de nuevo.";
             }
         }
         catch (Exception ex)
         {
             errorMessage = "Error de red al intentar conectar con la API. " + ex.Message;
-            Logger.LogError(ex, "LOGIN.RAZOR (HandleLogin): Excepción durante la llamada a la API.");
+        }
+        finally
+        {
+            isSubmitting = false;
         }
     }
 

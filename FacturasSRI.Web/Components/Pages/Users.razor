@@ -7,11 +7,14 @@
 
 <PageTitle>Usuarios</PageTitle>
 
-<h1>Gestión de Usuarios</h1>
+<div class="page-header">
+    <h1>Gestión de Usuarios</h1>
+    <p>Añade, edita y administra los usuarios del sistema.</p>
+</div>
 
 <div class="card mb-4">
     <div class="card-header">
-        Crear Nuevo Usuario
+        <h3>Crear Nuevo Usuario</h3>
     </div>
     <div class="card-body">
         <EditForm Model="@newUser" OnValidSubmit="@HandleAddUser">
@@ -63,35 +66,53 @@
                     }
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">Añadir Usuario</button>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-plus-circle-fill me-2"></i>Añadir Usuario
+            </button>
         </EditForm>
     </div>
 </div>
 
-<table class="table table-striped">
-    <thead class="table-dark">
-        <tr>
-            <th>Nombre Completo</th>
-            <th>Correo Electrónico</th>
-            <th>Roles</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var user in users)
-        {
-            <tr>
-                <td>@user.PrimerNombre @user.SegundoNombre @user.PrimerApellido @user.SegundoApellido</td>
-                <td>@user.Email</td>
-                <td>@string.Join(", ", user.Roles)</td>
-                <td>
-                    <button class="btn btn-sm btn-warning me-2" @onclick="() => OpenEditModal(user.Id)">Editar</button>
-                    <button class="btn btn-sm btn-danger" @onclick="() => HandleDeleteUser(user.Id)">Desactivar</button>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+<div class="card">
+    <div class="card-header">
+        <h3>Listado de Usuarios</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Nombre Completo</th>
+                        <th>Correo Electrónico</th>
+                        <th>Roles</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in users)
+                    {
+                        <tr>
+                            <td>@user.PrimerNombre @user.SegundoNombre @user.PrimerApellido @user.SegundoApellido</td>
+                            <td>@user.Email</td>
+                            <td>@string.Join(", ", user.Roles)</td>
+                            <td class="text-end">
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(user.Id)">
+                                        <i class="bi bi-pencil-square"></i> Editar
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => HandleDeleteUser(user.Id)">
+                                        <i class="bi bi-trash"></i> Desactivar
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 
 @if (showEditModal)
 {
@@ -100,7 +121,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Editar Usuario: @editingUser.PrimerNombre @editingUser.PrimerApellido</h5>
-                    <button type-="button" class="btn-close" @onclick="CloseEditModal"></button>
+                    <button type-button" class="btn-close" @onclick="CloseEditModal"></button>
                 </div>
                 <div class="modal-body">
                     <EditForm Model="@editingUser" OnValidSubmit="@HandleUpdateUser">

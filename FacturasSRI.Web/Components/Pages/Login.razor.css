@@ -1,0 +1,28 @@
+.login-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: var(--secondary-color);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 0.75rem;
+    box-shadow: var(--box-shadow-lg);
+}
+
+.login-logo {
+    font-size: 3rem;
+    color: var(--accent-color);
+}
+
+.form-floating > .form-control {
+    height: calc(3.5rem + 2px);
+    line-height: 1.25;
+}
+
+.form-floating > label {
+    padding: 1rem 0.75rem;
+}

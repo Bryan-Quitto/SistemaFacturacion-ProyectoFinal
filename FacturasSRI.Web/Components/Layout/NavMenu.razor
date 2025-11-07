@@ -2,75 +2,131 @@
 @using FacturasSRI.Web.Services
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
-@inject IJSRuntime JSRuntime
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">FacturasSRI</a>
+<div class="nav-menu">
+    <div class="nav-header">
+        <a class="navbar-brand" href="">
+            <i class="bi bi-receipt-cutoff"></i>
+            <span>FacturasSRI</span>
+        </a>
     </div>
+
+    <nav class="nav flex-column">
+        <div class="nav-item">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <i class="bi bi-grid-1x2-fill"></i>
+                <span>Panel Principal</span>
+            </NavLink>
+        </div>
+
+        <AuthorizeView Roles="Administrador, Vendedor">
+            <div class="nav-section">
+                <div class="nav-link-header" @onclick="() => ToggleSubMenu(ref isFacturasOpen)">
+                    <i class="bi bi-file-earmark-text-fill"></i>
+                    <span>Facturas</span>
+                    <i class="bi @(isFacturasOpen ? "bi-chevron-down" : "bi-chevron-right") ms-auto"></i>
+                </div>
+                @if (isFacturasOpen)
+                {
+                    <ul class="nav-submenu">
+                        <li><NavLink href="invoices/create">Crear Factura</NavLink></li>
+                        <li><NavLink href="invoices" Match="NavLinkMatch.All">Listar Facturas</NavLink></li>
+                    </ul>
+                }
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-link-header" @onclick="() => ToggleSubMenu(ref isClientesOpen)">
+                    <i class="bi bi-people-fill"></i>
+                    <span>Clientes</span>
+                    <i class="bi @(isClientesOpen ? "bi-chevron-down" : "bi-chevron-right") ms-auto"></i>
+                </div>
+                @if (isClientesOpen)
+                {
+                    <ul class="nav-submenu">
+                        <li><NavLink href="customers/create">Crear Cliente</NavLink></li>
+                        <li><NavLink href="customers" Match="NavLinkMatch.All">Listar Clientes</NavLink></li>
+                    </ul>
+                }
+            </div>
+        </AuthorizeView>
+
+        <AuthorizeView Roles="Administrador, Vendedor, Bodeguero">
+            <div class="nav-section">
+                <div class="nav-link-header" @onclick="() => ToggleSubMenu(ref isProductosOpen)">
+                    <i class="bi bi-box-seam-fill"></i>
+                    <span>Productos</span>
+                    <i class="bi @(isProductosOpen ? "bi-chevron-down" : "bi-chevron-right") ms-auto"></i>
+                </div>
+                @if (isProductosOpen)
+                {
+                    <ul class="nav-submenu">
+                        <li><NavLink href="products/create">Crear Producto</NavLink></li>
+                        <li><NavLink href="products" Match="NavLinkMatch.All">Listar Productos</NavLink></li>
+                    </ul>
+                }
+            </div>
+        </AuthorizeView>
+
+        <AuthorizeView Roles="Administrador, Bodeguero">
+            <div class="nav-section">
+                <div class="nav-link-header" @onclick="() => ToggleSubMenu(ref isComprasOpen)">
+                    <i class="bi bi-cart-plus-fill"></i>
+                    <span>Compras</span>
+                    <i class="bi @(isComprasOpen ? "bi-chevron-down" : "bi-chevron-right") ms-auto"></i>
+                </div>
+                @if (isComprasOpen)
+                {
+                    <ul class="nav-submenu">
+                        <li><NavLink href="purchases" Match="NavLinkMatch.All">Registrar Compra</NavLink></li>
+                    </ul>
+                }
+            </div>
+             <div class="nav-section">
+                <div class="nav-link-header" @onclick="() => ToggleSubMenu(ref isImpuestosOpen)">
+                    <i class="bi bi-cash-coin"></i>
+                    <span>Impuestos</span>
+                    <i class="bi @(isImpuestosOpen ? "bi-chevron-down" : "bi-chevron-right") ms-auto"></i>
+                </div>
+                @if (isImpuestosOpen)
+                {
+                    <ul class="nav-submenu">
+                        <li><NavLink href="taxes/create">Crear Impuesto</NavLink></li>
+                        <li><NavLink href="taxes" Match="NavLinkMatch.All">Listar Impuestos</NavLink></li>
+                    </ul>
+                }
+            </div>
+        </AuthorizeView>
+
+        <AuthorizeView Roles="Administrador">
+            <div class="nav-section">
+                <div class="nav-link-header" @onclick="() => ToggleSubMenu(ref isUsuariosOpen)">
+                    <i class="bi bi-person-fill-gear"></i>
+                    <span>Usuarios</span>
+                    <i class="bi @(isUsuariosOpen ? "bi-chevron-down" : "bi-chevron-right") ms-auto"></i>
+                </div>
+                @if (isUsuariosOpen)
+                {
+                    <ul class="nav-submenu">
+                        <li><NavLink href="users/create">Crear Usuario</NavLink></li>
+                        <li><NavLink href="users" Match="NavLinkMatch.All">Listar Usuarios</NavLink></li>
+                    </ul>
+                }
+            </div>
+        </AuthorizeView>
+    </nav>
 </div>
 
-<nav class="nav flex-column">
-    <div class="nav-item px-3">
-        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-            <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Panel Principal
-        </NavLink>
-    </div>
-
-    <AuthorizeView Roles="Administrador, Vendedor">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="invoices">
-                <span class="bi bi-file-earmark-text-fill-nav-menu" aria-hidden="true"></span> Facturas
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="customers">
-                <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> Clientes
-            </NavLink>
-        </div>
-    </AuthorizeView>
-
-    <AuthorizeView Roles="Administrador, Vendedor, Bodeguero">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="products">
-                <span class="bi bi-box-fill-nav-menu" aria-hidden="true"></span> Productos
-            </NavLink>
-        </div>
-    </AuthorizeView>
-
-    <AuthorizeView Roles="Administrador, Bodeguero">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="taxes">
-                <span class="bi bi-cash-coin-nav-menu" aria-hidden="true"></span> Impuestos
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="purchases">
-                <span class="bi bi-cart-plus-fill-nav-menu" aria-hidden="true"></span> Compras
-            </NavLink>
-        </div>
-    </AuthorizeView>
-
-    <AuthorizeView Roles="Administrador">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="users">
-                <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> Usuarios
-            </NavLink>
-        </div>
-    </AuthorizeView>
-
-    <div class="nav-item px-3">
-        <button class="nav-link btn btn-link" @onclick="HandleLogout">
-            <span class="bi bi-box-arrow-right-nav-menu" aria-hidden="true"></span> Cerrar Sesión
-        </button>
-    </div>
-</nav>
-
 @code {
-    private async Task HandleLogout()
+    private bool isFacturasOpen;
+    private bool isClientesOpen;
+    private bool isProductosOpen;
+    private bool isComprasOpen;
+    private bool isImpuestosOpen;
+    private bool isUsuariosOpen;
+
+    private void ToggleSubMenu(ref bool subMenuState)
     {
-        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
-        ((ApiAuthenticationStateProvider)AuthenticationStateProvider).MarkUserAsLoggedOut();
-        Navigation.NavigateTo("/login");
+        subMenuState = !subMenuState;
     }
 }

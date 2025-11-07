@@ -8,86 +8,122 @@
 
 <PageTitle>Productos</PageTitle>
 
-<h1>Productos</h1>
+<div class="page-header">
+    <h1>Gestión de Productos</h1>
+    <p>Añade, edita y administra tus productos.</p>
+</div>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
     <div class="alert alert-danger">@errorMessage</div>
 }
 
-<div class="mb-3">
-    <EditForm Model="@newProduct" OnValidSubmit="@HandleAddProduct">
-        <DataAnnotationsValidator />
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="nombre" class="form-label">Nombre</label>
-                    <InputText id="nombre" class="form-control" @bind-Value="newProduct.Nombre" />
-                    <ValidationMessage For="@(() => newProduct.Nombre)" />
+<div class="card mb-4">
+    <div class="card-header">
+        <h3>Añadir Nuevo Producto</h3>
+    </div>
+    <div class="card-body">
+        <EditForm Model="@newProduct" OnValidSubmit="@HandleAddProduct">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre</label>
+                        <InputText id="nombre" class="form-control" @bind-Value="newProduct.Nombre" />
+                        <ValidationMessage For="@(() => newProduct.Nombre)" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="codigoPrincipal" class="form-label">Código Principal</label>
+                        <InputText id="codigoPrincipal" class="form-control" @bind-Value="newProduct.CodigoPrincipal" />
+                        <ValidationMessage For="@(() => newProduct.CodigoPrincipal)" />
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label for="codigoPrincipal" class="form-label">Código Principal</label>
-                    <InputText id="codigoPrincipal" class="form-control" @bind-Value="newProduct.CodigoPrincipal" />
-                    <ValidationMessage For="@(() => newProduct.CodigoPrincipal)" />
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="descripcion" class="form-label">Descripción</label>
-                    <InputText id="descripcion" class="form-control" @bind-Value="newProduct.Descripcion" />
-                </div>
-                <div class="mb-3">
-                    <label for="precioVentaUnitario" class="form-label">Precio de Venta Unitario</label>
-                    <InputNumber id="precioVentaUnitario" class="form-control" @bind-Value="newProduct.PrecioVentaUnitario" />
-                    <ValidationMessage For="@(() => newProduct.PrecioVentaUnitario)" />
-                </div>
-                <div class="mb-3 form-check">
-                    <InputCheckbox id="manejaInventario" class="form-check-input" @bind-Value="newProduct.ManejaInventario" />
-                    <label for="manejaInventario" class="form-check-label">Maneja Inventario</label>
-                </div>
-                <div class="mb-3 form-check">
-                    <InputCheckbox id="manejaLotes" class="form-check-input" @bind-Value="newProduct.ManejaLotes" />
-                    <label for="manejaLotes" class="form-check-label">Maneja Lotes</label>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <InputText id="descripcion" class="form-control" @bind-Value="newProduct.Descripcion" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="precioVentaUnitario" class="form-label">Precio de Venta Unitario</label>
+                        <InputNumber id="precioVentaUnitario" class="form-control" @bind-Value="newProduct.PrecioVentaUnitario" />
+                        <ValidationMessage For="@(() => newProduct.PrecioVentaUnitario)" />
+                    </div>
                 </div>
             </div>
-        </div>
-        <button type="submit" class="btn btn-primary">Añadir Producto</button>
-    </EditForm>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="form-check form-check-inline">
+                        <InputCheckbox id="manejaInventario" class="form-check-input" @bind-Value="newProduct.ManejaInventario" />
+                        <label for="manejaInventario" class="form-check-label">Maneja Inventario</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <InputCheckbox id="manejaLotes" class="form-check-input" @bind-Value="newProduct.ManejaLotes" />
+                        <label for="manejaLotes" class="form-check-label">Maneja Lotes</label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-plus-circle-fill me-2"></i>Añadir Producto
+                </button>
+            </div>
+        </EditForm>
+    </div>
 </div>
 
-@if (products == null)
-{
-    <p><em>Cargando...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nombre</th>
-                <th>Código Principal</th>
-                <th>Precio de Venta Unitario</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var product in products)
-            {
-                <tr>
-                    <td>@product.Nombre</td>
-                    <td>@product.CodigoPrincipal</td>
-                    <td>@product.PrecioVentaUnitario</td>
-                    <td>
-                        <a href="@($"stock/{product.Id}")" class="btn btn-sm btn-info">Ver Stock</a>
-                        <button class="btn btn-sm btn-secondary" @onclick="() => OpenEditModal(product)">Editar</button>
-                        <button class="btn btn-sm btn-primary" @onclick="() => OpenAssignTaxesModal(product)">Administrar Impuestos</button>
-                        <button class="btn btn-sm btn-danger" @onclick="() => HandleDeleteProduct(product.Id)">Desactivar</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+<div class="card">
+    <div class="card-header">
+        <h3>Listado de Productos</h3>
+    </div>
+    <div class="card-body">
+        @if (products == null)
+        {
+            <p><em>Cargando...</em></p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Código Principal</th>
+                            <th>Precio Unitario</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var product in products)
+                        {
+                            <tr>
+                                <td>@product.Nombre</td>
+                                <td>@product.CodigoPrincipal</td>
+                                <td>@product.PrecioVentaUnitario.ToString("C")</td>
+                                <td class="text-end">
+                                    <div class="btn-group" role="group">
+                                        <a href="@($"stock/{product.Id}")" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-box-seam"></i> Stock
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(product)">
+                                            <i class="bi bi-pencil-square"></i> Editar
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-info" @onclick="() => OpenAssignTaxesModal(product)">
+                                            <i class="bi bi-percent"></i> Impuestos
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => HandleDeleteProduct(product.Id)">
+                                            <i class="bi bi-trash"></i> Desactivar
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
 
 @if (productToEdit != null)
 {
