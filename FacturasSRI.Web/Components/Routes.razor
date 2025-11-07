@@ -1,6 +1,27 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using FacturasSRI.Web.Components
+
+<Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            
+            <Authorizing>
+                <PageTitle>Autorizando...</PageTitle>
+                <div class="d-flex justify-content-center align-items-center" style="height: 80vh;">
+                    <div class="text-center">
+                        <p class="lead">Cargando información del usuario...</p>
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </Authorizing>
+            
+            <NotAuthorized>
+                <RedirectToLogin />
+            </NotAuthorized>
+
+        </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>

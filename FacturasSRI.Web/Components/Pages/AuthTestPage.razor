@@ -1,0 +1,39 @@
+@page "/authtest"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using FacturasSRI.Web.Services
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<PageTitle>Prueba de Autenticación</PageTitle>
+<h1>Prueba de Aislamiento del AuthenticationStateProvider</h1>
+<div class="alert alert-info my-3">
+<p class="h4">El estado actual que ve la UI es:</p>
+<AuthorizeView>
+<Authorized>
+<p class="h3 text-success">Estás AUTORIZADO.</p>
+<p>Usuario: @context.User.Identity?.Name</p>
+</Authorized>
+<NotAuthorized>
+<p class="h3 text-danger">NO estás autorizado.</p>
+</NotAuthorized>
+</AuthorizeView>
+</div>
+<div class="my-3">
+<button class="btn btn-primary" @onclick="SimulateLogin">1. Simular Login</button>
+<button class="btn btn-secondary" @onclick="SimulateLogout">2. Simular Logout</button>
+</div>
+<p>Abre la consola del navegador (F12) para ver los logs del servidor.</p>
+@code {
+private void SimulateLogin()
+{
+// Este es un token JWT falso pero estructuralmente válido. No necesita ser real.
+// Payload: { "sub": "testuser@example.com", "name": "Test User", "exp": "muy_en_el_futuro" }
+var fakeJwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlckBleGFtcGxlLmNvbSIsIm5hbWUiOiJVc3VhcmlvIGRlIFBydWViYSIsImVtYWlsIjoidGVzdHVzZXJAZXhhbXBsZS5jb20iLCJleHAiOjE5NTk2MDQwMDB9.fakeSignature";
+// Llamada directa al proveedor
+    ((ApiAuthenticationStateProvider)AuthenticationStateProvider).MarkUserAsAuthenticated(fakeJwt);
+}
+
+private void SimulateLogout()
+{
+    // Llamada directa al proveedor
+    ((ApiAuthenticationStateProvider)AuthenticationStateProvider).MarkUserAsLoggedOut();
+}
+}

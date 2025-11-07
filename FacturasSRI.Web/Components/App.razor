@@ -1,6 +1,7 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+﻿@using Microsoft.AspNetCore.Components.Authorization
 
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,14 +13,10 @@
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />
 </head>
-
 <body>
-    
     <CascadingAuthenticationState>
         <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
     </CascadingAuthenticationState>
-
     <script src="_framework/blazor.server.js"></script>
 </body>
-
 </html>

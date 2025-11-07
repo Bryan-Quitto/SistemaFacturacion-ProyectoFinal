@@ -1,14 +1,17 @@
-﻿@inherits LayoutComponentBase
+﻿@using FacturasSRI.Web.Services
+@inherits LayoutComponentBase
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
 
 <div class="d-flex">
-    
     <AuthorizeView>
         <Authorized>
             <div class="sidebar vh-100">
                 <NavMenu />
             </div>
         </Authorized>
-        </AuthorizeView>
+    </AuthorizeView>
 
     <main class="main-content flex-grow-1">
         <article class="content px-4">
@@ -18,7 +21,16 @@
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
+    Se ha producido un error no controlado.
+    <a href="." class="reload">Recargando</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private async Task HandleLogout()
+    {
+        await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+        ((ApiAuthenticationStateProvider)AuthenticationStateProvider).MarkUserAsLoggedOut();
+        Navigation.NavigateTo("/login");
+    }
+}

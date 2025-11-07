@@ -45,17 +45,25 @@ namespace FacturasSRI.Web.Services
             return new AuthenticationState(new ClaimsPrincipal(identity));
         }
 
-        public void MarkUserAsAuthenticated(string email)
-        {
-            _logger.LogInformation($"MarkUserAsAuthenticated llamado para {email}. Notificando al sistema para que re-evalúe.");
-            NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
-        }
+        public void MarkUserAsAuthenticated(string token)
+{
+    _logger.LogInformation($"MarkUserAsAuthenticated llamado. Notificando al sistema para que re-evalúe.");
+    
+    var authenticatedUser = new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt"));
+    var authState = Task.FromResult(new AuthenticationState(authenticatedUser));
+    
+    NotifyAuthenticationStateChanged(authState);
+}
 
-        public void MarkUserAsLoggedOut()
-        {
-            _logger.LogInformation("MarkUserAsLoggedOut llamado. Notificando al sistema para que re-evalúe.");
-            NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
-        }
+public void MarkUserAsLoggedOut()
+{
+    _logger.LogInformation("MarkUserAsLoggedOut llamado. Notificando al sistema para que re-evalúe.");
+
+    var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
+    var authState = Task.FromResult(new AuthenticationState(anonymousUser));
+    
+    NotifyAuthenticationStateChanged(authState);
+}
 
         private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
         {

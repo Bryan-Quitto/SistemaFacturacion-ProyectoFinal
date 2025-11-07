@@ -1,4 +1,5 @@
 using FacturasSRI.Web.Components;
+using Microsoft.AspNetCore.Components.Web;
 using FacturasSRI.Application.Interfaces;
 using FacturasSRI.Infrastructure.Services;
 using FacturasSRI.Infrastructure.Persistence;
@@ -8,17 +9,18 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using FacturasSRI.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddControllers();
 
 builder.Services.AddDbContext<FacturasSRIDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+           .LogTo(Console.WriteLine, LogLevel.Information));
 
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IProductService, ProductService>();
@@ -45,21 +47,21 @@ builder.Services.AddScoped(sp =>
     else
     {
         baseAddress = builder.Configuration["Jwt:Issuer"] 
-                      ?? throw new InvalidOperationException("HttpContext is null and Jwt:Issuer is not configured.");
+                        ?? throw new InvalidOperationException("HttpContext is null and Jwt:Issuer is not configured.");
     }
 
     return new HttpClient { BaseAddress = new Uri(baseAddress) };
 });
 
-builder.Services.AddAuthentication("Cookies") // Usamos "Cookies" como esquema principal
+builder.Services.AddAuthentication("Cookies")
     .AddCookie("Cookies", options =>
     {
-        options.LoginPath = "/login"; // Redirige a /login si no está autenticado
+        options.LoginPath = "/login";
+        options.AccessDeniedPath = "/forbidden";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
     })
-    // 2. Mantener JwtBearer para la API
-    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options => // Le damos un nombre ("Bearer")
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -77,26 +79,20 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
-
-
 app.UseAntiforgery();
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapStaticAssets();
+
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
-
+   .AddInteractiveServerRenderMode();
+    
 app.MapControllers();
-
 app.Run();
