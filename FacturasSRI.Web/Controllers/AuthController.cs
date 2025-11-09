@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Collections.Generic;
 using BCrypt.Net;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace FacturasSRI.Web.Controllers
 {
@@ -26,18 +27,26 @@ namespace FacturasSRI.Web.Controllers
         private readonly IConfiguration _configuration;
         private readonly FacturasSRIDbContext _context;
         private readonly ILogger<AuthController> _logger;
+        private readonly IMemoryCache _cache;
 
-        public AuthController(IConfiguration configuration, FacturasSRIDbContext context, ILogger<AuthController> logger)
+        public AuthController(IConfiguration configuration, FacturasSRIDbContext context, ILogger<AuthController> logger, IMemoryCache cache)
         {
             _configuration = configuration;
             _context = context;
             _logger = logger;
+            _cache = cache;
         }
 
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto loginRequest)
         {
+            var lockoutKey = $"lockout_{loginRequest.Email}";
+            if (_cache.TryGetValue(lockoutKey, out _))
+            {
+                return StatusCode(429, "Demasiados intentos fallidos. Por favor, espere 30 segundos.");
+            }
+
             var user = await _context.Usuarios
                 .Include(u => u.UsuarioRoles)
                     .ThenInclude(ur => ur.Rol)
@@ -45,8 +54,12 @@ namespace FacturasSRI.Web.Controllers
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(loginRequest.Password, user.PasswordHash))
             {
-                return Unauthorized();
+                HandleFailedLogin(loginRequest.Email);
+                return Unauthorized("Credenciales inválidas.");
             }
+            
+            var failureCountKey = $"failures_{loginRequest.Email}";
+            _cache.Remove(failureCountKey);
 
             var claims = new List<Claim>
             {
@@ -69,6 +82,26 @@ namespace FacturasSRI.Web.Controllers
             var token = GenerateJwtToken(user);
             
             return Ok(new { token });
+        }
+
+        private void HandleFailedLogin(string email)
+        {
+            var failureCountKey = $"failures_{email}";
+            var failureCount = _cache.GetOrCreate(failureCountKey, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15);
+                return 0;
+            });
+
+            failureCount++;
+            _cache.Set(failureCountKey, failureCount);
+
+            if (failureCount >= 3)
+            {
+                var lockoutKey = $"lockout_{email}";
+                _cache.Set(lockoutKey, true, TimeSpan.FromSeconds(30));
+                _cache.Remove(failureCountKey);
+            }
         }
 
         private string GenerateJwtToken(Usuario user)

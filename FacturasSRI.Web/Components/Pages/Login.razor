@@ -112,9 +112,28 @@
                     errorMessage = "La respuesta del servidor no contenía un token válido.";
                 }
             }
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<LoginResult>();
+                
+                if (result != null && !string.IsNullOrEmpty(result.Token))
+                {
+                    await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", result.Token);
+                    ((ApiAuthenticationStateProvider)AuthenticationStateProvider).MarkUserAsAuthenticated(result.Token);
+                    Navigation.NavigateTo("/", forceLoad: true);
+                }
+                else
+                {
+                    errorMessage = "La respuesta del servidor no contenía un token válido.";
+                }
+            }
             else
             {
-                errorMessage = "Credenciales incorrectas. Por favor, intente de nuevo.";
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    errorMessage = $"Error: {response.ReasonPhrase}";
+                }
             }
         }
         catch (Exception ex)

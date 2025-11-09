@@ -21,3 +21,13 @@
     <script src="lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
+@code {
+    protected override void OnInitialized()
+    {
+        var culture = new System.Globalization.CultureInfo("es");
+        System.Threading.Thread.CurrentThread.CurrentCulture = culture;
+        System.Threading.Thread.CurrentThread.CurrentUICulture = culture;
+        base.OnInitialized();
+    }
+}
