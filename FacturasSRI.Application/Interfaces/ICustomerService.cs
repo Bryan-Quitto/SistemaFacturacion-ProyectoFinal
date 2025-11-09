@@ -12,5 +12,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<CustomerDto> CreateCustomerAsync(CustomerDto customer);
         Task UpdateCustomerAsync(CustomerDto customer);
         Task DeleteCustomerAsync(Guid id);
+        Task<List<CustomerDto>> GetActiveCustomersAsync(); // New method
     }
 }

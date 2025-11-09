@@ -55,7 +55,7 @@ namespace FacturasSRI.Infrastructure.Services
             var user = await _context.Usuarios.FindAsync(id);
             if (user != null)
             {
-                user.EstaActivo = false;
+                user.EstaActivo = !user.EstaActivo; // Toggle the active status
                 await _context.SaveChangesAsync();
             }
         }
@@ -88,6 +88,25 @@ namespace FacturasSRI.Infrastructure.Services
         }
 
         public async Task<List<UserDto>> GetUsersAsync()
+        {
+            return await _context.Usuarios
+                .AsNoTracking()
+                .Include(u => u.UsuarioRoles)
+                    .ThenInclude(ur => ur.Rol)
+                .Select(user => new UserDto
+                {
+                    Id = user.Id,
+                    PrimerNombre = user.PrimerNombre,
+                    SegundoNombre = user.SegundoNombre,
+                    PrimerApellido = user.PrimerApellido,
+                    SegundoApellido = user.SegundoApellido,
+                    Email = user.Email,
+                    EstaActivo = user.EstaActivo,
+                    Roles = user.UsuarioRoles.Select(ur => ur.Rol.Nombre).ToList()
+                }).ToListAsync();
+        }
+
+        public async Task<List<UserDto>> GetActiveUsersAsync()
         {
             return await _context.Usuarios
                 .Where(u => u.EstaActivo)

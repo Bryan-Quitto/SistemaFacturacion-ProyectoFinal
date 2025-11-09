@@ -88,7 +88,7 @@
     {
         try
         {
-            var allProducts = await ProductService.GetProductsAsync();
+            var allProducts = await ProductService.GetActiveProductsAsync();
             products = allProducts.Where(p => p.ManejaInventario).ToList();
         }
         catch (Exception)

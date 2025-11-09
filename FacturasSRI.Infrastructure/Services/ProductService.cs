@@ -54,7 +54,8 @@ namespace FacturasSRI.Infrastructure.Services
                 Descripcion = product.Descripcion,
                 PrecioVentaUnitario = product.PrecioVentaUnitario,
                 ManejaInventario = product.ManejaInventario,
-                ManejaLotes = product.ManejaLotes
+                ManejaLotes = product.ManejaLotes,
+                IsActive = product.EstaActivo // Map EstaActivo to IsActive
             };
         }
 
@@ -73,7 +74,29 @@ namespace FacturasSRI.Infrastructure.Services
                               ManejaInventario = product.ManejaInventario,
                               ManejaLotes = product.ManejaLotes,
                               StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
-                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado"
+                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
+                              IsActive = product.EstaActivo // Map EstaActivo to IsActive
+                          }).ToListAsync();
+        }
+
+        public async Task<List<ProductDto>> GetActiveProductsAsync()
+        {
+            return await (from product in _context.Productos
+                          join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
+                          from usuario in usuarioJoin.DefaultIfEmpty()
+                          where product.EstaActivo == true // Filter for active products
+                          select new ProductDto
+                          {
+                              Id = product.Id,
+                              CodigoPrincipal = product.CodigoPrincipal,
+                              Nombre = product.Nombre,
+                              Descripcion = product.Descripcion,
+                              PrecioVentaUnitario = product.PrecioVentaUnitario,
+                              ManejaInventario = product.ManejaInventario,
+                              ManejaLotes = product.ManejaLotes,
+                              StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
+                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
+                              IsActive = product.EstaActivo // Map EstaActivo to IsActive
                           }).ToListAsync();
         }
 
@@ -88,6 +111,7 @@ namespace FacturasSRI.Infrastructure.Services
                 product.PrecioVentaUnitario = productDto.PrecioVentaUnitario;
                 product.ManejaInventario = productDto.ManejaInventario;
                 product.ManejaLotes = productDto.ManejaLotes;
+                product.EstaActivo = productDto.IsActive; // Update EstaActivo from ProductDto.IsActive
                 await _context.SaveChangesAsync();
             }
         }
@@ -111,7 +135,7 @@ namespace FacturasSRI.Infrastructure.Services
             var product = await _context.Productos.FindAsync(id);
             if (product != null)
             {
-                product.EstaActivo = false;
+                product.EstaActivo = !product.EstaActivo; // Toggle the active status
                 await _context.SaveChangesAsync();
             }
         }

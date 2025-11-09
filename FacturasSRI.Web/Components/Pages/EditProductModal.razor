@@ -39,6 +39,10 @@
                             <InputCheckbox class="form-check-input" @bind-Value="Product.ManejaLotes" />
                             <label class="form-check-label">Maneja Lotes</label>
                         </div>
+                        <div class="mb-3 form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="Product.IsActive" />
+                            <label class="form-check-label">Está Activo</label>
+                        </div>
 
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" @onclick="Close">Cancelar</button>

@@ -23,5 +23,6 @@ namespace FacturasSRI.Application.Dtos
         public int StockTotal { get; set; }
         public string CreadoPor { get; set; } = string.Empty;
         public Guid UsuarioIdCreador { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

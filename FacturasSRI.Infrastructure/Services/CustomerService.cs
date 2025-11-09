@@ -44,7 +44,7 @@ namespace FacturasSRI.Infrastructure.Services
             var customer = await _context.Clientes.FindAsync(id);
             if (customer != null)
             {
-                customer.EstaActivo = false;
+                customer.EstaActivo = !customer.EstaActivo; // Toggle the active status
                 await _context.SaveChangesAsync();
             }
         }
@@ -74,7 +74,26 @@ namespace FacturasSRI.Infrastructure.Services
             return await (from customer in _context.Clientes
                           join usuario in _context.Usuarios on customer.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
-                          where customer.EstaActivo
+                          select new CustomerDto
+                          {
+                              Id = customer.Id,
+                              TipoIdentificacion = customer.TipoIdentificacion,
+                              NumeroIdentificacion = customer.NumeroIdentificacion,
+                              RazonSocial = customer.RazonSocial,
+                              Email = customer.Email,
+                              Direccion = customer.Direccion,
+                              Telefono = customer.Telefono,
+                              EstaActivo = customer.EstaActivo,
+                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado"
+                          }).ToListAsync();
+        }
+
+        public async Task<List<CustomerDto>> GetActiveCustomersAsync()
+        {
+            return await (from customer in _context.Clientes
+                          join usuario in _context.Usuarios on customer.UsuarioIdCreador equals usuario.Id into usuarioJoin
+                          from usuario in usuarioJoin.DefaultIfEmpty()
+                          where customer.EstaActivo == true // Filter for active customers
                           select new CustomerDto
                           {
                               Id = customer.Id,
@@ -100,6 +119,7 @@ namespace FacturasSRI.Infrastructure.Services
                 customer.Email = customerDto.Email;
                 customer.Direccion = customerDto.Direccion;
                 customer.Telefono = customerDto.Telefono;
+                customer.EstaActivo = customerDto.EstaActivo; // Update EstaActivo from CustomerDto.EstaActivo
                 await _context.SaveChangesAsync();
             }
         }

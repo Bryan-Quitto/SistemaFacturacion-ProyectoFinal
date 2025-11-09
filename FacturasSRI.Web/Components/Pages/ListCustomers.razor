@@ -2,6 +2,7 @@
 @attribute [Authorize(Policy = "VendedorPolicy")]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Web.Components.Shared
 @inject ICustomerService CustomerService
 @inject NavigationManager Navigation
 
@@ -34,7 +35,9 @@
                 <td>@customer.CreadoPor</td>
                 <td>
                     <button class="btn btn-sm btn-secondary" @onclick="() => OpenEditModal(customer)">Editar</button>
-                    <button class="btn btn-sm btn-danger" @onclick="() => HandleDeleteCustomer(customer.Id)">Desactivar</button>
+                    <button class="btn btn-sm @(customer.EstaActivo ? "btn-danger" : "btn-success")" @onclick="() => HandleDeleteCustomer(customer.Id)">
+                        @(customer.EstaActivo ? "Desactivar" : "Activar")
+                    </button>
                 </td>
             </tr>
         }
@@ -47,10 +50,22 @@
 }
 
 
+<ConfirmationModal IsVisible="showConfirmationModal"
+                   Title="@confirmationModalTitle"
+                   Message="@confirmationModalMessage"
+                   OnConfirm="ConfirmToggleCustomerStatus"
+                   OnCancel="CancelToggleCustomerStatus" />
+
 @code {
     private List<CustomerDto> customers = new();
     private CustomerDto? customerToEdit;
     private bool isEditModalVisible = false;
+
+    // Confirmation Modal State
+    private bool showConfirmationModal = false;
+    private string confirmationModalTitle = string.Empty;
+    private string confirmationModalMessage = string.Empty;
+    private Guid customerToToggleId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -62,10 +77,40 @@
         customers = await CustomerService.GetCustomersAsync();
     }
 
-    private async Task HandleDeleteCustomer(Guid id)
+    private void HandleDeleteCustomer(Guid id)
     {
-        await CustomerService.DeleteCustomerAsync(id);
-        await LoadCustomers();
+        var customerToToggle = customers.FirstOrDefault(c => c.Id == id);
+        if (customerToToggle == null) return;
+
+        customerToToggleId = id;
+        confirmationModalTitle = "Confirmar Acción";
+        confirmationModalMessage = $"¿Está seguro de que desea {(customerToToggle.EstaActivo ? "desactivar" : "activar")} al cliente {customerToToggle.RazonSocial}?";
+        showConfirmationModal = true;
+    }
+
+    private async Task ConfirmToggleCustomerStatus()
+    {
+        showConfirmationModal = false; // Hide the modal
+
+        var customerToToggle = customers.FirstOrDefault(c => c.Id == customerToToggleId);
+        if (customerToToggle == null) return;
+
+        try
+        {
+            await CustomerService.DeleteCustomerAsync(customerToToggleId);
+            await LoadCustomers();
+        }
+        catch (Exception ex)
+        {
+            // Handle error, e.g., display an error message
+            Console.WriteLine($"Error al toggling customer status: {ex.Message}");
+        }
+    }
+
+    private void CancelToggleCustomerStatus()
+    {
+        showConfirmationModal = false; // Hide the modal
+        customerToToggleId = Guid.Empty;
     }
 
     private async Task HandleUpdateCustomer(CustomerDto customer)
@@ -75,7 +120,6 @@
         customerToEdit = null;
         await LoadCustomers();
     }
-
     private void OpenEditModal(CustomerDto customer)
     {
         customerToEdit = new CustomerDto

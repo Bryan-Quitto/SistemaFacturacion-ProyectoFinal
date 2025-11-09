@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "Administrador")]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Web.Components.Shared
 @inject IUserService UserService
 @inject IRoleService RoleService
 @inject NavigationManager Navigation
@@ -45,8 +46,8 @@
                                     <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(user.Id)">
                                         <i class="bi bi-pencil-square"></i> Editar
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => HandleDeleteUser(user.Id)">
-                                        <i class="bi bi-trash"></i> Desactivar
+                                    <button class="btn btn-sm @(user.EstaActivo ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => HandleDeleteUser(user.Id)">
+                                        <i class="bi @(user.EstaActivo ? "bi-trash" : "bi-check-circle")"></i> @(user.EstaActivo ? "Desactivar" : "Activar")
                                     </button>
                                 </div>
                             </td>
@@ -111,6 +112,10 @@
                                 <label class="form-label">Nueva Contraseña</label>
                                 <InputText type="password" class="form-control" @bind-Value="editingUser.Password" placeholder="Dejar en blanco para no cambiar" />
                             </div>
+                            <div class="col-md-6 mb-3 form-check">
+                                <InputCheckbox class="form-check-input" @bind-Value="editingUser.EstaActivo" />
+                                <label class="form-check-label">Está Activo</label>
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">Cancelar</button>
@@ -125,6 +130,12 @@
 }
 
 
+<ConfirmationModal IsVisible="showConfirmationModal"
+                   Title="@confirmationModalTitle"
+                   Message="@confirmationModalMessage"
+                   OnConfirm="ConfirmToggleUserStatus"
+                   OnCancel="CancelToggleUserStatus" />
+
 @code {
     private List<UserDto> users = new();
     private List<RoleDto> allRoles = new();
@@ -132,6 +143,12 @@
     private bool showEditModal = false;
     private UserDto editingUser = new();
     private Guid editingUserRoleId;
+
+    // Confirmation Modal State
+    private bool showConfirmationModal = false;
+    private string confirmationModalTitle = string.Empty;
+    private string confirmationModalMessage = string.Empty;
+    private Guid userToToggleId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -170,10 +187,40 @@
         await LoadData();
     }
 
-    private async Task HandleDeleteUser(Guid id)
+    private void HandleDeleteUser(Guid id)
     {
-        await UserService.DeleteUserAsync(id);
-        await LoadData();
+        var userToToggle = users.FirstOrDefault(u => u.Id == id);
+        if (userToToggle == null) return;
+
+        userToToggleId = id;
+        confirmationModalTitle = "Confirmar Acción";
+        confirmationModalMessage = $"¿Está seguro de que desea {(userToToggle.EstaActivo ? "desactivar" : "activar")} al usuario {userToToggle.PrimerNombre} {userToToggle.PrimerApellido}?";
+        showConfirmationModal = true;
+    }
+
+    private async Task ConfirmToggleUserStatus()
+    {
+        showConfirmationModal = false; // Hide the modal
+
+        var userToToggle = users.FirstOrDefault(u => u.Id == userToToggleId);
+        if (userToToggle == null) return;
+
+        try
+        {
+            await UserService.DeleteUserAsync(userToToggleId);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            // Handle error, e.g., display an error message
+            Console.WriteLine($"Error al toggling user status: {ex.Message}");
+        }
+    }
+
+    private void CancelToggleUserStatus()
+    {
+        showConfirmationModal = false; // Hide the modal
+        userToToggleId = Guid.Empty;
     }
 
     private void GoToCreateUser()

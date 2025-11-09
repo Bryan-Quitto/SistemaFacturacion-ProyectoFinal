@@ -200,8 +200,8 @@
     {
         try
         {
-            allCustomers = await CustomerService.GetCustomersAsync();
-            allProducts = await ProductService.GetProductsAsync();
+            allCustomers = await CustomerService.GetActiveCustomersAsync();
+            allProducts = await ProductService.GetActiveProductsAsync();
         }
         catch (Exception ex)
         {

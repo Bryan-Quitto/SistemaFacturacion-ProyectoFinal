@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Web.Components.Shared
 @inject IProductService ProductService
 @inject NavigationManager Navigation
 
@@ -67,8 +68,8 @@
                                         <button class="btn btn-sm btn-outline-info" @onclick="() => OpenAssignTaxesModal(product)">
                                             <i class="bi bi-percent"></i> Impuestos
                                         </button>
-                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => HandleDeleteProduct(product.Id)">
-                                            <i class="bi bi-trash"></i> Desactivar
+                                        <button class="btn btn-sm @(product.IsActive ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => HandleDeleteProduct(product.Id)">
+                                            <i class="bi @(product.IsActive ? "bi-trash" : "bi-check-circle")"></i> @(product.IsActive ? "Desactivar" : "Activar")
                                         </button>
                                     </div>
                                 </td>
@@ -92,6 +93,12 @@
     <AssignTaxesModal Product="selectedProduct" IsVisible="isAssignTaxesModalVisible" OnClose="CloseAssignTaxesModal" />
 }
 
+<ConfirmationModal IsVisible="showConfirmationModal"
+                   Title="@confirmationModalTitle"
+                   Message="@confirmationModalMessage"
+                   OnConfirm="ConfirmToggleProductStatus"
+                   OnCancel="CancelToggleProductStatus" />
+
 @code {
     public EventCallback<ProductDto> OnSave { get; set; }
     private List<ProductDto>? products;
@@ -101,6 +108,12 @@
 
     private ProductDto? productToEdit;
     private bool isEditModalVisible = false;
+
+    // Confirmation Modal State
+    private bool showConfirmationModal = false;
+    private string confirmationModalTitle = string.Empty;
+    private string confirmationModalMessage = string.Empty;
+    private Guid productToToggleId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -120,18 +133,42 @@
         }
     }
 
-    private async Task HandleDeleteProduct(Guid id)
+    private void HandleDeleteProduct(Guid id)
+    {
+        var productToToggle = products?.FirstOrDefault(p => p.Id == id);
+        if (productToToggle == null) return;
+
+        productToToggleId = id;
+        confirmationModalTitle = "Confirmar Acción";
+        confirmationModalMessage = $"¿Está seguro de que desea {(productToToggle.IsActive ? "desactivar" : "activar")} el producto {productToToggle.Nombre}?";
+        showConfirmationModal = true;
+    }
+
+    private async Task ConfirmToggleProductStatus()
     {
         errorMessage = null;
+        showConfirmationModal = false; // Hide the modal
+
+        var productToToggle = products?.FirstOrDefault(p => p.Id == productToToggleId);
+        if (productToToggle == null) return;
+
+        string action = productToToggle.IsActive ? "desactivar" : "activar";
+
         try
         {
-            await ProductService.DeleteProductAsync(id);
+            await ProductService.DeleteProductAsync(productToToggleId);
             await LoadProducts();
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al desactivar producto: {ex.Message}";
+            errorMessage = $"Error al {action} producto: {ex.Message}";
         }
+    }
+
+    private void CancelToggleProductStatus()
+    {
+        showConfirmationModal = false; // Hide the modal
+        productToToggleId = Guid.Empty;
     }
     
     private async Task HandleUpdateProductInModal(ProductDto product)
@@ -164,7 +201,8 @@
             Descripcion = product.Descripcion,
             PrecioVentaUnitario = product.PrecioVentaUnitario,
             ManejaInventario = product.ManejaInventario,
-            ManejaLotes = product.ManejaLotes
+            ManejaLotes = product.ManejaLotes,
+            IsActive = product.IsActive // Initialize IsActive
         };
         isEditModalVisible = true;
     }
