@@ -55,6 +55,10 @@ namespace FacturasSRI.Web.Controllers
             if (user == null || !BCrypt.Net.BCrypt.Verify(loginRequest.Password, user.PasswordHash))
             {
                 HandleFailedLogin(loginRequest.Email);
+                if (_cache.TryGetValue(lockoutKey, out _))
+                {
+                    return StatusCode(429, "Demasiados intentos fallidos. Por favor, espere 30 segundos.");
+                }
                 return Unauthorized("Credenciales inválidas.");
             }
             
