@@ -99,12 +99,12 @@ app.UseHttpsRedirection();
 
 var supportedCultures = new[]
 {
-    new CultureInfo("es")
+    new CultureInfo("es-EC") // Changed to es-EC for dollar currency symbol
 };
 
 app.UseRequestLocalization(new RequestLocalizationOptions
 {
-    DefaultRequestCulture = new RequestCulture("es"),
+    DefaultRequestCulture = new RequestCulture("es-EC"), // Changed to es-EC
     SupportedCultures = supportedCultures,
     SupportedUICultures = supportedCultures
 });

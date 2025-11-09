@@ -116,7 +116,7 @@
                                                 <ValidationMessage For="@(() => item.Cantidad)" />
                                             </td>
                                             <td class="text-end">@item.PrecioVentaUnitario.ToString("C")</td>
-                                            <td class="text-end">@((item.Cantidad * item.PrecioVentaUnitario).ToString("C"))</td>
+                                            <td class="text-end">@((item.Cantidad * item.PrecioVentaUnitario).ToString("C")))</td>
                                             <td class="text-center">
                                                 <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoveItem(item.ProductoId)">
                                                     <i class="bi bi-trash"></i>

@@ -61,6 +61,13 @@ namespace FacturasSRI.Web.Controllers
                 }
                 return Unauthorized("Credenciales inválidas.");
             }
+
+            // Add check for EstaActivo
+            if (!user.EstaActivo)
+            {
+                _logger.LogWarning("Intento de inicio de sesión de usuario inactivo: {Email}", loginRequest.Email);
+                return Unauthorized("Su cuenta ha sido desactivada. Por favor, contacte al administrador.");
+            }
             
             var failureCountKey = $"failures_{loginRequest.Email}";
             _cache.Remove(failureCountKey);
