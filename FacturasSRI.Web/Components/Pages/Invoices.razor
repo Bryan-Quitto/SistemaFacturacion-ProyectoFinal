@@ -18,6 +18,10 @@
     </button>
 </div>
 
+<div class="mb-3">
+    <input type="text" class="form-control" placeholder="Buscar facturas por número o cliente..." @bind-value="searchTerm" @bind-value:event="oninput" />
+</div>
+
 @if (errorMessage != null)
 {
     <div class="alert alert-danger">@errorMessage</div>
@@ -25,7 +29,7 @@
 
 <div class="card">
     <div class="card-body">
-        @if (invoices == null)
+        @if (allInvoices == null) // Check allInvoices for loading state
         {
             <p><em>Cargando facturas...</em></p>
         }
@@ -44,7 +48,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var invoice in invoices)
+                        @foreach (var invoice in FilteredInvoices) // Use FilteredInvoices
                         {
                             <tr>
                                 <td><strong>@invoice.NumeroFactura</strong></td>
@@ -68,15 +72,23 @@
 
 
 @code {
-    private List<InvoiceDto>? invoices;
+    private List<InvoiceDto>? allInvoices; // Holds all invoices
     private List<CustomerDto> customers = new();
     private string? errorMessage;
+
+    private string searchTerm = string.Empty; // New property for search
+
+    private List<InvoiceDto> FilteredInvoices => string.IsNullOrWhiteSpace(searchTerm)
+        ? allInvoices ?? new()
+        : allInvoices?.Where(invoice => invoice.NumeroFactura.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                        (customers.FirstOrDefault(c => c.Id == invoice.ClienteId)?.RazonSocial?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+                      .ToList() ?? new();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            invoices = await InvoiceService.GetInvoicesAsync();
+            allInvoices = await InvoiceService.GetInvoicesAsync(); // Load all invoices
             customers = await CustomerService.GetCustomersAsync();
         }
         catch (Exception ex)

@@ -19,6 +19,10 @@
     </button>
 </div>
 
+<div class="mb-3">
+    <input type="text" class="form-control" placeholder="Buscar usuarios por nombre o correo..." @bind-value="searchTerm" @bind-value:event="oninput" />
+</div>
+
 <div class="card">
     <div class="card-header">
         <h3>Listado de Usuarios</h3>
@@ -35,7 +39,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var user in users)
+                    @foreach (var user in FilteredUsers) // Use FilteredUsers
                     {
                         <tr>
                             <td>@user.PrimerNombre @user.SegundoNombre @user.PrimerApellido @user.SegundoApellido</td>
@@ -137,7 +141,7 @@
                    OnCancel="CancelToggleUserStatus" />
 
 @code {
-    private List<UserDto> users = new();
+    private List<UserDto> allUsers = new(); // Holds all users
     private List<RoleDto> allRoles = new();
     
     private bool showEditModal = false;
@@ -150,6 +154,15 @@
     private string confirmationModalMessage = string.Empty;
     private Guid userToToggleId;
 
+    private string searchTerm = string.Empty; // New property for search
+
+    private List<UserDto> FilteredUsers => string.IsNullOrWhiteSpace(searchTerm)
+        ? allUsers
+        : allUsers.Where(u => u.PrimerNombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                               u.PrimerApellido.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                               u.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                      .ToList();
+
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
@@ -157,7 +170,7 @@
 
     private async Task LoadData()
     {
-        users = await UserService.GetUsersAsync();
+        allUsers = await UserService.GetUsersAsync(); // Load all users
         allRoles = await RoleService.GetRolesAsync();
     }
 
@@ -189,7 +202,7 @@
 
     private void HandleDeleteUser(Guid id)
     {
-        var userToToggle = users.FirstOrDefault(u => u.Id == id);
+        var userToToggle = allUsers.FirstOrDefault(u => u.Id == id);
         if (userToToggle == null) return;
 
         userToToggleId = id;
@@ -202,7 +215,7 @@
     {
         showConfirmationModal = false; // Hide the modal
 
-        var userToToggle = users.FirstOrDefault(u => u.Id == userToToggleId);
+        var userToToggle = allUsers.FirstOrDefault(u => u.Id == userToToggleId);
         if (userToToggle == null) return;
 
         try

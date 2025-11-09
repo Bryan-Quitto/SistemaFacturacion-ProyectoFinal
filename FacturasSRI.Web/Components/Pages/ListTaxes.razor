@@ -15,6 +15,10 @@
     </button>
 </div>
 
+<div class="mb-3">
+    <input type="text" class="form-control" placeholder="Buscar impuestos por nombre o código SRI..." @bind-value="searchTerm" @bind-value:event="oninput" />
+</div>
+
 <table class="table">
     <thead>
         <tr>
@@ -25,7 +29,7 @@
         </tr>
     </thead>
     <tbody>
-        @foreach (var tax in taxes)
+        @foreach (var tax in FilteredTaxes) // Use FilteredTaxes
         {
             <tr>
                 <td>@tax.Nombre</td>
@@ -41,7 +45,6 @@
         }
     </tbody>
 </table>
-
 @if (taxToEdit != null)
 {
     <EditTaxModal Tax="taxToEdit" IsVisible="isEditModalVisible" OnSave="HandleUpdateTax" OnClose="CloseEditModal" />
@@ -54,7 +57,7 @@
                    OnCancel="CancelToggleTaxStatus" />
 
 @code {
-    private List<TaxDto> taxes = new();
+    private List<TaxDto> allTaxes = new(); // Holds all taxes
     private TaxDto? taxToEdit;
     private bool isEditModalVisible = false;
 
@@ -64,6 +67,14 @@
     private string confirmationModalMessage = string.Empty;
     private Guid taxToToggleId;
 
+    private string searchTerm = string.Empty; // New property for search
+
+    private List<TaxDto> FilteredTaxes => string.IsNullOrWhiteSpace(searchTerm)
+        ? allTaxes
+        : allTaxes.Where(t => t.Nombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                               t.CodigoSRI.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                      .ToList();
+
     protected override async Task OnInitializedAsync()
     {
         await LoadTaxes();
@@ -71,12 +82,12 @@
 
     private async Task LoadTaxes()
     {
-        taxes = await TaxService.GetTaxesAsync();
+        allTaxes = await TaxService.GetTaxesAsync(); // Load all taxes
     }
 
     private void HandleDeleteTax(Guid id)
     {
-        var taxToToggle = taxes.FirstOrDefault(t => t.Id == id);
+        var taxToToggle = allTaxes.FirstOrDefault(t => t.Id == id);
         if (taxToToggle == null) return;
 
         taxToToggleId = id;
@@ -89,7 +100,7 @@
     {
         showConfirmationModal = false; // Hide the modal
 
-        var taxToToggle = taxes.FirstOrDefault(t => t.Id == taxToToggleId);
+        var taxToToggle = allTaxes.FirstOrDefault(t => t.Id == taxToToggleId);
         if (taxToToggle == null) return;
 
         try

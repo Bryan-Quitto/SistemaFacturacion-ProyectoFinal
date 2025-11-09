@@ -11,11 +11,15 @@
     <p>Consulta todos los movimientos de ajuste registrados en el sistema.</p>
 </div>
 
+<div class="mb-3">
+    <input type="text" class="form-control" placeholder="Buscar ajustes por producto o motivo..." @bind-value="searchTerm" @bind-value:event="oninput" />
+</div>
+
 @if (isLoading)
 {
     <p><em>Cargando historial de ajustes...</em></p>
 }
-else if (adjustments.Any())
+else if (FilteredAdjustments.Any()) // Use FilteredAdjustments
 {
     <div class="card">
         <div class="card-body">
@@ -32,7 +36,7 @@ else if (adjustments.Any())
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var ajuste in adjustments)
+                        @foreach (var ajuste in FilteredAdjustments) // Use FilteredAdjustments
                         {
                             <tr>
                                 <td>@ajuste.Fecha.ToLocalTime().ToString("g")</td>
@@ -53,16 +57,24 @@ else
 {
     <p>No se han registrado ajustes de inventario todavía.</p>
 }
-
 @code {
-    private List<AjusteListItemDto> adjustments = new();
+    private List<AjusteListItemDto> allAdjustments = new(); // Holds all adjustments
     private bool isLoading = true;
+
+    private string searchTerm = string.Empty; // New property for search
+
+    private List<AjusteListItemDto> FilteredAdjustments => string.IsNullOrWhiteSpace(searchTerm)
+        ? allAdjustments
+        : allAdjustments.Where(a => a.ProductoNombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                    a.Motivo.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                    a.UsuarioAutoriza.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                      .ToList();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            adjustments = await AjusteInventarioService.GetAdjustmentsAsync();
+            allAdjustments = await AjusteInventarioService.GetAdjustmentsAsync(); // Load all adjustments
         }
         catch (Exception)
         {

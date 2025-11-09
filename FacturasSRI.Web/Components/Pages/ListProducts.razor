@@ -18,6 +18,10 @@
     </button>
 </div>
 
+<div class="mb-3">
+    <input type="text" class="form-control" placeholder="Buscar productos por nombre o código..." @bind-value="searchTerm" @bind-value:event="oninput" />
+</div>
+
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
@@ -30,7 +34,7 @@
         <h3>Listado de Productos</h3>
     </div>
     <div class="card-body">
-        @if (products == null)
+        @if (allProducts == null) // Check allProducts for loading state
         {
             <p><em>Cargando...</em></p>
         }
@@ -49,7 +53,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var product in products)
+                        @foreach (var product in FilteredProducts) // Use FilteredProducts
                         {
                             <tr>
                                 <td>@product.Nombre</td>
@@ -101,7 +105,7 @@
 
 @code {
     public EventCallback<ProductDto> OnSave { get; set; }
-    private List<ProductDto>? products;
+    private List<ProductDto>? allProducts; // Holds all products
     private ProductDto? selectedProduct;
     private bool isAssignTaxesModalVisible = false;
     private string? errorMessage;
@@ -115,6 +119,14 @@
     private string confirmationModalMessage = string.Empty;
     private Guid productToToggleId;
 
+    private string searchTerm = string.Empty; // New property for search
+
+    private List<ProductDto> FilteredProducts => string.IsNullOrWhiteSpace(searchTerm)
+        ? allProducts ?? new()
+        : allProducts?.Where(p => p.Nombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                  p.CodigoPrincipal.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                      .ToList() ?? new();
+
     protected override async Task OnInitializedAsync()
     {
         await LoadProducts();
@@ -125,7 +137,7 @@
         errorMessage = null;
         try
         {
-            products = await ProductService.GetProductsAsync();
+            allProducts = await ProductService.GetProductsAsync(); // Load all products
         }
         catch (Exception ex)
         {
@@ -135,7 +147,7 @@
 
     private void HandleDeleteProduct(Guid id)
     {
-        var productToToggle = products?.FirstOrDefault(p => p.Id == id);
+        var productToToggle = allProducts?.FirstOrDefault(p => p.Id == id);
         if (productToToggle == null) return;
 
         productToToggleId = id;
@@ -149,7 +161,7 @@
         errorMessage = null;
         showConfirmationModal = false; // Hide the modal
 
-        var productToToggle = products?.FirstOrDefault(p => p.Id == productToToggleId);
+        var productToToggle = allProducts?.FirstOrDefault(p => p.Id == productToToggleId);
         if (productToToggle == null) return;
 
         string action = productToToggle.IsActive ? "desactivar" : "activar";

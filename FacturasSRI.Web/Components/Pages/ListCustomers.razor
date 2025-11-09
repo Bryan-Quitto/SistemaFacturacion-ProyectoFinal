@@ -15,6 +15,10 @@
     </button>
 </div>
 
+<div class="mb-3">
+    <input type="text" class="form-control" placeholder="Buscar clientes por razón social o identificación..." @bind-value="searchTerm" @bind-value:event="oninput" />
+</div>
+
 <table class="table">
     <thead>
         <tr>
@@ -26,7 +30,7 @@
         </tr>
     </thead>
     <tbody>
-        @foreach (var customer in customers)
+        @foreach (var customer in FilteredCustomers) // Use FilteredCustomers
         {
             <tr>
                 <td>@customer.RazonSocial</td>
@@ -43,7 +47,6 @@
         }
     </tbody>
 </table>
-
 @if (customerToEdit != null)
 {
     <EditCustomerModal Customer="customerToEdit" IsVisible="isEditModalVisible" OnSave="HandleUpdateCustomer" OnClose="CloseEditModal" />
@@ -57,7 +60,7 @@
                    OnCancel="CancelToggleCustomerStatus" />
 
 @code {
-    private List<CustomerDto> customers = new();
+    private List<CustomerDto> allCustomers = new(); // Holds all customers
     private CustomerDto? customerToEdit;
     private bool isEditModalVisible = false;
 
@@ -67,6 +70,14 @@
     private string confirmationModalMessage = string.Empty;
     private Guid customerToToggleId;
 
+    private string searchTerm = string.Empty; // New property for search
+
+    private List<CustomerDto> FilteredCustomers => string.IsNullOrWhiteSpace(searchTerm)
+        ? allCustomers
+        : allCustomers.Where(c => c.RazonSocial.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                  c.NumeroIdentificacion.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                      .ToList();
+
     protected override async Task OnInitializedAsync()
     {
         await LoadCustomers();
@@ -74,12 +85,12 @@
     
     private async Task LoadCustomers()
     {
-        customers = await CustomerService.GetCustomersAsync();
+        allCustomers = await CustomerService.GetCustomersAsync(); // Load all customers
     }
 
     private void HandleDeleteCustomer(Guid id)
     {
-        var customerToToggle = customers.FirstOrDefault(c => c.Id == id);
+        var customerToToggle = allCustomers.FirstOrDefault(c => c.Id == id);
         if (customerToToggle == null) return;
 
         customerToToggleId = id;
@@ -92,7 +103,7 @@
     {
         showConfirmationModal = false; // Hide the modal
 
-        var customerToToggle = customers.FirstOrDefault(c => c.Id == customerToToggleId);
+        var customerToToggle = allCustomers.FirstOrDefault(c => c.Id == customerToToggleId);
         if (customerToToggle == null) return;
 
         try

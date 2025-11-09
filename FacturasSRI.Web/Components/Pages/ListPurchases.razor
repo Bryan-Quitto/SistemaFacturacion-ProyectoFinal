@@ -11,11 +11,15 @@
     <p>Consulta todos los lotes de productos que han sido ingresados al inventario.</p>
 </div>
 
+<div class="mb-3">
+    <input type="text" class="form-control" placeholder="Buscar compras por producto o proveedor..." @bind-value="searchTerm" @bind-value:event="oninput" />
+</div>
+
 @if (isLoading)
 {
     <p><em>Cargando historial de compras...</em></p>
 }
-else if (purchases.Any())
+else if (FilteredPurchases.Any()) // Use FilteredPurchases
 {
     <div class="card">
         <div class="card-body">
@@ -35,7 +39,7 @@ else if (purchases.Any())
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var purchase in purchases)
+                        @foreach (var purchase in FilteredPurchases) // Use FilteredPurchases
                         {
                             <tr>
                                 <td>@purchase.FechaCompra.ToLocalTime().ToString("g")</td>
@@ -59,16 +63,23 @@ else
 {
     <p>No se han registrado compras todavía.</p>
 }
-
 @code {
-    private List<PurchaseListItemDto> purchases = new();
+    private List<PurchaseListItemDto> allPurchases = new(); // Holds all purchases
     private bool isLoading = true;
+
+    private string searchTerm = string.Empty; // New property for search
+
+    private List<PurchaseListItemDto> FilteredPurchases => string.IsNullOrWhiteSpace(searchTerm)
+        ? allPurchases
+        : allPurchases.Where(p => p.ProductName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                  p.Proveedor.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                      .ToList();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            purchases = await PurchaseService.GetPurchasesAsync();
+            allPurchases = await PurchaseService.GetPurchasesAsync(); // Load all purchases
         }
         catch (Exception)
         {
