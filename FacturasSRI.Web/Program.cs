@@ -19,8 +19,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddControllers();
 
 builder.Services.AddDbContext<FacturasSRIDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
-           .LogTo(Console.WriteLine, LogLevel.Information));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IProductService, ProductService>();
@@ -30,29 +29,23 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<ITaxService, TaxService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IAjusteInventarioService, AjusteInventarioService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 builder.Services.AddScoped<AuthenticationStateProvider, ApiAuthenticationStateProvider>();
 builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddScoped<ApiClient>();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped(sp => 
+
+builder.Services.AddHttpClient("ApiClient", (serviceProvider, client) =>
 {
-    var accessor = sp.GetRequiredService<IHttpContextAccessor>();
-    string baseAddress;
-
-    if (accessor.HttpContext != null)
+    var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
+    if (httpContextAccessor.HttpContext != null)
     {
-        var request = accessor.HttpContext.Request;
-        baseAddress = $"{request.Scheme}://{request.Host}";
+        var request = httpContextAccessor.HttpContext.Request;
+        client.BaseAddress = new Uri($"{request.Scheme}://{request.Host}");
     }
-    else
-    {
-        baseAddress = builder.Configuration["Jwt:Issuer"] 
-                        ?? throw new InvalidOperationException("HttpContext is null and Jwt:Issuer is not configured.");
-    }
-
-    return new HttpClient { BaseAddress = new Uri(baseAddress) };
 });
+builder.Services.AddScoped<ApiClient>();
+
 
 builder.Services.AddAuthentication("Cookies")
     .AddCookie("Cookies", options =>
@@ -60,7 +53,6 @@ builder.Services.AddAuthentication("Cookies")
         options.LoginPath = "/login";
         options.AccessDeniedPath = "/forbidden";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.SlidingExpiration = true;
     })
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
@@ -75,6 +67,7 @@ builder.Services.AddAuthentication("Cookies")
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
         };
     });
+
 
 builder.Services.AddAuthorization(options =>
 {
@@ -92,10 +85,11 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseAntiforgery();
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapStaticAssets();
+app.UseAntiforgery();
 
 app.MapControllers();
 

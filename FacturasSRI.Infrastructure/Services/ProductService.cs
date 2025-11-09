@@ -59,16 +59,19 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<ProductDto>> GetProductsAsync()
         {
-            return await _context.Productos.Select(product => new ProductDto
-            {
-                Id = product.Id,
-                CodigoPrincipal = product.CodigoPrincipal,
-                Nombre = product.Nombre,
-                Descripcion = product.Descripcion,
-                PrecioVentaUnitario = product.PrecioVentaUnitario,
-                ManejaInventario = product.ManejaInventario,
-                ManejaLotes = product.ManejaLotes
-            }).ToListAsync();
+            return await _context.Productos
+                .Include(p => p.Lotes)
+                .Select(product => new ProductDto
+                {
+                    Id = product.Id,
+                    CodigoPrincipal = product.CodigoPrincipal,
+                    Nombre = product.Nombre,
+                    Descripcion = product.Descripcion,
+                    PrecioVentaUnitario = product.PrecioVentaUnitario,
+                    ManejaInventario = product.ManejaInventario,
+                    ManejaLotes = product.ManejaLotes,
+                    StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal
+                }).ToListAsync();
         }
 
         public async Task UpdateProductAsync(ProductDto productDto)
@@ -111,35 +114,41 @@ namespace FacturasSRI.Infrastructure.Services
         }
 
         public async Task<ProductStockDto?> GetProductStockDetailsAsync(Guid productId)
+        {
+            var product = await _context.Productos
+                .Include(p => p.Lotes)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (product == null)
             {
-                var product = await _context.Productos
-                    .Include(p => p.Lotes)
-                    .FirstOrDefaultAsync(p => p.Id == productId);
-
-                if (product == null)
-                {
-                    return null;
-                }
-
-                var lotesActivos = product.Lotes.Where(l => l.CantidadDisponible > 0).ToList();
-
-                var stockDetails = new ProductStockDto
-                {
-                    ProductId = product.Id,
-                    ProductName = product.Nombre,
-                    TotalStock = lotesActivos.Sum(l => l.CantidadDisponible),
-                    Lotes = lotesActivos.Select(l => new LoteDto
-                    {
-                        Id = l.Id,
-                        CantidadDisponible = l.CantidadDisponible,
-                        PrecioCompraUnitario = l.PrecioCompraUnitario,
-                        FechaCaducidad = l.FechaCaducidad
-                    }).ToList()
-                };
-
-                return stockDetails;
+                return null;
             }
 
+            var stockDetails = new ProductStockDto
+            {
+                ProductId = product.Id,
+                ProductName = product.Nombre,
+                ManejaLotes = product.ManejaLotes
+            };
+
+            if (product.ManejaLotes)
+            {
+                var lotesActivos = product.Lotes.Where(l => l.CantidadDisponible > 0).ToList();
+                stockDetails.TotalStock = lotesActivos.Sum(l => l.CantidadDisponible);
+                stockDetails.Lotes = lotesActivos.Select(l => new LoteDto
+                {
+                    Id = l.Id,
+                    CantidadDisponible = l.CantidadDisponible,
+                    PrecioCompraUnitario = l.PrecioCompraUnitario,
+                    FechaCaducidad = l.FechaCaducidad
+                }).ToList();
+            }
+            else
+            {
+                stockDetails.TotalStock = product.StockTotal;
+            }
+
+            return stockDetails;
+        }
     }
-    
 }

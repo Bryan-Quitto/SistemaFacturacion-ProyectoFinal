@@ -38,94 +38,62 @@ namespace FacturasSRI.Web.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto loginRequest)
         {
-            _logger.LogInformation("--- Inicio de Intento de Login ---");
-            _logger.LogInformation($"Buscando usuario por email: {loginRequest.Email}");
-
             var user = await _context.Usuarios
                 .Include(u => u.UsuarioRoles)
                     .ThenInclude(ur => ur.Rol)
                 .FirstOrDefaultAsync(u => u.Email == loginRequest.Email);
 
-            if (user == null)
+            if (user == null || !BCrypt.Net.BCrypt.Verify(loginRequest.Password, user.PasswordHash))
             {
-                _logger.LogWarning($"Resultado: Usuario NO ENCONTRADO con email: {loginRequest.Email}");
-                _logger.LogInformation("--- Fin de Intento de Login ---");
                 return Unauthorized();
             }
-            
-            _logger.LogInformation($"Resultado: Usuario ENCONTRADO. ID: {user.Id}");
-            _logger.LogInformation($"Verificando contraseña contra el hash de la BD...");
-
-            bool isPasswordCorrect = false;
-            try
-            {
-                isPasswordCorrect = BCrypt.Net.BCrypt.Verify(loginRequest.Password, user.PasswordHash);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "BCrypt.Verify lanzó una excepción. El hash en la BD podría estar corrupto o no ser un hash de BCrypt.");
-                _logger.LogInformation("--- Fin de Intento de Login ---");
-                return Unauthorized();
-            }
-
-            if (!isPasswordCorrect)
-            {
-                _logger.LogWarning("Resultado: Contraseña INCORRECTA.");
-                _logger.LogInformation("--- Fin de Intento de Login ---");
-                return Unauthorized();
-            }
-
-            _logger.LogInformation("Resultado: Contraseña CORRECTA. Generando sesión y token.");
 
             var claims = new List<Claim>
-{
-    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-    new Claim(ClaimTypes.Name, user.PrimerNombre),
-    new Claim(ClaimTypes.Email, user.Email),
-};
-
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.PrimerNombre),
+                new Claim(ClaimTypes.Email, user.Email),
+            };
 
             foreach (var usuarioRol in user.UsuarioRoles)
             {
-                _logger.LogInformation($"Añadiendo Rol al claim: {usuarioRol.Rol.Nombre}");
                 claims.Add(new Claim(ClaimTypes.Role, usuarioRol.Rol.Nombre));
             }
 
-            var claimsIdentity = new ClaimsIdentity(
-                claims, CookieAuthenticationDefaults.AuthenticationScheme);
-
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = true,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
-            };
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(claimsIdentity),
-                authProperties);
+                new ClaimsPrincipal(claimsIdentity));
 
-            var token = GenerateJwtToken(user, claims);
+            var token = GenerateJwtToken(user);
             
-            _logger.LogInformation("--- Fin de Intento de Login (Éxito) ---");
             return Ok(new { token });
         }
 
-        private string GenerateJwtToken(Usuario user, IEnumerable<Claim> claims)
+        private string GenerateJwtToken(Usuario user)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            var claimsList = new List<Claim>(claims);
-            if (!claimsList.Exists(c => c.Type == JwtRegisteredClaimNames.Jti))
+            var claims = new List<Claim>
             {
-                claimsList.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.PrimerNombre),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
+            
+            foreach (var usuarioRol in user.UsuarioRoles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, usuarioRol.Rol.Nombre));
             }
 
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
-                claims: claimsList,
+                claims: claims,
                 expires: DateTime.Now.AddMinutes(120),
                 signingCredentials: credentials);
 

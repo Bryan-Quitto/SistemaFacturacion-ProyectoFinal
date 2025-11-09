@@ -7,5 +7,7 @@ namespace FacturasSRI.Application.Interfaces
     public interface IPurchaseService
     {
         Task<bool> CreatePurchaseAsync(PurchaseDto purchase);
+        Task<List<PurchaseListItemDto>> GetPurchasesAsync();
+
     }
 }

@@ -11,6 +11,5 @@ namespace FacturasSRI.Domain.Entities
         public bool EstaActivo { get; set; } = true;
 
         public virtual ICollection<UsuarioRol> UsuarioRoles { get; set; } = new List<UsuarioRol>();
-        public virtual ICollection<Permiso> Permisos { get; set; } = new List<Permiso>();
     }
 }

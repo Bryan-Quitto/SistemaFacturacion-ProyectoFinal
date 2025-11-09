@@ -1,45 +1,31 @@
 # Archivos y carpetas de compilación de .NET
 **/[Bb]in/
 **/[Oo]bj/
-**/[Rr]elease/
-**/[Dd]ebug/
 
 # Archivos de publicación
 **/publish/
-**/bin/Release/
-**/bin/Debug/
-*.publish.xml
-*.pubxml
 
-# Archivos específicos del usuario de Visual Studio
+# Archivos específicos del usuario de Visual Studio y otros editores
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
-
-# Archivos de caché y configuración de editores
 .vs/
 .vscode/
 .idea/
 *.sln.DotSettings.user
 
-# Mac, Linux, Windows
+# Archivos de sistema operativo
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Archivos de registro y temporales
 *.log
 *.tmp
 *.temp
 
-# Archivos de entorno (nunca subir secretos)
-.env
-.env.*
-!.env.example
-secrets.json
-appsettings.Development.json
-
-# Paquetes y dependencias
+# Paquetes y dependencias (node_modules es el más importante)
 **/node_modules/
 **/packages/
 *.nupkg
@@ -47,14 +33,14 @@ appsettings.Development.json
 # Específico de Blazor
 **/wwwroot/dist/
 
-# Archivos de User Secrets
-**/Properties/launchSettings.json
+# --- SECCIÓN DE CONFIGURACIÓN CORREGIDA ---
+
+# Ignorar archivos de secretos de usuario y configuración de desarrollo local.
+# Estos archivos contienen información sensible o específica de la máquina.
 secrets.json
-appsettings*.json
-!appsettings.template.json
+*.user
+appsettings.Development.json
 
-# Archivos generados por EF Core (a menudo se prefiere mantenerlos, pero se pueden excluir si se regeneran en CI)
-# **/Migrations/*
-
-# Archivos del sistema operativo
-desktop.ini
+# Ignorar el archivo de configuración de lanzamiento (launchSettings.json).
+# Este archivo a menudo contiene perfiles y configuraciones específicas del entorno local.
+**/Properties/launchSettings.json

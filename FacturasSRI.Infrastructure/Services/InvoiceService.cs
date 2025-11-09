@@ -4,6 +4,7 @@ using FacturasSRI.Domain.Entities;
 using FacturasSRI.Domain.Enums;
 using FacturasSRI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -16,11 +17,13 @@ namespace FacturasSRI.Infrastructure.Services
     {
         private readonly FacturasSRIDbContext _context;
         private readonly ILogger<InvoiceService> _logger;
+        private readonly IConfiguration _configuration;
 
-        public InvoiceService(FacturasSRIDbContext context, ILogger<InvoiceService> logger)
+        public InvoiceService(FacturasSRIDbContext context, ILogger<InvoiceService> logger, IConfiguration configuration)
         {
             _context = context;
             _logger = logger;
+            _configuration = configuration;
         }
         
         public async Task<InvoiceDto> CreateInvoiceAsync(CreateInvoiceDto invoiceDto)
@@ -29,8 +32,25 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 try
                 {
-                    var puntoEmision = await _context.PuntosEmision.Include(p => p.Establecimiento).FirstAsync();
-                    var numeroFactura = $"{puntoEmision.Establecimiento.Codigo}-{puntoEmision.Codigo}-{puntoEmision.SecuencialFactura:D9}";
+                    var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"];
+                    var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"];
+
+                    var secuencial = await _context.Secuenciales
+                        .FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
+
+                    if (secuencial == null)
+                    {
+                        secuencial = new Secuencial { 
+                            Id = Guid.NewGuid(),
+                            Establecimiento = establishmentCode!, 
+                            PuntoEmision = emissionPointCode!, 
+                            UltimoSecuencialFactura = 0 
+                        };
+                        _context.Secuenciales.Add(secuencial);
+                    }
+                    
+                    secuencial.UltimoSecuencialFactura++;
+                    var numeroFactura = $"{establishmentCode}-{emissionPointCode}-{secuencial.UltimoSecuencialFactura:D9}";
                     
                     var invoice = new Factura
                     {
@@ -39,7 +59,7 @@ namespace FacturasSRI.Infrastructure.Services
                         FechaEmision = DateTime.UtcNow,
                         NumeroFactura = numeroFactura,
                         Estado = EstadoFactura.Generada,
-                        UsuarioIdCreador = Guid.Parse("1252d27c-ea79-4b10-94ee-607e9bac4658"), // TEMPORAL: Reemplazar con el userId real
+                        UsuarioIdCreador = Guid.Parse("1252d27c-ea79-4b10-94ee-607e9bac4658"), 
                         FechaCreacion = DateTime.UtcNow
                     };
 
@@ -73,7 +93,14 @@ namespace FacturasSRI.Infrastructure.Services
 
                         if (producto.ManejaInventario)
                         {
-                            await DescontarStock(detalle, item.Cantidad);
+                            if (producto.ManejaLotes)
+                            {
+                                await DescontarStockDeLotes(detalle);
+                            }
+                            else
+                            {
+                                await DescontarStockGeneral(producto, detalle.Cantidad);
+                            }
                         }
 
                         invoice.Detalles.Add(detalle);
@@ -91,15 +118,13 @@ namespace FacturasSRI.Infrastructure.Services
                         FacturaId = invoice.Id,
                         ClienteId = invoice.ClienteId,
                         FechaEmision = invoice.FechaEmision,
-                        FechaVencimiento = invoice.FechaEmision.AddDays(30), // Asumimos 30 días de crédito
+                        FechaVencimiento = invoice.FechaEmision.AddDays(30),
                         MontoTotal = invoice.Total,
                         SaldoPendiente = invoice.Total,
-                        Pagada = false,
-                        UsuarioIdCreador = Guid.Parse("1252d27c-ea79-4b10-94ee-607e9bac4658"), // TEMPORAL: Reemplazar
+                        UsuarioIdCreador = Guid.Parse("1252d27c-ea79-4b10-94ee-607e9bac4658"),
                         FechaCreacion = DateTime.UtcNow
                     };
                     
-                    puntoEmision.SecuencialFactura++;
                     _context.Facturas.Add(invoice);
                     _context.CuentasPorCobrar.Add(cuentaPorCobrar);
                     
@@ -118,8 +143,18 @@ namespace FacturasSRI.Infrastructure.Services
             }   
         }
 
-        private async Task DescontarStock(FacturaDetalle detalle, int cantidadADescontar)
+        private async Task DescontarStockGeneral(Producto producto, int cantidadADescontar)
         {
+            if (producto.StockTotal < cantidadADescontar)
+            {
+                throw new InvalidOperationException($"No hay stock suficiente para '{producto.Nombre}'. Stock disponible: {producto.StockTotal}, se requieren: {cantidadADescontar}.");
+            }
+            producto.StockTotal -= cantidadADescontar;
+        }
+
+        private async Task DescontarStockDeLotes(FacturaDetalle detalle)
+        {
+            var cantidadADescontar = detalle.Cantidad;
             var lotesDisponibles = await _context.Lotes
                 .Where(l => l.ProductoId == detalle.ProductoId && l.CantidadDisponible > 0)
                 .OrderBy(l => l.FechaCompra)
@@ -128,7 +163,9 @@ namespace FacturasSRI.Infrastructure.Services
             var stockTotal = lotesDisponibles.Sum(l => l.CantidadDisponible);
             if (stockTotal < cantidadADescontar)
             {
-                throw new InvalidOperationException($"No hay stock suficiente para el producto ID {detalle.ProductoId}. Stock disponible: {stockTotal}, se requieren: {cantidadADescontar}.");
+                var producto = await _context.Productos.FindAsync(detalle.ProductoId);
+                var nombreProducto = producto?.Nombre ?? $"Producto ID {detalle.ProductoId}";
+                throw new InvalidOperationException($"No hay stock suficiente para '{nombreProducto}'. Stock disponible: {stockTotal}, se requieren: {cantidadADescontar}.");
             }
 
             foreach (var lote in lotesDisponibles)
@@ -136,7 +173,7 @@ namespace FacturasSRI.Infrastructure.Services
                 if (cantidadADescontar <= 0) break;
 
                 int cantidadConsumida = Math.Min(lote.CantidadDisponible, cantidadADescontar);
-                
+
                 lote.CantidadDisponible -= cantidadConsumida;
                 cantidadADescontar -= cantidadConsumida;
 
@@ -147,7 +184,7 @@ namespace FacturasSRI.Infrastructure.Services
                     LoteId = lote.Id,
                     CantidadConsumida = cantidadConsumida
                 };
-                detalle.ConsumosDeLote.Add(consumoDeLote);
+                _context.FacturaDetalleConsumoLotes.Add(consumoDeLote);
             }
         }
 

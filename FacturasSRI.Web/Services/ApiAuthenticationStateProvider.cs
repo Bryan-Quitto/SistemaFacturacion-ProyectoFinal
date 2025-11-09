@@ -14,6 +14,7 @@ namespace FacturasSRI.Web.Services
     {
         private readonly IJSRuntime _jsRuntime;
         private readonly ILogger<ApiAuthenticationStateProvider> _logger;
+        private static readonly AuthenticationState _anonymousState = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
 
         public ApiAuthenticationStateProvider(IJSRuntime jsRuntime, ILogger<ApiAuthenticationStateProvider> logger)
         {
@@ -28,97 +29,88 @@ namespace FacturasSRI.Web.Services
             {
                 token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
             }
-            catch (InvalidOperationException ex)
+            catch (InvalidOperationException)
             {
-                _logger.LogWarning(ex, "IJSRuntime no disponible (probablemente pre-renderizado).");
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                return _anonymousState;
             }
 
             if (string.IsNullOrEmpty(token))
             {
-                _logger.LogInformation("No se encontró token en localStorage.");
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                return _anonymousState;
             }
             
-            _logger.LogInformation("Token encontrado, parseando claims...");
-            var identity = new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt");
-            return new AuthenticationState(new ClaimsPrincipal(identity));
+            var principal = new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt"));
+            return new AuthenticationState(principal);
         }
 
         public void MarkUserAsAuthenticated(string token)
-{
-    _logger.LogInformation($"MarkUserAsAuthenticated llamado. Notificando al sistema para que re-evalúe.");
-    
-    var authenticatedUser = new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt"));
-    var authState = Task.FromResult(new AuthenticationState(authenticatedUser));
-    
-    NotifyAuthenticationStateChanged(authState);
-}
+        {
+            var authenticatedUser = new ClaimsPrincipal(new ClaimsIdentity(ParseClaimsFromJwt(token), "jwt"));
+            var authState = Task.FromResult(new AuthenticationState(authenticatedUser));
+            NotifyAuthenticationStateChanged(authState);
+        }
 
-public async Task MarkUserAsLoggedOut()
-{
-    _logger.LogInformation("MarkUserAsLoggedOut llamado. Notificando al sistema para que re-evalúe.");
-
-    await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
-
-    var anonymousUser = new ClaimsPrincipal(new ClaimsIdentity());
-    var authState = Task.FromResult(new AuthenticationState(anonymousUser));
-    
-    NotifyAuthenticationStateChanged(authState);
-}
+        public async Task MarkUserAsLoggedOut()
+        {
+            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+            var authState = Task.FromResult(_anonymousState);
+            NotifyAuthenticationStateChanged(authState);
+        }
 
         private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
         {
-            _logger.LogInformation("--- Parseando JWT ---");
             var claims = new List<Claim>();
             var payload = jwt.Split('.')[1];
             var jsonBytes = ParseBase64WithoutPadding(payload);
             var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
 
-            if (keyValuePairs.TryGetValue(ClaimTypes.Email, out var email) && email != null)
+            if (keyValuePairs == null)
             {
-                claims.Add(new Claim(ClaimTypes.Email, email.ToString()));
+                return claims;
             }
-            if (keyValuePairs.TryGetValue("sub", out var sub) && sub != null)
+            
+            // Buscar el ID del usuario (primero el 'sub' estándar, luego el de Microsoft)
+            if (keyValuePairs.TryGetValue("sub", out var sub) && sub?.ToString() is string subValue)
             {
-                claims.Add(new Claim(ClaimTypes.NameIdentifier, sub.ToString()));
+                claims.Add(new Claim(ClaimTypes.NameIdentifier, subValue));
             }
-            if (keyValuePairs.TryGetValue(ClaimTypes.Name, out var name) && name != null)
+            else if (keyValuePairs.TryGetValue(ClaimTypes.NameIdentifier, out var nameId) && nameId?.ToString() is string nameIdValue)
             {
-                claims.Add(new Claim(ClaimTypes.Name, name.ToString()));
+                claims.Add(new Claim(ClaimTypes.NameIdentifier, nameIdValue));
             }
 
-            if (keyValuePairs.TryGetValue("role", out var roles) || 
-                keyValuePairs.TryGetValue(ClaimTypes.Role, out roles))
-                
+            // Buscar el Nombre del usuario
+            if (keyValuePairs.TryGetValue(ClaimTypes.Name, out var name) && name?.ToString() is string nameValue)
             {
-                _logger.LogInformation("Se encontró un claim de Rol.");
+                claims.Add(new Claim(ClaimTypes.Name, nameValue));
+            }
+
+            // Buscar el Email del usuario
+            if (keyValuePairs.TryGetValue(ClaimTypes.Email, out var email) && email?.ToString() is string emailValue)
+            {
+                claims.Add(new Claim(ClaimTypes.Email, emailValue));
+            }
+
+            // Buscar Roles
+            if (keyValuePairs.TryGetValue(ClaimTypes.Role, out var roles))
+            {
                 if (roles is JsonElement rolesElement && rolesElement.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var role in rolesElement.EnumerateArray())
                     {
-                        if(role.GetString() != null)
+                        if(role.GetString() is string roleValue)
                         {
-                            var roleValue = role.GetString();
-                            _logger.LogInformation($"Añadiendo Rol al Principal: {roleValue}");
                             claims.Add(new Claim(ClaimTypes.Role, roleValue));
                         }
                     }
                 }
-                else if (roles != null)
+                else if (roles?.ToString() is string singleRole)
                 {
-                    var roleValue = roles.ToString();
-                    _logger.LogInformation($"Añadiendo Rol (individual) al Principal: {roleValue}");
-                    claims.Add(new Claim(ClaimTypes.Role, roleValue));
+                    claims.Add(new Claim(ClaimTypes.Role, singleRole));
                 }
             }
-            else
-            {
-                _logger.LogWarning("No se encontró ningún claim 'role' o 'http://.../role' en el token.");
-            }
-            
-            _logger.LogInformation("--- Parseo de JWT Terminado ---");
-            return claims.AsEnumerable();
+
+            return claims;
         }
 
         private byte[] ParseBase64WithoutPadding(string base64)

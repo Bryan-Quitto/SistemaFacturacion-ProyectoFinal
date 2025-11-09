@@ -11,5 +11,6 @@ namespace FacturasSRI.Application.Dtos
         public decimal PrecioVentaUnitario { get; set; }
         public bool ManejaInventario { get; set; } = true;
         public bool ManejaLotes { get; set; } = true;
+        public int StockTotal { get; set; }
     }
 }

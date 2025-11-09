@@ -1,0 +1,21 @@
+Hola Gemini, puedes revisar por favor todo el proyecto para saber si se cumple con todo este sprint por favor, SOLO REVISA SI FALTA ALGO O ESTA COMPLETO NO MODIFIQUES NADA DEL CODIGO!:
+
+HU (ID)	Tarea (Sprint Task)	Estimación (horas)	Responsable
+HU-01	(Arquitectura) Crear estructura de proyectos: .Domain, .Application, etc.	3	Dev 1
+HU-01	(Arquitectura) Configurar Inyección de Dependencias base	3	Dev 2
+HU-02	(Git) Inicializar repositorio, crear ramas master y develop (Git Flow)	2	Dev 1
+HU-03	(DB) Instalar paquetes EF Core y definir DbContext	2	Dev 3
+HU-03	(DB) Definir Entidades (Cliente, Producto, Lote) en .Domain	3	Dev 3
+HU-03	(DB) Configurar connection string y ejecutar la primera migración	3	Dev 3
+HU-04	(API/Test) Crear un endpoint de "HealthCheck" para pruebas de conexión	2	Dev 4
+HU-04	(Blazor/Test) Crear página en Blazor que consuma el "HealthCheck"	2	Dev 4
+HU-05	(Backend) Crear DTOs, Servicios y Repositorio para Clientes	3	Dev 2
+HU-05	(Backend) Crear Endpoints (API) para Crear [POST] y Editar [PUT] Clientes	2	Dev 2
+HU-05	(Frontend) Crear formulario en Blazor para Crear/Editar Cliente	4	Dev 1
+HU-05	(Frontend) Crear página en Blazor para Listar [GET] y buscar Clientes	3	Dev 1
+HU-06	(Backend) Crear DTOs, Servicios y Endpoints para Productos (CRUD simple)	3	Dev 4
+HU-06	(Frontend) Crear formulario y lista en Blazor para gestionar Productos	3	Dev 4
+HU-07	(Backend) Crear DTOs, Servicios y Endpoints para registrar Lotes [POST]	4	Dev 3
+HU-07	(Frontend) Crear formulario en Blazor para registrar un Lote	4	Dev 4
+HU-08	(Backend) Crear Endpoint [GET] para ver Lotes por producto	2	Dev 2
+HU-08	(Frontend) Modificar vista de Producto para mostrar sus Lotes y stock	2	Dev 2

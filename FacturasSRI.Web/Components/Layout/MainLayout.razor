@@ -2,6 +2,7 @@
 @inherits LayoutComponentBase
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
+@inject ILogger<MainLayout> Logger
 
 <div class="page">
     <AuthorizeView>
@@ -35,15 +36,17 @@
         <article class="content px-4">
             <div class="container-fluid">
                 
-                <ErrorBoundary>
+                <ErrorBoundary @ref="errorBoundary">
                     <ChildContent>
                         @Body
                     </ChildContent>
-                    <ErrorContent>
+                    <ErrorContent Context="ex">
+                        @{
+                            Logger.LogError(ex, "ErrorBoundary capturó una excepción en la UI.");
+                        }
                         <div class="alert alert-danger">
-                            <h4>Error en el contenido de la página:</h4>
-                            <p>@context.Message</p>
-                            <pre>@context.StackTrace</pre>
+                            <h4>Ha ocurrido un error inesperado.</h4>
+                            <p>Hemos registrado el error. Por favor, intenta recargar la página.</p>
                         </div>
                     </ErrorContent>
                 </ErrorBoundary>
@@ -66,10 +69,17 @@
 </div>
 
 @code {
+    private ErrorBoundary? errorBoundary;
+
+    protected override void OnParametersSet()
+    {
+        errorBoundary?.Recover();
+    }
+
     private async Task HandleLogout()
     {
         var apiStateProvider = (ApiAuthenticationStateProvider)AuthenticationStateProvider;
         await apiStateProvider.MarkUserAsLoggedOut();
-        Navigation.NavigateTo("/login");
+        Navigation.NavigateTo("/login", forceLoad: true);
     }
 }

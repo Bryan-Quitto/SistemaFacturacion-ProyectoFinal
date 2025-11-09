@@ -7,18 +7,20 @@ namespace FacturasSRI.Web.Services
 {
     public class ApiClient
     {
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly IJSRuntime _jsRuntime;
 
-        public ApiClient(HttpClient httpClient, IJSRuntime jsRuntime)
+        public ApiClient(IHttpClientFactory httpClientFactory, IJSRuntime jsRuntime)
         {
-            _httpClient = httpClient;
+            _httpClientFactory = httpClientFactory;
             _jsRuntime = jsRuntime;
         }
 
         public async Task<HttpClient> GetHttpClientAsync()
         {
-            string token = null;
+            var httpClient = _httpClientFactory.CreateClient("ApiClient");
+            string token = string.Empty;
+
             try
             {
                 token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "authToken");
@@ -29,13 +31,14 @@ namespace FacturasSRI.Web.Services
 
             if (!string.IsNullOrEmpty(token))
             {
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
             else
             {
-                _httpClient.DefaultRequestHeaders.Authorization = null;
+                httpClient.DefaultRequestHeaders.Authorization = null;
             }
-            return _httpClient;
+
+            return httpClient;
         }
     }
 }
