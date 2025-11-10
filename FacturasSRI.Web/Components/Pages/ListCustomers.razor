@@ -3,8 +3,11 @@
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Web.Components.Shared
+@using Microsoft.AspNetCore.Components.Authorization
 @inject ICustomerService CustomerService
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IUserService UserService
 
 <PageTitle>Lista de Clientes</PageTitle>
 
@@ -25,7 +28,10 @@
             <th>Razón Social</th>
             <th>Número de Identificación</th>
             <th>Correo Electrónico</th>
-            <th>Creado Por</th>
+            <th>Teléfono</th>
+            <th>Creado por</th>
+            <th>Última edición por</th>
+            <th>Fecha de edición</th>
             <th>Acciones</th>
         </tr>
     </thead>
@@ -36,7 +42,10 @@
                 <td>@customer.RazonSocial</td>
                 <td>@customer.NumeroIdentificacion</td>
                 <td>@customer.Email</td>
+                <td>@customer.Telefono</td>
                 <td>@customer.CreadoPor</td>
+                <td>@customer.UltimaModificacionPor</td>
+                <td>@(customer.FechaModificacion.HasValue ? customer.FechaModificacion.Value.ToShortDateString() : "N/A")</td>
                 <td>
                     <button class="btn btn-sm btn-secondary" @onclick="() => OpenEditModal(customer)">Editar</button>
                     <button class="btn btn-sm @(customer.EstaActivo ? "btn-danger" : "btn-success")" @onclick="() => HandleDeleteCustomer(customer.Id)">
@@ -126,6 +135,23 @@
 
     private async Task HandleUpdateCustomer(CustomerDto customer)
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = user.FindFirst(c => c.Type == "sub") ?? user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out Guid currentUserId))
+            {
+                customer.UsuarioIdCreador = currentUserId; // This is actually the modifier's ID
+                var userDto = await UserService.GetUserByIdAsync(currentUserId);
+                if (userDto != null)
+                {
+                    customer.UltimaModificacionPor = $"{userDto.PrimerNombre} {userDto.PrimerApellido}";
+                }
+            }
+        }
+
         await CustomerService.UpdateCustomerAsync(customer);
         isEditModalVisible = false;
         customerToEdit = null;
@@ -142,7 +168,12 @@
             Direccion = customer.Direccion,
             Telefono = customer.Telefono,
             TipoIdentificacion = customer.TipoIdentificacion,
-            EstaActivo = customer.EstaActivo
+            EstaActivo = customer.EstaActivo,
+            UsuarioIdCreador = customer.UsuarioIdCreador,
+            FechaCreacion = customer.FechaCreacion,
+            FechaModificacion = customer.FechaModificacion,
+            UsuarioModificadorId = customer.UsuarioModificadorId,
+            UltimaModificacionPor = customer.UltimaModificacionPor
         };
         isEditModalVisible = true;
     }

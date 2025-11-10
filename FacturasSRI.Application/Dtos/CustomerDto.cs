@@ -28,5 +28,7 @@ namespace FacturasSRI.Application.Dtos
         public Guid UsuarioIdCreador { get; set; }
         public DateTime FechaCreacion { get; set; }
         public DateTime? FechaModificacion { get; set; }
+        public Guid? UsuarioModificadorId { get; set; }
+        public string? UltimaModificacionPor { get; set; }
     }
 }

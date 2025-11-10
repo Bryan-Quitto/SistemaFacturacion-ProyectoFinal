@@ -72,8 +72,10 @@ namespace FacturasSRI.Infrastructure.Services
         public async Task<List<CustomerDto>> GetCustomersAsync()
         {
             return await (from customer in _context.Clientes
-                          join usuario in _context.Usuarios on customer.UsuarioIdCreador equals usuario.Id into usuarioJoin
-                          from usuario in usuarioJoin.DefaultIfEmpty()
+                          join usuarioCreador in _context.Usuarios on customer.UsuarioIdCreador equals usuarioCreador.Id into usuarioCreadorJoin
+                          from usuarioCreador in usuarioCreadorJoin.DefaultIfEmpty()
+                          join usuarioModificador in _context.Usuarios on customer.UsuarioModificadorId equals usuarioModificador.Id into usuarioModificadorJoin
+                          from usuarioModificador in usuarioModificadorJoin.DefaultIfEmpty()
                           select new CustomerDto
                           {
                               Id = customer.Id,
@@ -84,15 +86,20 @@ namespace FacturasSRI.Infrastructure.Services
                               Direccion = customer.Direccion,
                               Telefono = customer.Telefono,
                               EstaActivo = customer.EstaActivo,
-                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado"
+                              CreadoPor = usuarioCreador != null ? usuarioCreador.PrimerNombre + " " + usuarioCreador.PrimerApellido : "Usuario no encontrado",
+                              FechaCreacion = customer.FechaCreacion,
+                              FechaModificacion = customer.FechaModificacion,
+                              UltimaModificacionPor = usuarioModificador != null ? usuarioModificador.PrimerNombre + " " + usuarioModificador.PrimerApellido : "N/A"
                           }).ToListAsync();
         }
 
         public async Task<List<CustomerDto>> GetActiveCustomersAsync()
         {
             return await (from customer in _context.Clientes
-                          join usuario in _context.Usuarios on customer.UsuarioIdCreador equals usuario.Id into usuarioJoin
-                          from usuario in usuarioJoin.DefaultIfEmpty()
+                          join usuarioCreador in _context.Usuarios on customer.UsuarioIdCreador equals usuarioCreador.Id into usuarioCreadorJoin
+                          from usuarioCreador in usuarioCreadorJoin.DefaultIfEmpty()
+                          join usuarioModificador in _context.Usuarios on customer.UsuarioModificadorId equals usuarioModificador.Id into usuarioModificadorJoin
+                          from usuarioModificador in usuarioModificadorJoin.DefaultIfEmpty()
                           where customer.EstaActivo == true // Filter for active customers
                           select new CustomerDto
                           {
@@ -104,7 +111,10 @@ namespace FacturasSRI.Infrastructure.Services
                               Direccion = customer.Direccion,
                               Telefono = customer.Telefono,
                               EstaActivo = customer.EstaActivo,
-                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado"
+                              CreadoPor = usuarioCreador != null ? usuarioCreador.PrimerNombre + " " + usuarioCreador.PrimerApellido : "Usuario no encontrado",
+                              FechaCreacion = customer.FechaCreacion,
+                              FechaModificacion = customer.FechaModificacion,
+                              UltimaModificacionPor = usuarioModificador != null ? usuarioModificador.PrimerNombre + " " + usuarioModificador.PrimerApellido : "N/A"
                           }).ToListAsync();
         }
 
@@ -120,6 +130,9 @@ namespace FacturasSRI.Infrastructure.Services
                 customer.Direccion = customerDto.Direccion;
                 customer.Telefono = customerDto.Telefono;
                 customer.EstaActivo = customerDto.EstaActivo; // Update EstaActivo from CustomerDto.EstaActivo
+                customer.FechaModificacion = DateTime.UtcNow;
+                customer.UsuarioModificadorId = customerDto.UsuarioIdCreador; // Assuming UsuarioIdCreador in DTO is the modifier's ID
+                customer.UltimaModificacionPor = customerDto.UltimaModificacionPor; // Assuming UltimaModificacionPor in DTO is the modifier's name
                 await _context.SaveChangesAsync();
             }
         }
