@@ -78,8 +78,8 @@
                 @if (isComprasOpen)
                 {
                     <ul class="nav-submenu">
-                        <li><NavLink href="purchases" Match="NavLinkMatch.All">Registrar Compra</NavLink></li>
-                        <li><NavLink href="purchases/list" Match="NavLinkMatch.All">Listar Compras</NavLink></li>
+                        <li><NavLink href="purchases/create" Match="NavLinkMatch.All">Registrar Compra</NavLink></li>
+                        <li><NavLink href="purchases" Match="NavLinkMatch.All">Listar Compras</NavLink></li>
                     </ul>
                 }
             </div>
@@ -108,11 +108,10 @@
                 </div>
                 @if (isInventarioOpen)
                 {
-                    <ul class="nav-submenu">
-                        <li><NavLink href="inventory/adjustments" Match="NavLinkMatch.All">Registrar Ajuste</NavLink></li>
-<li><NavLink href="inventory/adjustments/list" Match="NavLinkMatch.All">Listar Ajustes</NavLink></li>
-                    </ul>
-                }
+                                        <ul class="nav-submenu">
+                                            <li><NavLink href="inventory/adjustments/create" Match="NavLinkMatch.All">Registrar Ajuste</NavLink></li>
+                                            <li><NavLink href="inventory/adjustments" Match="NavLinkMatch.All">Listar Ajustes</NavLink></li>
+                                        </ul>                }
             </div>
         </AuthorizeView>
 
