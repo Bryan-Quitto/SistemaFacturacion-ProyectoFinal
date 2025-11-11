@@ -23,6 +23,10 @@
 
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
-        <PageTitle>Aether Tech</PageTitle>
     </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <FacturasSRI.Web.Components.Pages.NotFound />
+        </LayoutView>
+    </NotFound>
 </Router>

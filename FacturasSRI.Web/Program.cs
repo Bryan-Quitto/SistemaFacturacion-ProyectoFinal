@@ -110,6 +110,8 @@ app.UseRequestLocalization(new RequestLocalizationOptions
     SupportedUICultures = supportedCultures
 });
 
+app.UseStatusCodePagesWithReExecute("/");
+
 app.UseStaticFiles();
 
 app.UseAuthentication();

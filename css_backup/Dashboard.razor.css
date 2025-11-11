@@ -1,0 +1,43 @@
+.dashboard-header {
+    margin-bottom: 2rem;
+}
+
+.dashboard-header h1 {
+    font-weight: 700;
+}
+
+.dashboard-header p {
+    color: var(--text-color-light);
+    font-size: 1.1rem;
+}
+
+.summary-card .card-body {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+}
+
+.summary-card .card-icon {
+    font-size: 2.5rem;
+    color: var(--primary-light);
+    margin-right: 1.5rem;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.summary-card .card-content h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color-light);
+    margin: 0;
+}
+
+.summary-card .card-content p {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin: 0;
+}

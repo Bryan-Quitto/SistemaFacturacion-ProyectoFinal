@@ -1,0 +1,65 @@
+.page-header {
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-weight: 700;
+}
+
+.page-header p {
+    color: var(--text-color-light);
+    font-size: 1.1rem;
+}
+
+.step-section {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.step-number {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+.step-content {
+    flex-grow: 1;
+}
+
+.step-title {
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.search-results {
+    position: absolute;
+    z-index: 1000;
+    width: calc(100% - 3rem); /* Adjust based on parent padding */
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    box-shadow: var(--box-shadow-lg);
+}
+
+.selected-item-info {
+    background-color: var(--secondary-color);
+    border-color: var(--border-color);
+}
+
+.invoice-items-table th {
+    background-color: transparent;
+}
+
+.list-group.active strong {
+    color: var(--white);
+}
