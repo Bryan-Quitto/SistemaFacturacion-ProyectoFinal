@@ -41,13 +41,14 @@ html, body {
 
 .sidebar {
     width: 260px;
-    background-color: #34495e; /* Softer dark blue-gray */
-    color: var(--white);
+    background-color: var(--background-color); /* Changed to white */
+    color: var(--text-color); /* Changed to dark text */
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
     z-index: 1000;
     box-shadow: var(--box-shadow-lg);
+    border-right: 1px solid var(--border-color); /* Added border */
 }
 
 .main-content {
@@ -75,7 +76,7 @@ html, body {
 }
 
 /* ==========================================================================
-   NavMenu - QuickBooks Inspired
+   NavMenu - Restored Original Styles
    ========================================================================== */
 
 .nav-menu {
@@ -83,20 +84,27 @@ html, body {
     flex-direction: column;
     height: 100%;
     width: 100%;
+    background-color: var(--background-color); /* Ensure white background */
 }
 
 .nav-header {
-    padding: 1rem 1.5rem;
+    padding: 1rem; /* Original padding */
     display: flex;
     align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--border-color); /* Original border */
     flex-shrink: 0;
 }
 
 .nav-header .navbar-brand {
-    color: var(--white);
-    font-weight: 600;
-    font-size: 1.2rem;
+    color: var(--primary-dark); /* Original color */
+    font-weight: 700; /* Original font weight */
+    font-size: 1.25rem; /* Original font size */
+    gap: 0.75rem; /* Original gap */
+}
+
+.nav-header .navbar-brand i {
+    font-size: 1.5rem; /* Original font size */
+    color: var(--accent-color); /* Original color */
 }
 
 .nav-container {
@@ -105,21 +113,22 @@ html, body {
     flex-grow: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 1rem;
+    padding: 1rem 0; /* Original padding */
     min-height: 0;
 }
 
 .nav-item, .nav-section {
-    margin-bottom: 0.5rem;
+    padding: 0 1rem; /* Original padding */
+    margin-bottom: 0.25rem; /* Original margin */
 }
 
 .nav-item .nav-link,
 .nav-link-header {
     display: flex;
     align-items: center;
-    padding: 0.8rem 1rem;
-    border-radius: 0.5rem;
-    color: rgba(255, 255, 255, 0.9); /* Adjusted text color */
+    padding: 0.75rem 1rem; /* Original padding */
+    border-radius: 0.375rem; /* Original border-radius */
+    color: var(--text-color-light); /* Original color */
     font-weight: 500;
     transition: background-color 0.2s, color 0.2s;
     text-decoration: none;
@@ -132,48 +141,49 @@ html, body {
 .nav-item .nav-link i,
 .nav-link-header i {
     margin-right: 1rem;
-    font-size: 1.2rem;
-    width: 24px;
+    font-size: 1.125rem; /* Original font size */
+    width: 20px; /* Original width */
     text-align: center;
-    color: rgba(255, 255, 255, 0.7); /* Adjusted icon color */
+    color: var(--text-color-light); /* Original color */
     transition: color 0.2s;
 }
 
 .nav-item .nav-link:hover,
 .nav-link-header:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: var(--white);
+    background-color: var(--primary-light); /* Original hover background */
+    color: var(--primary-dark); /* Original hover color */
 }
 
 .nav-item .nav-link:hover i,
 .nav-link-header:hover i {
-    color: var(--white);
+    color: var(--primary-dark); /* Original hover icon color */
 }
 
 .nav-item .nav-link.active {
-    background-color: var(--primary-light); /* Softer active background */
-    color: var(--primary-dark); /* Darker text for active link */
+    background-color: var(--primary-dark); /* Original active background */
+    color: var(--white); /* Original active color */
     font-weight: 600;
 }
 
 .nav-item .nav-link.active i {
-    color: var(--primary-dark); /* Darker icon for active link */
+    color: var(--white); /* Original active icon color */
 }
 
 .nav-submenu {
     list-style: none;
-    padding: 0.5rem 0 0.5rem 1rem;
-    margin: 0;
-    background-color: rgba(0, 0, 0, 0.1); /* Softer submenu background */
-    border-radius: 0.5rem;
-    overflow: hidden;
+    padding: 0; /* Original padding */
+    margin: 0.5rem 0 0 0; /* Original margin */
+    background-color: transparent; /* Ensure no background */
+    border-radius: 0; /* Ensure no border-radius */
+    overflow: visible; /* Ensure no overflow hidden */
 }
 
 .nav-submenu li a {
     display: block;
-    padding: 0.7rem 1rem 0.7rem 3rem;
-    color: rgba(255, 255, 255, 0.8); /* Adjusted submenu text color */
-    border-radius: 0.375rem;
+    padding: 0.6rem 1rem 0.6rem calc(1rem + 20px + 1rem); /* Original padding */
+    color: var(--text-color-light); /* Original color */
+    opacity: 0.85; /* Original opacity */
+    border-radius: 0.375rem; /* Original border-radius */
     text-decoration: none;
     position: relative;
     font-size: 0.95rem;
@@ -181,12 +191,21 @@ html, body {
 }
 
 .nav-submenu a:hover {
-    background-color: rgba(255, 255, 255, 0.05); /* Softer submenu hover */
-    color: var(--white);
+    background-color: var(--primary-light); /* Original hover background */
+    color: var(--primary-dark); /* Original hover color */
+    opacity: 1; /* Original opacity */
 }
 
 .nav-submenu a.active {
-    color: var(--white);
+    color: var(--primary-dark); /* Original active color */
+    font-weight: 700; /* Original font weight */
+    background-color: var(--primary-light); /* Original active background */
+    opacity: 1; /* Original opacity */
+}
+
+.nav-section:has(.nav-submenu a.active) > .nav-link-header {
+    background-color: var(--primary-light); /* Original background */
+    color: var(--primary-dark); /* Original color */
     font-weight: 600;
 }
 
