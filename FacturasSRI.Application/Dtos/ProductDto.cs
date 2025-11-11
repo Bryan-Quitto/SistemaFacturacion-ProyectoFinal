@@ -28,7 +28,5 @@ namespace FacturasSRI.Application.Dtos
         public DateTime FechaCreacion { get; set; }
         public DateTime? FechaModificacion { get; set; }
         public TipoProducto TipoProducto { get; set; }
-        public string ImpuestoPrincipalNombre { get; set; } = "N/A"; // Added
-        public decimal ImpuestoPrincipalPorcentaje { get; set; } = 0; // Added
     }
 }

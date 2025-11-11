@@ -45,29 +45,20 @@ namespace FacturasSRI.Infrastructure.Services
                           where product.Id == id
                           join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
-                          // Left join with ProductoImpuesto to get associated taxes
-                          join pi in _context.ProductoImpuestos on product.Id equals pi.ProductoId into productTaxes
-                          from pi in productTaxes.DefaultIfEmpty()
-                          // Left join with Impuesto to get tax details
-                          join tax in _context.Impuestos on pi.ImpuestoId equals tax.Id into taxDetails
-                          from tax in taxDetails.DefaultIfEmpty()
-                          group new { product, usuario, tax } by product.Id into g // Group by product to handle multiple taxes
                           select new ProductDto
                           {
-                              Id = g.Key,
-                              CodigoPrincipal = g.First().product.CodigoPrincipal,
-                              Nombre = g.First().product.Nombre,
-                              Descripcion = g.First().product.Descripcion,
-                              PrecioVentaUnitario = g.First().product.PrecioVentaUnitario,
-                              ManejaInventario = g.First().product.ManejaInventario,
-                              ManejaLotes = g.First().product.ManejaLotes,
-                              StockTotal = g.First().product.ManejaLotes ? g.First().product.Lotes.Sum(l => l.CantidadDisponible) : g.First().product.StockTotal,
-                              CreadoPor = g.First().usuario != null ? g.First().usuario.PrimerNombre + " " + g.First().usuario.PrimerApellido : "Usuario no encontrado",
-                              IsActive = g.First().product.EstaActivo,
-                              FechaCreacion = g.First().product.FechaCreacion,
-                              FechaModificacion = g.First().product.FechaModificacion,
-                              ImpuestoPrincipalNombre = g.Where(x => x.tax != null).Select(x => x.tax!.Nombre).FirstOrDefault() ?? "N/A", // Get first tax name
-                              ImpuestoPrincipalPorcentaje = g.Where(x => x.tax != null).Select(x => x.tax!.Porcentaje).FirstOrDefault() // Get first tax percentage
+                              Id = product.Id,
+                              CodigoPrincipal = product.CodigoPrincipal,
+                              Nombre = product.Nombre,
+                              Descripcion = product.Descripcion,
+                              PrecioVentaUnitario = product.PrecioVentaUnitario,
+                              ManejaInventario = product.ManejaInventario,
+                              ManejaLotes = product.ManejaLotes,
+                              StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
+                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
+                              IsActive = product.EstaActivo,
+                              FechaCreacion = product.FechaCreacion,
+                              FechaModificacion = product.FechaModificacion
                           }).FirstOrDefaultAsync();
         }
 
@@ -76,27 +67,18 @@ namespace FacturasSRI.Infrastructure.Services
             return await (from product in _context.Productos
                           join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
-                          // Left join with ProductoImpuesto to get associated taxes
-                          join pi in _context.ProductoImpuestos on product.Id equals pi.ProductoId into productTaxes
-                          from pi in productTaxes.DefaultIfEmpty()
-                          // Left join with Impuesto to get tax details
-                          join tax in _context.Impuestos on pi.ImpuestoId equals tax.Id into taxDetails
-                          from tax in taxDetails.DefaultIfEmpty()
-                          group new { product, usuario, tax } by product.Id into g // Group by product to handle multiple taxes
                           select new ProductDto
                           {
-                              Id = g.Key,
-                              CodigoPrincipal = g.First().product.CodigoPrincipal,
-                              Nombre = g.First().product.Nombre,
-                              Descripcion = g.First().product.Descripcion,
-                              PrecioVentaUnitario = g.First().product.PrecioVentaUnitario,
-                              ManejaInventario = g.First().product.ManejaInventario,
-                              ManejaLotes = g.First().product.ManejaLotes,
-                              StockTotal = g.First().product.ManejaLotes ? g.First().product.Lotes.Sum(l => l.CantidadDisponible) : g.First().product.StockTotal,
-                              CreadoPor = g.First().usuario != null ? g.First().usuario.PrimerNombre + " " + g.First().usuario.PrimerApellido : "Usuario no encontrado",
-                              IsActive = g.First().product.EstaActivo,
-                              ImpuestoPrincipalNombre = g.Where(x => x.tax != null).Select(x => x.tax!.Nombre).FirstOrDefault() ?? "N/A", // Get first tax name
-                              ImpuestoPrincipalPorcentaje = g.Where(x => x.tax != null).Select(x => x.tax!.Porcentaje).FirstOrDefault() // Get first tax percentage
+                              Id = product.Id,
+                              CodigoPrincipal = product.CodigoPrincipal,
+                              Nombre = product.Nombre,
+                              Descripcion = product.Descripcion,
+                              PrecioVentaUnitario = product.PrecioVentaUnitario,
+                              ManejaInventario = product.ManejaInventario,
+                              ManejaLotes = product.ManejaLotes,
+                              StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
+                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
+                              IsActive = product.EstaActivo
                           }).ToListAsync();
         }
 
@@ -105,28 +87,19 @@ namespace FacturasSRI.Infrastructure.Services
             return await (from product in _context.Productos
                           join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
-                          // Left join with ProductoImpuesto to get associated taxes
-                          join pi in _context.ProductoImpuestos on product.Id equals pi.ProductoId into productTaxes
-                          from pi in productTaxes.DefaultIfEmpty()
-                          // Left join with Impuesto to get tax details
-                          join tax in _context.Impuestos on pi.ImpuestoId equals tax.Id into taxDetails
-                          from tax in taxDetails.DefaultIfEmpty()
                           where product.EstaActivo == true // Filter for active products
-                          group new { product, usuario, tax } by product.Id into g // Group by product to handle multiple taxes
                           select new ProductDto
                           {
-                              Id = g.Key,
-                              CodigoPrincipal = g.First().product.CodigoPrincipal,
-                              Nombre = g.First().product.Nombre,
-                              Descripcion = g.First().product.Descripcion,
-                              PrecioVentaUnitario = g.First().product.PrecioVentaUnitario,
-                              ManejaInventario = g.First().product.ManejaInventario,
-                              ManejaLotes = g.First().product.ManejaLotes,
-                              StockTotal = g.First().product.ManejaLotes ? g.First().product.Lotes.Sum(l => l.CantidadDisponible) : g.First().product.StockTotal,
-                              CreadoPor = g.First().usuario != null ? g.First().usuario.PrimerNombre + " " + g.First().usuario.PrimerApellido : "Usuario no encontrado",
-                              IsActive = g.First().product.EstaActivo,
-                              ImpuestoPrincipalNombre = g.Where(x => x.tax != null).Select(x => x.tax!.Nombre).FirstOrDefault() ?? "N/A", // Get first tax name
-                              ImpuestoPrincipalPorcentaje = g.Where(x => x.tax != null).Select(x => x.tax!.Porcentaje).FirstOrDefault() // Get first tax percentage
+                              Id = product.Id,
+                              CodigoPrincipal = product.CodigoPrincipal,
+                              Nombre = product.Nombre,
+                              Descripcion = product.Descripcion,
+                              PrecioVentaUnitario = product.PrecioVentaUnitario,
+                              ManejaInventario = product.ManejaInventario,
+                              ManejaLotes = product.ManejaLotes,
+                              StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
+                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
+                              IsActive = product.EstaActivo
                           }).ToListAsync();
         }
 
@@ -142,20 +115,6 @@ namespace FacturasSRI.Infrastructure.Services
                 product.ManejaInventario = productDto.ManejaInventario;
                 product.ManejaLotes = productDto.ManejaLotes;
                 product.EstaActivo = productDto.IsActive; // Update EstaActivo from ProductDto.IsActive
-                await _context.SaveChangesAsync();
-            }
-        }
-
-        public async Task AssignTaxesToProductAsync(Guid productId, List<Guid> taxIds)
-        {
-            var product = await _context.Productos.Include(p => p.ProductoImpuestos).FirstOrDefaultAsync(p => p.Id == productId);
-            if (product != null)
-            {
-                product.ProductoImpuestos.Clear();
-                foreach (var taxId in taxIds)
-                {
-                    product.ProductoImpuestos.Add(new ProductoImpuesto { ProductoId = productId, ImpuestoId = taxId });
-                }
                 await _context.SaveChangesAsync();
             }
         }
@@ -206,6 +165,52 @@ namespace FacturasSRI.Infrastructure.Services
             }
 
             return stockDetails;
+        }
+
+        public async Task ApplyTaxToAllProductsAsync(Guid taxId)
+        {
+            // This is a destructive operation, so be careful.
+            // It removes all existing tax assignments and applies the new one.
+
+            // 1. Remove all existing product-tax relationships
+            var allProductTaxes = await _context.ProductoImpuestos.ToListAsync();
+            _context.ProductoImpuestos.RemoveRange(allProductTaxes);
+
+            // 2. Get all product IDs
+            var allProductIds = await _context.Productos.Select(p => p.Id).ToListAsync();
+
+            // 3. Create new assignments
+            var newAssignments = allProductIds.Select(productId => new ProductoImpuesto
+            {
+                ProductoId = productId,
+                ImpuestoId = taxId
+            });
+
+            await _context.ProductoImpuestos.AddRangeAsync(newAssignments);
+
+            // 4. Save changes
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<TaxDto?> GetCurrentGlobalTaxAsync()
+        {
+            var firstProductTax = await _context.ProductoImpuestos
+                .Include(pi => pi.Impuesto)
+                .FirstOrDefaultAsync();
+
+            if (firstProductTax == null)
+            {
+                return null;
+            }
+
+            return new TaxDto
+            {
+                Id = firstProductTax.Impuesto.Id,
+                Nombre = firstProductTax.Impuesto.Nombre,
+                Porcentaje = firstProductTax.Impuesto.Porcentaje,
+                CodigoSRI = firstProductTax.Impuesto.CodigoSRI,
+                EstaActivo = firstProductTax.Impuesto.EstaActivo
+            };
         }
     }
 }
