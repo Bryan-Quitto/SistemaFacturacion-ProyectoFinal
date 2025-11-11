@@ -110,17 +110,24 @@ app.UseRequestLocalization(new RequestLocalizationOptions
     SupportedUICultures = supportedCultures
 });
 
-app.UseStatusCodePagesWithReExecute("/");
+
 
 app.UseStaticFiles();
+
+app.UseStatusCodePagesWithReExecute("/NotFound"); // Handle 404s by re-executing to Blazor's NotFound route
+
+app.UseRouting(); // Add UseRouting here
 
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
-app.MapControllers();
+app.UseEndpoints(endpoints => // Wrap mappings in UseEndpoints
+{
+    endpoints.MapControllers(); // API endpoints
 
-app.MapRazorComponents<App>()
-   .AddInteractiveServerRenderMode();
+        endpoints.MapRazorComponents<App>() // Blazor components
+            .AddInteractiveServerRenderMode();
+    });
     
-app.Run();
+    app.Run();

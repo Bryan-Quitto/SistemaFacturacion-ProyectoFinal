@@ -1,8 +1,26 @@
 @page "/notfound"
+@inject NavigationManager Navigation
 
-<div class="text-center">
-    <h1 class="display-1">404</h1>
-    <p class="lead">Página no encontrada</p>
-    <p>La página que buscas no existe.</p>
-    <a href="/" class="btn btn-primary">Volver al Panel Principal</a>
+<PageTitle>Página no encontrada (404)</PageTitle>
+
+<div class="text-center mt-5">
+    <h1 class="display-1 fw-bold">404</h1>
+    <p class="fs-3"> <span class="text-danger">¡Ups!</span> Página no encontrada.</p>
+    <p class="lead">
+        La página que estás buscando no existe.
+    </p>
+    <p class="text-muted small mt-4">
+        La URL solicitada: <code>@attemptedUrl</code> no fue encontrada en el servidor.
+    </p>
+    <a href="/" class="btn btn-primary mt-3">Volver al Panel Principal</a>
 </div>
+
+@code {
+    private string attemptedUrl = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        var absoluteUri = new Uri(Navigation.Uri);
+        attemptedUrl = absoluteUri.PathAndQuery;
+    }
+}

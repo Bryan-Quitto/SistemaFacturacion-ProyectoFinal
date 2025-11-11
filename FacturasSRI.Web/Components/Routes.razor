@@ -17,16 +17,50 @@
                 </div>
             </Authorizing>
             
-            <NotAuthorized>
-                <RedirectToLogin />
-            </NotAuthorized>
-
-        </AuthorizeRouteView>
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <LayoutView Layout="typeof(Layout.MainLayout)">
-            <FacturasSRI.Web.Components.Pages.NotFound />
-        </LayoutView>
-    </NotFound>
-</Router>
+                        <NotAuthorized Context="authContext">
+            
+                            @{
+            
+                                var authenticationState = authContext.User.Identity?.IsAuthenticated ?? false;
+            
+                                if (authenticationState)
+            
+                                {
+            
+                                    <LayoutView Layout="typeof(Layout.EmptyLayout)">
+            
+                                        <FacturasSRI.Web.Components.Pages.Forbidden />
+            
+                                    </LayoutView>
+            
+                                }
+            
+                                else
+            
+                                {
+            
+                                    <RedirectToLogin />
+            
+                                }
+            
+                            }
+            
+                        </NotAuthorized>
+            
+                    </AuthorizeRouteView>
+            
+                    <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            
+                </Found>
+            
+                <NotFound>
+            
+                    <LayoutView Layout="typeof(Layout.EmptyLayout)">
+            
+                        <FacturasSRI.Web.Components.Pages.NotFound />
+            
+                    </LayoutView>
+            
+                </NotFound>
+            
+            </Router>
