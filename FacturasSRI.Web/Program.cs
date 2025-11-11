@@ -126,8 +126,8 @@ app.UseEndpoints(endpoints => // Wrap mappings in UseEndpoints
 {
     endpoints.MapControllers(); // API endpoints
 
-        endpoints.MapRazorComponents<App>() // Blazor components
-            .AddInteractiveServerRenderMode();
-    });
+    endpoints.MapRazorComponents<App>() // Blazor components
+        .AddInteractiveServerRenderMode();
+});
     
     app.Run();

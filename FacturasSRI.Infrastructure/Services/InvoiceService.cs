@@ -219,9 +219,9 @@ namespace FacturasSRI.Infrastructure.Services
             };
         }
 
-        public async Task<List<InvoiceDto>> GetInvoicesAsync()
+        public Task<List<InvoiceDto>> GetInvoicesAsync()
         {
-            return await (from invoice in _context.Facturas
+            return (from invoice in _context.Facturas
                           join usuario in _context.Usuarios on invoice.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
                           orderby invoice.FechaCreacion descending
