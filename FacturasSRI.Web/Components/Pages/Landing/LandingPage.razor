@@ -1,0 +1,75 @@
+@page "/Landing"
+@layout EmptyLayout
+
+<PageTitle>Aether Tech | Facturación Inteligente para tu Negocio</PageTitle>
+<div class="d-flex flex-column min-vh-100 text-white" style="background: linear-gradient(135deg,#2444d1 ,#6172d3 );">
+    <!-- ============================================ -->
+    <!-- HEADER / BARRA DE NAVEGACIÓN -->
+    <!-- ============================================ -->
+    <header class="py-3">
+        <div class="container">
+            <div class="d-flex flex-wrap align-items-center justify-content-between">
+                
+                <!-- Logo y Nombre de la Empresa -->
+                <a href="/" class="d-flex align-items-center text-white text-decoration-none">
+                    <img src="logo.png" alt="Logo Aether Tech" style="height: 32px;" class="me-3" />
+                    <span class="fs-4">Aether Tech</span>
+                </a>
+
+                <!-- Botones de Acción -->
+                <div>
+                    <a href="/login" class="btn btn-outline-light">Iniciar Sesión</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================ -->
+    <!-- SECCIÓN PRINCIPAL "HÉROE" -->
+    <!-- ============================================ -->
+    <main class="flex-grow-1 d-flex align-items-center">
+        <div class="container">
+            <div class="col-lg-8">
+                
+                <h1 class="display-3 fw-bold m-0 mb-3" style="line-height: 1.1;">
+                    FACTURACIÓN INTELIGENTE
+                </h1>
+
+                <!-- Subtítulo -->
+                <h2 class="fw-bold text-info mb-4">
+                    PARA HACER CRECER TU NEGOCIO
+                </h2>
+
+                <!-- Párrafo de Descripción -->
+                <p class="fs-5 col-lg-10">
+                    Con Aether Tech, crea, envía y gestiona tus facturas en minutos, no en horas. Automatiza tus cobros y obtén reportes claros para tomar las mejores decisiones.
+                </p>
+
+                <!-- Botón de Llamado a la Acción -->
+                <div class="mt-4">
+                    <a href="/login" class="btn btn-light btn-lg px-4 fw-bold">Empieza Ahora</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ============================================ -->
+    <!-- FOOTER -->
+    <!-- ============================================ -->
+    <footer class="text-center py-4">
+        <div class="container">
+            <p class="text-white-50 mb-0">© @DateTime.Now.Year Aether Tech. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+</div>
+<style>
+
+    h1.display-3:focus {
+        outline: none !important;
+        box-shadow: none !important;
+    }
+</style>
+@code {
+    // No se necesita C# para esta página de presentación.
+}
