@@ -3,9 +3,11 @@ using FacturasSRI.Application.Interfaces;
 using FacturasSRI.Domain.Entities;
 using FacturasSRI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 
 namespace FacturasSRI.Infrastructure.Services
@@ -14,11 +16,13 @@ namespace FacturasSRI.Infrastructure.Services
     {
         private readonly FacturasSRIDbContext _context;
         private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
 
-        public UserService(FacturasSRIDbContext context, IEmailService emailService)
+        public UserService(FacturasSRIDbContext context, IEmailService emailService, IConfiguration configuration)
         {
             _context = context;
             _emailService = emailService;
+            _configuration = configuration;
         }
 
         private string GenerateTemporaryPassword(int length = 12)
@@ -33,6 +37,62 @@ namespace FacturasSRI.Infrastructure.Services
             return new string(password);
         }
 
+        public async Task<bool> GeneratePasswordResetTokenAsync(string email)
+        {
+            var user = await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null)
+            {
+                // No revelar si el usuario existe o no por seguridad.
+                return true;
+            }
+
+            var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            
+            // Guardar el hash del token en la BD, no el token en texto plano.
+            user.PasswordResetToken = BCrypt.Net.BCrypt.HashPassword(token);
+            user.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(30);
+
+            await _context.SaveChangesAsync();
+
+            // La URL base de la aplicación debería estar en appsettings.json
+            var baseUrl = _configuration["App:BaseUrl"] ?? "https://localhost:7123";
+            var resetLink = $"{baseUrl}/reset-password?token={Uri.EscapeDataString(token)}";
+
+            await _emailService.SendPasswordResetEmailAsync(user.Email, user.PrimerNombre, resetLink);
+
+            return true;
+        }
+
+        public async Task<bool> ResetPasswordAsync(string token, string newPassword)
+        {
+            var users = await _context.Usuarios
+                .Where(u => u.PasswordResetToken != null && u.PasswordResetTokenExpiry > DateTime.UtcNow)
+                .ToListAsync();
+
+            Usuario? userToUpdate = null;
+            foreach (var user in users)
+            {
+                if (BCrypt.Net.BCrypt.Verify(token, user.PasswordResetToken))
+                {
+                    userToUpdate = user;
+                    break;
+                }
+            }
+
+            if (userToUpdate == null)
+            {
+                return false;
+            }
+
+            userToUpdate.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            userToUpdate.PasswordResetToken = null;
+            userToUpdate.PasswordResetTokenExpiry = null;
+            userToUpdate.FechaModificacion = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+        
         public async Task<UserDto> CreateUserAsync(UserDto userDto)
         {
             var temporaryPassword = GenerateTemporaryPassword();
@@ -165,5 +225,59 @@ namespace FacturasSRI.Infrastructure.Services
                 await _context.SaveChangesAsync();
             }
         }
+
+        public async Task<UserDto?> GetUserProfileAsync(string userId)
+        {
+            if (!Guid.TryParse(userId, out var userGuid))
+            {
+                return null;
+            }
+            return await GetUserByIdAsync(userGuid);
+        }
+
+        public async Task UpdateUserProfileAsync(string userId, UpdateProfileDto profileDto)
+        {
+            if (!Guid.TryParse(userId, out var userGuid))
+            {
+                return;
+            }
+
+            var user = await _context.Usuarios.FindAsync(userGuid);
+
+            if (user != null)
+            {
+                user.PrimerNombre = profileDto.PrimerNombre;
+                user.SegundoNombre = profileDto.SegundoNombre;
+                user.PrimerApellido = profileDto.PrimerApellido;
+                user.SegundoApellido = profileDto.SegundoApellido;
+                user.FechaModificacion = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<bool> ChangePasswordAsync(string userId, ChangePasswordDto passwordDto)
+        {
+            if (!Guid.TryParse(userId, out var userGuid))
+            {
+                return false;
+            }
+
+            var user = await _context.Usuarios.FindAsync(userGuid);
+
+            if (user == null || !BCrypt.Net.BCrypt.Verify(passwordDto.OldPassword, user.PasswordHash))
+            {
+                return false;
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(passwordDto.NewPassword);
+            user.FechaModificacion = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }
+
+
+                

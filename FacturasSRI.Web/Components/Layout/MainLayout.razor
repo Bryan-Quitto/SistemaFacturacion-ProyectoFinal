@@ -26,6 +26,8 @@
                             Hola, @context.User.Identity?.Name
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/profile">Mi Perfil</a></li>
+                            <li><hr class="dropdown-divider"></li>
                             <li><button class="dropdown-item" @onclick="HandleLogout">Cerrar Sesión</button></li>
                         </ul>
                     </div>

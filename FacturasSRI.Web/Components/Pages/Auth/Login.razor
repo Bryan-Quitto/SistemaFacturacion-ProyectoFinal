@@ -45,6 +45,10 @@
                     <label for="password">Contraseña</label>
                     <ValidationMessage For="@(() => loginRequest.Password)" />
                 </div>
+
+                <div class="text-end mb-3">
+                    <a href="/request-password-reset">¿Olvidaste tu contraseña?</a>
+                </div>
                 
                 <button class="w-100 btn btn-lg btn-primary" type="submit">
                     @if (isSubmitting)
