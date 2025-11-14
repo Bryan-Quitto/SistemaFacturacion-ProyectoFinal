@@ -28,5 +28,10 @@ namespace FacturasSRI.Application.Dtos
         public DateTime FechaCreacion { get; set; }
         public DateTime? FechaModificacion { get; set; }
         public TipoProducto TipoProducto { get; set; }
+        public string Marca { get; set; } = string.Empty;
+        public Guid CategoriaId { get; set; }
+        public string CategoriaNombre { get; set; } = string.Empty;
+
+
     }
 }

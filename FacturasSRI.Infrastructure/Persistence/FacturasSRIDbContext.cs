@@ -12,6 +12,7 @@ namespace FacturasSRI.Infrastructure.Persistence
         }
 
         public DbSet<AjusteInventario> AjustesInventario { get; set; }
+        public DbSet<Categoria> Categorias { get; set; }
         public DbSet<Cliente> Clientes { get; set; }
         public DbSet<CuentaPorCobrar> CuentasPorCobrar { get; set; }
         public DbSet<CuentaPorPagar> CuentasPorPagar { get; set; }

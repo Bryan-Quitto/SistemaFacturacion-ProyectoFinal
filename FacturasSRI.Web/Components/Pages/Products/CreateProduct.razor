@@ -5,10 +5,10 @@
 @inject IProductService ProductService
 @inject NavigationManager Navigation
 @using System.Security.Claims
+@using FacturasSRI.Domain.Entities
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Crear Producto</PageTitle>
-
 <div class="page-header">
     <h1>Crear Nuevo Producto</h1>
     <p>Rellene los detalles para añadir un nuevo producto al catálogo.</p>
@@ -35,6 +35,10 @@
                         <InputText id="codigoPrincipal" class="form-control" @bind-Value="newProduct.CodigoPrincipal" />
                         <ValidationMessage For="@(() => newProduct.CodigoPrincipal)" />
                     </div>
+                    <div class="mb-3">
+                        <label for="marca" class="form-label">Marca</label>
+                        <InputText id="marca" class="form-control" @bind-Value="newProduct.Marca" />
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <div class="mb-3">
@@ -43,15 +47,30 @@
                     </div>
                     <div class="mb-3">
                         <label for="precioVentaUnitario" class="form-label">Precio de Venta Unitario</label>
-                        <InputNumber id="precioVentaUnitario" class="form-control" @bind-Value="newProduct.PrecioVentaUnitario" />
+                        <InputNumber id="precioVentaUnitario" class="form-control"
+                            @bind-Value="newProduct.PrecioVentaUnitario" />
                         <ValidationMessage For="@(() => newProduct.PrecioVentaUnitario)" />
                     </div>
+                    <div class="mb-3">
+                        <label for="categoria" class="form-label">Categoría</label>
+                        <InputText id="categoria" class="form-control" list="categorias-list"
+                            @bind-Value="selectedCategoriaNombre" />
+                        <datalist id="categorias-list">
+                            @foreach (var categoria in categorias)
+                            {
+                                <option value="@categoria.Nombre"></option>
+                            }
+                        </datalist>
+                        <ValidationMessage For="@(() => newProduct.CategoriaId)" />
+                    </div>
                 </div>
+
             </div>
             <div class="row mt-3">
                 <div class="col-md-12">
                     <div class="form-check form-check-inline">
-                        <InputCheckbox id="manejaInventario" class="form-check-input" @bind-Value="newProduct.ManejaInventario" />
+                        <InputCheckbox id="manejaInventario" class="form-check-input"
+                            @bind-Value="newProduct.ManejaInventario" />
                         <label for="manejaInventario" class="form-check-label">Maneja Inventario</label>
                     </div>
                     <div class="form-check form-check-inline">
@@ -61,7 +80,7 @@
                 </div>
             </div>
             <div class="mt-4">
-                 <button type="button" class="btn btn-secondary" @onclick="GoToList">Cancelar</button>
+                <button type="button" class="btn btn-secondary" @onclick="GoToList">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Guardar Producto</button>
             </div>
         </EditForm>
@@ -70,12 +89,44 @@
 
 @code {
     private ProductDto newProduct = new();
+    private List<CategoriaDto> categorias = new();
+    private string selectedCategoriaNombre = "";
     private string? statusMessage;
     private bool isSuccess;
-    
+
+    // --- PASO 1: AÑADIR ESTE MÉTODO COMPLETO ---
+    // Este método se ejecuta automáticamente CUANDO la página se carga por primera vez.
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Aquí cargamos la lista de categorías para que esté disponible en el formulario.
+            categorias = await ProductService.GetAllCategoriasAsync();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error crítico al cargar las categorías: {ex.Message}";
+        }
+    }
+
+    // --- PASO 2: USAR ESTA VERSIÓN CORREGIDA DE HandleAddProduct ---
+    // Este método ahora SOLO se encarga de guardar el producto.
     private async Task HandleAddProduct()
     {
         statusMessage = null;
+        isSuccess = false;
+
+        // 1. Buscamos la categoría que el usuario seleccionó en la lista que YA cargamos.
+        var selectedCategoria = categorias.FirstOrDefault(c => 
+            c.Nombre.Trim().Equals(selectedCategoriaNombre.Trim(), StringComparison.CurrentCultureIgnoreCase));
+
+        if (selectedCategoria == null)
+        {
+            statusMessage = "Por favor, seleccione una categoría válida de la lista.";
+            return; // Detenemos la ejecución si la categoría no es válida.
+        }
+        
+        newProduct.CategoriaId = selectedCategoria.Id;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
@@ -83,7 +134,6 @@
 
         if (string.IsNullOrEmpty(userId))
         {
-            isSuccess = false;
             statusMessage = "No se pudo identificar al usuario. Por favor, inicie sesión de nuevo.";
             return;
         }
@@ -95,10 +145,9 @@
             await ProductService.CreateProductAsync(newProduct);
             Navigation.NavigateTo("/products");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            isSuccess = false;
-            statusMessage = "Error al crear el producto.";
+            statusMessage = "Error al crear el producto";
         }
     }
 

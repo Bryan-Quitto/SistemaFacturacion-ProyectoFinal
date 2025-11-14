@@ -19,17 +19,20 @@
             <span class="text-muted">Impuesto Global:</span>
             <strong>@(currentGlobalTax?.Nombre ?? "No asignado")</strong>
         </div>
-        <button class="btn btn-outline-primary" @onclick="OpenGlobalTaxModal">
-            <i class="bi bi-pencil-square"></i> Cambiar
-        </button>
-        <button class="btn btn-primary ms-2" @onclick="GoToCreateProduct">
-            <i class="bi bi-plus-circle-fill me-2"></i>Crear Nuevo Producto
-        </button>
+        <AuthorizeView Roles="Administrador">
+            <button class="btn btn-outline-primary" @onclick="OpenGlobalTaxModal">
+                <i class="bi bi-pencil-square"></i> Cambiar
+            </button>
+            <button class="btn btn-primary ms-2" @onclick="GoToCreateProduct">
+                <i class="bi bi-plus-circle-fill me-2"></i>Crear Nuevo Producto
+            </button>
+        </AuthorizeView>
     </div>
 </div>
 
 <div class="mb-3">
-    <input type="text" class="form-control" placeholder="Buscar productos por nombre o código..." @bind-value="searchTerm" @bind-value:event="oninput" />
+    <input type="text" class="form-control" placeholder="Buscar productos por nombre o código..."
+        @bind-value="searchTerm" @bind-value:event="oninput" />
 </div>
 
 @if (!string.IsNullOrEmpty(errorMessage))
@@ -55,6 +58,8 @@
                         <tr>
                             <th>Nombre</th>
                             <th>Código Principal</th>
+                            <th>Marca</th>
+                            <th>Categoría</th>
                             <th>Precio Unitario</th>
                             <th>Stock Actual</th>
                             <th class="text-end">Acciones</th>
@@ -66,6 +71,8 @@
                             <tr>
                                 <td>@product.Nombre</td>
                                 <td>@product.CodigoPrincipal</td>
+                                <td>@product.Marca</td>
+                                <td>@product.CategoriaNombre</td>
                                 <td>@product.PrecioVentaUnitario.ToString("C")</td>
                                 <td>@product.StockTotal</td>
                                 <td class="text-end">
@@ -76,8 +83,11 @@
                                         <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(product)">
                                             <i class="bi bi-pencil-square"></i> Editar
                                         </button>
-                                        <button class="btn btn-sm @(product.IsActive ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => HandleDeleteProduct(product.Id)">
-                                            <i class="bi @(product.IsActive ? "bi-trash" : "bi-check-circle")"></i> @(product.IsActive ? "Desactivar" : "Activar")
+                                        <button
+                                            class="btn btn-sm @(product.IsActive ? "btn-outline-danger" : "btn-outline-success")"
+                                            @onclick="() => HandleDeleteProduct(product.Id)">
+                                            <i class="bi @(product.IsActive ? "bi-trash" : "bi-check-circle")"></i>
+                                            @(product.IsActive ? "Desactivar" : "Activar")
                                         </button>
                                     </div>
                                 </td>
@@ -93,14 +103,12 @@
 
 @if (productToEdit != null)
 {
-    <EditProductModal Product="productToEdit" IsVisible="isEditModalVisible" OnSave="HandleUpdateProductInModal" OnClose="CloseEditModal" />
+    <EditProductModal Product="productToEdit" IsVisible="isEditModalVisible" OnSave="HandleUpdateProductInModal"
+        OnClose="CloseEditModal" />
 }
 
-<ConfirmationModal IsVisible="showConfirmationModal"
-                   Title="@confirmationModalTitle"
-                   Message="@confirmationModalMessage"
-                   OnConfirm="ConfirmToggleProductStatus"
-                   OnCancel="CancelToggleProductStatus" />
+<ConfirmationModal IsVisible="showConfirmationModal" Title="@confirmationModalTitle" Message="@confirmationModalMessage"
+    OnConfirm="ConfirmToggleProductStatus" OnCancel="CancelToggleProductStatus" />
 
 @if (isGlobalTaxModalVisible)
 {
@@ -112,7 +120,8 @@
                     <button type="button" class="btn-close" @onclick="CloseGlobalTaxModal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Seleccione un impuesto para aplicarlo a todos los productos. Esto reemplazará cualquier impuesto asignado previamente.</p>
+                    <p>Seleccione un impuesto para aplicarlo a todos los productos. Esto reemplazará cualquier impuesto
+                        asignado previamente.</p>
                     <div class="mb-3">
                         <label for="globalTax" class="form-label">Impuesto</label>
                         <InputSelect id="globalTax" class="form-select" @bind-Value="selectedTaxId">
@@ -126,7 +135,8 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="CloseGlobalTaxModal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" @onclick="ApplyGlobalTax" disabled="@(selectedTaxId == Guid.Empty)">
+                    <button type="button" class="btn btn-primary" @onclick="ApplyGlobalTax"
+                        disabled="@(selectedTaxId == Guid.Empty)">
                         <i class="bi bi-arrow-repeat"></i> Aplicar a Todos
                     </button>
                 </div>
@@ -158,11 +168,11 @@
     private bool isGlobalTaxModalVisible = false;
 
     private List<ProductDto> FilteredProducts => (allProducts ?? new())
-        .Where(p => p.IsActive &&
-                    (string.IsNullOrWhiteSpace(searchTerm) ||
-                     p.Nombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                     p.CodigoPrincipal.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
-        .ToList();
+    .Where(p => p.IsActive &&
+    (string.IsNullOrWhiteSpace(searchTerm) ||
+    p.Nombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+    p.CodigoPrincipal.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
+    .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -277,7 +287,7 @@
         showConfirmationModal = false; // Hide the modal
         productToToggleId = Guid.Empty;
     }
-    
+
     private async Task HandleUpdateProductInModal(ProductDto product)
     {
         await ProductService.UpdateProductAsync(product);
@@ -297,7 +307,10 @@
             PrecioVentaUnitario = product.PrecioVentaUnitario,
             ManejaInventario = product.ManejaInventario,
             ManejaLotes = product.ManejaLotes,
-            IsActive = product.IsActive // Initialize IsActive
+            IsActive = product.IsActive, // Initialize IsActive
+            Marca = product.Marca,
+            CategoriaId = product.CategoriaId,
+            CategoriaNombre = product.CategoriaNombre
         };
         isEditModalVisible = true;
     }
@@ -308,7 +321,7 @@
         productToEdit = null;
         await LoadProducts();
     }
-    
+
     private void GoToCreateProduct()
     {
         Navigation.NavigateTo("/products/create");

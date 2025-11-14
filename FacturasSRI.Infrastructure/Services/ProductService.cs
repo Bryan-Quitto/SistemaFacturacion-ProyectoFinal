@@ -21,6 +21,14 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<ProductDto> CreateProductAsync(ProductDto productDto)
         {
+            if (await _context.Productos.AnyAsync(p => p.Nombre.ToLower() == productDto.Nombre.ToLower()))
+            {
+                throw new InvalidOperationException("Ya existe un producto con el mismo nombre.");
+            }
+            if (await _context.Productos.AnyAsync(p => p.CodigoPrincipal.ToLower() == productDto.CodigoPrincipal.ToLower()))
+            {
+                throw new InvalidOperationException("Ya existe un producto con el mismo código principal.");
+            }
             var product = new Producto
             {
                 Id = Guid.NewGuid(),
@@ -31,7 +39,9 @@ namespace FacturasSRI.Infrastructure.Services
                 ManejaInventario = productDto.ManejaInventario,
                 ManejaLotes = productDto.ManejaLotes,
                 UsuarioIdCreador = productDto.UsuarioIdCreador,
-                FechaCreacion = DateTime.UtcNow
+                FechaCreacion = DateTime.UtcNow,
+                Marca = productDto.Marca,
+                CategoriaId = productDto.CategoriaId
             };
             _context.Productos.Add(product);
             await _context.SaveChangesAsync();
@@ -45,6 +55,7 @@ namespace FacturasSRI.Infrastructure.Services
                           where product.Id == id
                           join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
+                          join categoria in _context.Categorias on product.CategoriaId equals categoria.Id
                           select new ProductDto
                           {
                               Id = product.Id,
@@ -58,7 +69,10 @@ namespace FacturasSRI.Infrastructure.Services
                               CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
                               IsActive = product.EstaActivo,
                               FechaCreacion = product.FechaCreacion,
-                              FechaModificacion = product.FechaModificacion
+                              FechaModificacion = product.FechaModificacion,
+                              Marca = product.Marca, // --- CAMBIO ---
+                              CategoriaId = product.CategoriaId, // --- CAMBIO ---
+                              CategoriaNombre = categoria.Nombre
                           }).FirstOrDefaultAsync();
         }
 
@@ -67,6 +81,8 @@ namespace FacturasSRI.Infrastructure.Services
             return await (from product in _context.Productos
                           join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
+                          join categoria in _context.Categorias on product.CategoriaId equals categoria.Id
+
                           select new ProductDto
                           {
                               Id = product.Id,
@@ -78,7 +94,10 @@ namespace FacturasSRI.Infrastructure.Services
                               ManejaLotes = product.ManejaLotes,
                               StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
                               CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
-                              IsActive = product.EstaActivo
+                              IsActive = product.EstaActivo,
+                              Marca = product.Marca,
+                              CategoriaId = product.CategoriaId,
+                              CategoriaNombre = categoria.Nombre
                           }).ToListAsync();
         }
 
@@ -87,6 +106,7 @@ namespace FacturasSRI.Infrastructure.Services
             return await (from product in _context.Productos
                           join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
+                          join categoria in _context.Categorias on product.CategoriaId equals categoria.Id
                           where product.EstaActivo == true // Filter for active products
                           select new ProductDto
                           {
@@ -99,7 +119,10 @@ namespace FacturasSRI.Infrastructure.Services
                               ManejaLotes = product.ManejaLotes,
                               StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
                               CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
-                              IsActive = product.EstaActivo
+                              IsActive = product.EstaActivo,
+                              Marca = product.Marca,
+                              CategoriaId = product.CategoriaId,
+                              CategoriaNombre = categoria.Nombre
                           }).ToListAsync();
         }
 
@@ -108,13 +131,23 @@ namespace FacturasSRI.Infrastructure.Services
             var product = await _context.Productos.FindAsync(productDto.Id);
             if (product != null)
             {
+                if (await _context.Productos.AnyAsync(p => p.Id != productDto.Id && p.Nombre.ToLower() == productDto.Nombre.ToLower()))
+                {
+                    throw new InvalidOperationException("Ya existe otro producto con el mismo nombre.");
+                }
+                if (await _context.Productos.AnyAsync(p => p.Id != productDto.Id && p.CodigoPrincipal.ToLower() == productDto.CodigoPrincipal.ToLower()))
+                {
+                    throw new InvalidOperationException("Ya existe otro producto con el mismo código principal.");
+                }
                 product.CodigoPrincipal = productDto.CodigoPrincipal;
                 product.Nombre = productDto.Nombre;
                 product.Descripcion = productDto.Descripcion;
                 product.PrecioVentaUnitario = productDto.PrecioVentaUnitario;
                 product.ManejaInventario = productDto.ManejaInventario;
                 product.ManejaLotes = productDto.ManejaLotes;
-                product.EstaActivo = productDto.IsActive; // Update EstaActivo from ProductDto.IsActive
+                product.EstaActivo = productDto.IsActive;
+                product.Marca = productDto.Marca;
+                product.CategoriaId = productDto.CategoriaId;
                 await _context.SaveChangesAsync();
             }
         }
@@ -239,6 +272,27 @@ namespace FacturasSRI.Infrastructure.Services
                 }).FirstOrDefaultAsync();
 
             return product;
+        }
+
+        public async Task<List<CategoriaDto>> GetAllCategoriasAsync()
+        {
+
+            try
+            {
+                var categoriasDesdeDb = await _context.Categorias
+                    .OrderBy(c => c.Nombre)
+                    .Select(c => new CategoriaDto
+                    {
+                        Id = c.Id,
+                        Nombre = c.Nombre
+                    })
+                    .ToListAsync();
+                return categoriasDesdeDb;
+            }
+            catch (Exception ex)
+            {
+                return new List<CategoriaDto>(); // Devolver lista vacía si hay error
+            }
         }
     }
 }

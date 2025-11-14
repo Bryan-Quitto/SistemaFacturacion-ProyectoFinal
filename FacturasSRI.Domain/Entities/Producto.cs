@@ -20,6 +20,10 @@ namespace FacturasSRI.Domain.Entities
         public DateTime? FechaModificacion { get; set; }
         public TipoProducto TipoProducto { get; set; }
 
+        public string Marca { get; set; } = string.Empty; // Campo para la marca
+        public Guid CategoriaId { get; set; } // Llave foránea para Categoria
+        public virtual Categoria Categoria { get; set; } // Propiedad de navegación
+
         public virtual ICollection<Lote> Lotes { get; set; } = new List<Lote>();
         public virtual ICollection<ProductoImpuesto> ProductoImpuestos { get; set; } = new List<ProductoImpuesto>();
     }
