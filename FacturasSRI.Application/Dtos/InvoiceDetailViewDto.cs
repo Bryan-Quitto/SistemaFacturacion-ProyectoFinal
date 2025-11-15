@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FacturasSRI.Domain.Enums;
 
 namespace FacturasSRI.Application.Dtos
 {
@@ -17,6 +18,11 @@ namespace FacturasSRI.Application.Dtos
         public decimal Total { get; set; }
         public List<InvoiceItemDetailDto> Items { get; set; } = new();
         public List<TaxSummary> TaxSummaries { get; set; } = new();
+
+        public EstadoFactura Estado { get; set; }
+        public string? ClaveAcceso { get; set; }
+        public string? NumeroAutorizacion { get; set; }
+        public string? RespuestaSRI { get; set; }
     }
 
     public class InvoiceItemDetailDto

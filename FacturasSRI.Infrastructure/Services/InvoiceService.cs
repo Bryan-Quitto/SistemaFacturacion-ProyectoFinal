@@ -129,7 +129,6 @@ namespace FacturasSRI.Infrastructure.Services
                     
                     secuencial.UltimoSecuencialFactura++;
                     var numeroSecuencial = secuencial.UltimoSecuencialFactura.ToString("D9");
-                    var numeroFactura = $"{establishmentCode}-{emissionPointCode}-{numeroSecuencial}";
                     
                     var invoice = new Factura
                     {
@@ -239,6 +238,7 @@ namespace FacturasSRI.Infrastructure.Services
                         await transaction.CommitAsync();
                         
                         var errorMsg = string.Join(", ", respuestaRecepcion.Errores.Select(e => $"{e.Identificador}: {e.Mensaje}"));
+                        _logger.LogWarning("Factura rechazada en Recepción: {Error}", errorMsg);
                         throw new InvalidOperationException($"El SRI rechazó la factura (Recepción): {errorMsg}");
                     }
 
@@ -250,17 +250,35 @@ namespace FacturasSRI.Infrastructure.Services
                     string respuestaAutorizacionXml = await _sriApiClientService.ConsultarAutorizacionAsync(claveAcceso);
                     RespuestaAutorizacion respuestaAutorizacion = _sriResponseParserService.ParsearRespuestaAutorizacion(respuestaAutorizacionXml);
 
-                    if (respuestaAutorizacion.Estado == "AUTORIZADO")
+                    switch (respuestaAutorizacion.Estado)
                     {
-                        invoice.Estado = EstadoFactura.Autorizada;
-                        facturaSri.NumeroAutorizacion = respuestaAutorizacion.NumeroAutorizacion;
-                        facturaSri.FechaAutorizacion = respuestaAutorizacion.FechaAutorizacion;
-                        facturaSri.RespuestaSRI = "AUTORIZADO";
-                    }
-                    else
-                    {
-                        invoice.Estado = EstadoFactura.RechazadaSRI;
-                        facturaSri.RespuestaSRI = JsonSerializer.Serialize(respuestaAutorizacion.Errores);
+                        case "AUTORIZADO":
+                            invoice.Estado = EstadoFactura.Autorizada;
+                            facturaSri.NumeroAutorizacion = respuestaAutorizacion.NumeroAutorizacion;
+                            facturaSri.FechaAutorizacion = respuestaAutorizacion.FechaAutorizacion;
+                            facturaSri.RespuestaSRI = "AUTORIZADO";
+                            break;
+                        
+                        case "NO AUTORIZADO":
+                            invoice.Estado = EstadoFactura.RechazadaSRI;
+                            facturaSri.RespuestaSRI = JsonSerializer.Serialize(respuestaAutorizacion.Errores);
+                            break;
+
+                        case "PROCESANDO":
+                            facturaSri.RespuestaSRI = "El SRI todavía está procesando la autorización.";
+                            _logger.LogInformation("Factura {NumeroFactura} sigue en procesamiento.", invoice.NumeroFactura);
+                            break;
+
+                        case "ERROR":
+                            invoice.Estado = EstadoFactura.RechazadaSRI;
+                            facturaSri.RespuestaSRI = JsonSerializer.Serialize(respuestaAutorizacion.Errores);
+                            break;
+
+                        default:
+                            invoice.Estado = EstadoFactura.RechazadaSRI;
+                            facturaSri.RespuestaSRI = "Respuesta desconocida del servicio de autorización.";
+                            _logger.LogWarning("Respuesta desconocida del SRI: {Estado}", respuestaAutorizacion.Estado);
+                            break;
                     }
                     
                     await _context.SaveChangesAsync();
@@ -277,6 +295,73 @@ namespace FacturasSRI.Infrastructure.Services
                 }
             }    
         }
+        
+        public async Task<InvoiceDetailViewDto?> CheckSriStatusAsync(Guid invoiceId)
+        {
+            var invoice = await _context.Facturas
+                .Include(i => i.InformacionSRI)
+                .FirstOrDefaultAsync(i => i.Id == invoiceId);
+
+            if (invoice == null || invoice.InformacionSRI == null || string.IsNullOrEmpty(invoice.InformacionSRI.ClaveAcceso))
+            {
+                _logger.LogWarning("No se encontró factura o información del SRI para consultar el estado (ID: {InvoiceId}).", invoiceId);
+                return null;
+            }
+
+            if (invoice.Estado == EstadoFactura.Autorizada)
+            {
+                _logger.LogInformation("La factura {InvoiceId} ya está autorizada. No se consulta al SRI.", invoiceId);
+                return await GetInvoiceDetailByIdAsync(invoiceId);
+            }
+
+            try
+            {
+                string respuestaAutorizacionXml = await _sriApiClientService.ConsultarAutorizacionAsync(invoice.InformacionSRI.ClaveAcceso);
+                RespuestaAutorizacion respuestaAutorizacion = _sriResponseParserService.ParsearRespuestaAutorizacion(respuestaAutorizacionXml);
+
+                switch (respuestaAutorizacion.Estado)
+                {
+                    case "AUTORIZADO":
+                        invoice.Estado = EstadoFactura.Autorizada;
+                        invoice.InformacionSRI.NumeroAutorizacion = respuestaAutorizacion.NumeroAutorizacion;
+                        invoice.InformacionSRI.FechaAutorizacion = respuestaAutorizacion.FechaAutorizacion;
+                        invoice.InformacionSRI.RespuestaSRI = "AUTORIZADO";
+                        break;
+                    
+                    case "NO AUTORIZADO":
+                        invoice.Estado = EstadoFactura.RechazadaSRI;
+                        invoice.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respuestaAutorizacion.Errores);
+                        break;
+
+                    case "PROCESANDO":
+                        invoice.InformacionSRI.RespuestaSRI = "El SRI todavía está procesando la autorización.";
+                        _logger.LogInformation("Factura {NumeroFactura} sigue en procesamiento.", invoice.NumeroFactura);
+                        break;
+                    
+                    case "ERROR":
+                        invoice.Estado = EstadoFactura.RechazadaSRI;
+                        invoice.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respuestaAutorizacion.Errores);
+                        break;
+
+                    default:
+                        invoice.Estado = EstadoFactura.RechazadaSRI;
+                        invoice.InformacionSRI.RespuestaSRI = $"Respuesta desconocida: {respuestaAutorizacion.Estado}";
+                        _logger.LogWarning("Respuesta desconocida del SRI: {Estado}", respuestaAutorizacion.Estado);
+                        break;
+                }
+
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al consultar el estado de la factura {InvoiceId} en el SRI.", invoiceId);
+                invoice.InformacionSRI.RespuestaSRI = $"Error de conexión: {ex.Message}";
+                await _context.SaveChangesAsync();
+            }
+            
+            return await GetInvoiceDetailByIdAsync(invoiceId);
+        }
+
 
         private async Task DescontarStockGeneral(Producto producto, int cantidadADescontar)
         {
@@ -378,6 +463,7 @@ namespace FacturasSRI.Infrastructure.Services
                 Id = invoice.Id,
                 FechaEmision = invoice.FechaEmision,
                 NumeroFactura = invoice.NumeroFactura,
+                Estado = invoice.Estado,
                 ClienteId = invoice.ClienteId,
                 SubtotalSinImpuestos = invoice.SubtotalSinImpuestos,
                 TotalDescuento = invoice.TotalDescuento,
@@ -406,7 +492,11 @@ namespace FacturasSRI.Infrastructure.Services
                             Id = invoice.Id,
                             FechaEmision = invoice.FechaEmision,
                             NumeroFactura = invoice.NumeroFactura,
+                            Estado = invoice.Estado,
                             ClienteId = invoice.ClienteId,
+                            SubtotalSinImpuestos = invoice.SubtotalSinImpuestos,
+                            TotalDescuento = invoice.TotalDescuento,
+                            TotalIVA = invoice.TotalIVA,
                             Total = invoice.Total,
                             CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado"
                         }).ToListAsync();
@@ -416,6 +506,7 @@ namespace FacturasSRI.Infrastructure.Services
         {
             var invoice = await _context.Facturas
                 .Include(i => i.Cliente)
+                .Include(i => i.InformacionSRI)
                 .Include(i => i.Detalles)
                     .ThenInclude(d => d.Producto)
                         .ThenInclude(p => p.ProductoImpuestos)
@@ -473,7 +564,11 @@ namespace FacturasSRI.Infrastructure.Services
                 TotalIVA = invoice.TotalIVA,
                 Total = invoice.Total,
                 Items = items,
-                TaxSummaries = taxSummaries
+                TaxSummaries = taxSummaries,
+                Estado = invoice.Estado,
+                ClaveAcceso = invoice.InformacionSRI?.ClaveAcceso,
+                NumeroAutorizacion = invoice.InformacionSRI?.NumeroAutorizacion,
+                RespuestaSRI = invoice.InformacionSRI?.RespuestaSRI
             };
         }
     }

@@ -9,6 +9,7 @@
 @inject NavigationManager Navigation
 @using System.Security.Claims
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@using FacturasSRI.Domain.Enums
 
 <PageTitle>Crear Nueva Factura</PageTitle>
 
@@ -119,20 +120,16 @@
                     <div class="card-body">
                         <div class="mb-3">
                             <label class="form-label">Tipo de Cliente</label>
-                            <div>
+                            <InputRadioGroup @bind-Value="customerSelectionType" @bind-Value:after="OnCustomerSelectionTypeChanged">
                                 <div class="form-check form-check-inline">
-                                    <InputRadio @bind-Value="customerSelectionType" Value="@("existing")" id="radioExistingCustomer" class="form-check-input" />
+                                    <InputRadio Value="@("existing")" id="radioExistingCustomer" class="form-check-input" />
                                     <label class="form-check-label" for="radioExistingCustomer">Cliente Existente</label>
                                 </div>
                                 <div class="form-check form-check-inline">
-                                    <InputRadio @bind-Value="customerSelectionType" Value="@("finalConsumer")" id="radioFinalConsumer" class="form-check-input" />
+                                    <InputRadio Value="@("finalConsumer")" id="radioFinalConsumer" class="form-check-input" />
                                     <label class="form-check-label" for="radioFinalConsumer">Consumidor Final</label>
                                 </div>
-                                <div class="form-check form-check-inline">
-                                    <InputRadio @bind-Value="customerSelectionType" Value="@("newCustomer")" id="radioNewCustomer" class="form-check-input" />
-                                    <label class="form-check-label" for="radioNewCustomer">Nuevo Cliente</label>
-                                </div>
-                            </div>
+                            </InputRadioGroup>
                         </div>
 
                         @if (customerSelectionType == "existing")
@@ -183,43 +180,6 @@
                                 Facturando a Consumidor Final.
                             </div>
                         }
-                        else if (customerSelectionType == "newCustomer")
-                        {
-                            <div class="mb-3">
-                                <label for="tipoIdentificacionComprador" class="form-label">Tipo de Identificación</label>
-                                <InputSelect id="tipoIdentificacionComprador" @bind-Value="formModel.TipoIdentificacionComprador" class="form-select">
-                                    <option value="">Seleccione...</option>
-                                    @foreach (var tipo in Enum.GetValues(typeof(FacturasSRI.Domain.Enums.TipoIdentificacion)))
-                                    {
-                                        @if ((FacturasSRI.Domain.Enums.TipoIdentificacion)tipo != FacturasSRI.Domain.Enums.TipoIdentificacion.ConsumidorFinal)
-                                        {
-                                            <option value="@tipo">@tipo.ToString()</option>
-                                        }
-                                    }
-                                </InputSelect>
-                                <ValidationMessage For="@(() => formModel.TipoIdentificacionComprador)" />
-                            </div>
-                            <div class="mb-3">
-                                <label for="identificacionComprador" class="form-label">Número de Identificación</label>
-                                <InputText id="identificacionComprador" @bind-Value="formModel.IdentificacionComprador" class="form-control" />
-                                <ValidationMessage For="@(() => formModel.IdentificacionComprador)" />
-                            </div>
-                            <div class="mb-3">
-                                <label for="razonSocialComprador" class="form-label">Razón Social / Nombre</label>
-                                <InputText id="razonSocialComprador" @bind-Value="formModel.RazonSocialComprador" class="form-control" />
-                                <ValidationMessage For="@(() => formModel.RazonSocialComprador)" />
-                            </div>
-                            <div class="mb-3">
-                                <label for="direccionComprador" class="form-label">Dirección</label>
-                                <InputText id="direccionComprador" @bind-Value="formModel.DireccionComprador" class="form-control" />
-                                <ValidationMessage For="@(() => formModel.DireccionComprador)" />
-                            </div>
-                            <div class="mb-3">
-                                <label for="emailComprador" class="form-label">Email</label>
-                                <InputText id="emailComprador" @bind-Value="formModel.EmailComprador" class="form-control" />
-                                <ValidationMessage For="@(() => formModel.EmailComprador)" />
-                            </div>
-                        }
                     </div>
                 </div>
 
@@ -255,7 +215,7 @@
                 <button type="button" class="btn btn-secondary me-2" @onclick='() => Navigation.NavigateTo("/invoices")'>
                     <i class="bi bi-x-circle me-2"></i>Cancelar
                 </button>
-                <button type="submit" class="btn btn-primary" disabled="@(!invoiceItems.Any() || isSubmitting || (customerSelectionType == "existing" && !formModel.SelectedClienteId.HasValue) || (customerSelectionType == "newCustomer" && (!formModel.TipoIdentificacionComprador.HasValue || string.IsNullOrWhiteSpace(formModel.IdentificacionComprador) || string.IsNullOrWhiteSpace(formModel.RazonSocialComprador))))">
+                <button type="submit" class="btn btn-primary" disabled="@(!invoiceItems.Any() || isSubmitting || (customerSelectionType == "existing" && !formModel.SelectedClienteId.HasValue))">
                      @if (isSubmitting)
                     {
                         <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
@@ -287,8 +247,8 @@
     private List<ProductDto> productSearchResults = new();
 
     private List<InvoiceItemViewModel> invoiceItems = new();
-    private CreateInvoiceFormModel formModel = new(); // Changed from object to CreateInvoiceFormModel
-    private string customerSelectionType = "existing"; // Added for customer selection radio buttons
+    private CreateInvoiceFormModel formModel = new();
+    private string customerSelectionType = "existing";
     
     private decimal subtotal = 0;
     private decimal total = 0;
@@ -335,17 +295,10 @@
         formModel.SelectedClienteId = null;
     }
 
-    private void OnCustomerSelectionTypeChanged(string newType)
+    private void OnCustomerSelectionTypeChanged()
     {
-        customerSelectionType = newType;
-        // Reset customer-related fields when selection type changes
         selectedCustomer = null;
         formModel.SelectedClienteId = null;
-        formModel.TipoIdentificacionComprador = null;
-        formModel.RazonSocialComprador = null;
-        formModel.IdentificacionComprador = null;
-        formModel.DireccionComprador = null;
-        formModel.EmailComprador = null;
         customerSearchTerm = string.Empty;
         customerSearchResults.Clear();
     }
@@ -470,22 +423,7 @@
         }
         else if (customerSelectionType == "finalConsumer")
         {
-            createDto.TipoIdentificacionComprador = FacturasSRI.Domain.Enums.TipoIdentificacion.ConsumidorFinal;
-            // No need to set other customer fields for ConsumidorFinal as they will be handled by the service
-        }
-        else if (customerSelectionType == "newCustomer")
-        {
-            if (!formModel.TipoIdentificacionComprador.HasValue || string.IsNullOrWhiteSpace(formModel.IdentificacionComprador) || string.IsNullOrWhiteSpace(formModel.RazonSocialComprador))
-            {
-                errorMessage = "Debe completar todos los campos requeridos para el nuevo cliente.";
-                isSubmitting = false;
-                return;
-            }
-            createDto.TipoIdentificacionComprador = formModel.TipoIdentificacionComprador.Value;
-            createDto.IdentificacionComprador = formModel.IdentificacionComprador;
-            createDto.RazonSocialComprador = formModel.RazonSocialComprador;
-            createDto.DireccionComprador = formModel.DireccionComprador;
-            createDto.EmailComprador = formModel.EmailComprador;
+            createDto.TipoIdentificacionComprador = TipoIdentificacion.ConsumidorFinal;
         }
         else
         {
@@ -539,27 +477,5 @@
     public class CreateInvoiceFormModel
     {
         public Guid? SelectedClienteId { get; set; }
-        public bool IsConsumidorFinal { get; set; } = false;
-
-        // Fields for new customer or ConsumidorFinal if not using existing client
-        [Required(ErrorMessage = "El tipo de identificación es requerido.")]
-        public TipoIdentificacion? TipoIdentificacionComprador { get; set; }
-        
-        [Required(ErrorMessage = "La razón social es requerida.")]
-        [StringLength(200, ErrorMessage = "La razón social no puede exceder los 200 caracteres.")]
-        public string? RazonSocialComprador { get; set; }
-        
-        [Required(ErrorMessage = "El número de identificación es requerido.")]
-        [StringLength(20, ErrorMessage = "El número de identificación no puede exceder los 20 caracteres.")]
-        public string? IdentificacionComprador { get; set; }
-        
-        [StringLength(300, ErrorMessage = "La dirección no puede exceder los 300 caracteres.")]
-        public string? DireccionComprador { get; set; }
-        
-        [EmailAddress(ErrorMessage = "Formato de correo electrónico inválido.")]
-        [StringLength(100, ErrorMessage = "El correo electrónico no puede exceder los 100 caracteres.")]
-        public string? EmailComprador { get; set; }
-
-        public List<InvoiceItemViewModel> Items { get; set; } = new();
     }
 }

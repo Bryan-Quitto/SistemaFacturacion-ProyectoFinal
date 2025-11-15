@@ -30,7 +30,7 @@ namespace FacturasSRI.Core.Services
         private const string DIRECCION_MATRIZ_EMISOR = "Av. de los Shyris N37-271 y Holanda, Edificio Shyris Center, Quito, Ecuador";
         private const string COD_ESTABLECIMIENTO = "001";
         private const string COD_PUNTO_EMISION = "001";
-        private const string OBLIGADO_CONTABILIDAD_STRING = "SI";
+        private const ObligadoContabilidad OBLIGADO_CONTABILIDAD = ObligadoContabilidad.Si;
         private const string TIPO_AMBIENTE = "1"; 
         
         private readonly CultureInfo _cultureInfo = CultureInfo.InvariantCulture;
@@ -50,7 +50,7 @@ namespace FacturasSRI.Core.Services
             string xmlSinFirmar = SerializarObjeto(facturaXml);
 
             string rutaCertificado = @"C:\Users\THINKPAD\Desktop\certificado_prueba_sri.p12";
-            string passwordCertificado = "TuPasswordSegura123"; 
+            string passwordCertificado = "9ninelivesL"; 
 
             string xmlFirmado = _firmaService.FirmarXml(xmlSinFirmar, rutaCertificado, passwordCertificado);
 
@@ -67,7 +67,7 @@ namespace FacturasSRI.Core.Services
 
             var facturaXml = new FacturaXml 
             {
-                Id = "comprobante",
+                Id = FacturaId.Comprobante,
                 Version = "1.0.0", 
             };
             
@@ -90,13 +90,13 @@ namespace FacturasSRI.Core.Services
             {
                 FechaEmision = facturaDominio.FechaEmision.ToString("dd/MM/yyyy"),
                 DirEstablecimiento = DIRECCION_MATRIZ_EMISOR, 
-                ObligadoContabilidad = (OBLIGADO_CONTABILIDAD_STRING == "SI" ? ObligadoContabilidad.SI : ObligadoContabilidad.NO),
+                ObligadoContabilidad = OBLIGADO_CONTABILIDAD,
                 
                 TipoIdentificacionComprador = MapearTipoIdentificacion(clienteDominio.TipoIdentificacion),
                 RazonSocialComprador = clienteDominio.RazonSocial,
                 IdentificacionComprador = clienteDominio.NumeroIdentificacion,
                 
-                TotalSinImpuesto = facturaDominio.SubtotalSinImpuestos,
+                TotalSinImpuestos = facturaDominio.SubtotalSinImpuestos,
                 TotalDescuento = facturaDominio.TotalDescuento,
                 Propina = 0.00m,
                 ImporteTotal = facturaDominio.Total
