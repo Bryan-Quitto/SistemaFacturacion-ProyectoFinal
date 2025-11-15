@@ -294,5 +294,23 @@ namespace FacturasSRI.Infrastructure.Services
                 return new List<CategoriaDto>(); // Devolver lista vacía si hay error
             }
         }
+        public async Task<List<string>> GetAllMarcasAsync()
+        {
+            try
+            {
+                var marcasDesdeDb = await _context.Productos
+                    .Select(p => p.Marca)
+                    .Where(m => !string.IsNullOrEmpty(m))
+                    .Distinct()
+                    .OrderBy(m => m)
+                    .ToListAsync();
+                return marcasDesdeDb;
+            }
+            catch (Exception ex)
+            {
+                // Log the exception if you have a logging mechanism
+                return new List<string>(); // Return an empty list on error
+            }
+        }
     }
 }

@@ -18,5 +18,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<TaxDto?> GetCurrentGlobalTaxAsync();
         Task<ProductDetailDto?> GetProductDetailsByIdAsync(Guid id);
         Task<List<CategoriaDto>> GetAllCategoriasAsync();
+        Task<List<string>> GetAllMarcasAsync();
     }
 }

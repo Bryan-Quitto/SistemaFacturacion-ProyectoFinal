@@ -37,7 +37,13 @@
                     </div>
                     <div class="mb-3">
                         <label for="marca" class="form-label">Marca</label>
-                        <InputText id="marca" class="form-control" @bind-Value="newProduct.Marca" />
+                        <InputText id="marca" class="form-control" @bind-Value="newProduct.Marca" list="marcas-list" />
+                        <datalist id="marcas-list">
+                            @foreach (var marca in marcas)
+                            {
+                                <option value="@marca"></option>
+                            }
+                        </datalist>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -53,14 +59,13 @@
                     </div>
                     <div class="mb-3">
                         <label for="categoria" class="form-label">Categoría</label>
-                        <InputText id="categoria" class="form-control" list="categorias-list"
-                            @bind-Value="selectedCategoriaNombre" />
-                        <datalist id="categorias-list">
+                        <InputSelect id="categoria" class="form-select" @bind-Value="newProduct.CategoriaId">
+                            <option value="">Seleccione una categoría</option>
                             @foreach (var categoria in categorias)
                             {
-                                <option value="@categoria.Nombre"></option>
+                                <option value="@categoria.Id">@categoria.Nombre</option>
                             }
-                        </datalist>
+                        </InputSelect>
                         <ValidationMessage For="@(() => newProduct.CategoriaId)" />
                     </div>
                 </div>
@@ -90,7 +95,7 @@
 @code {
     private ProductDto newProduct = new();
     private List<CategoriaDto> categorias = new();
-    private string selectedCategoriaNombre = "";
+    private List<string> marcas = new();
     private string? statusMessage;
     private bool isSuccess;
 
@@ -102,6 +107,7 @@
         {
             // Aquí cargamos la lista de categorías para que esté disponible en el formulario.
             categorias = await ProductService.GetAllCategoriasAsync();
+            marcas = await ProductService.GetAllMarcasAsync();
         }
         catch (Exception ex)
         {
@@ -115,18 +121,6 @@
     {
         statusMessage = null;
         isSuccess = false;
-
-        // 1. Buscamos la categoría que el usuario seleccionó en la lista que YA cargamos.
-        var selectedCategoria = categorias.FirstOrDefault(c => 
-            c.Nombre.Trim().Equals(selectedCategoriaNombre.Trim(), StringComparison.CurrentCultureIgnoreCase));
-
-        if (selectedCategoria == null)
-        {
-            statusMessage = "Por favor, seleccione una categoría válida de la lista.";
-            return; // Detenemos la ejecución si la categoría no es válida.
-        }
-        
-        newProduct.CategoriaId = selectedCategoria.Id;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
@@ -145,9 +139,13 @@
             await ProductService.CreateProductAsync(newProduct);
             Navigation.NavigateTo("/products");
         }
+        catch (InvalidOperationException ex)
+        {
+            statusMessage = ex.Message; // Muestra el mensaje específico de la excepción
+        }
         catch (Exception ex)
         {
-            statusMessage = "Error al crear el producto";
+            statusMessage = "Error al crear el producto: " + ex.Message;
         }
     }
 
