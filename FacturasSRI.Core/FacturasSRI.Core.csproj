@@ -7,11 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="FirmaXadesNet" Version="2.0.1.1" />
+    <ProjectReference Include="..\FacturasSRI.Domain\FacturasSRI.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FacturasSRI.Domain\FacturasSRI.Domain.csproj" />
+    <PackageReference Include="BouncyCastle.NetCore" Version="2.2.1" />
+    <PackageReference Include="FirmaXadesNetCore" Version="1.1.0" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.0" />
   </ItemGroup>
 
 </Project>

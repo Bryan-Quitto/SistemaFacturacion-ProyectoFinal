@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\FacturasSRI.Application\FacturasSRI.Application.csproj" />
     <ProjectReference Include="..\FacturasSRI.Domain\FacturasSRI.Domain.csproj" />
+    <ProjectReference Include="..\FacturasSRI.Core\FacturasSRI.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

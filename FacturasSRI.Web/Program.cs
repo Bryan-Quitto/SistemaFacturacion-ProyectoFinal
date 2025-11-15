@@ -54,6 +54,11 @@ builder.Services.AddScoped<AuthenticationStateProvider, ApiAuthenticationStatePr
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
+builder.Services.AddScoped<FacturasSRI.Core.Services.FirmaDigitalService>();
+builder.Services.AddScoped<FacturasSRI.Core.Services.XmlGeneratorService>();
+builder.Services.AddScoped<FacturasSRI.Core.Services.SriApiClientService>();
+builder.Services.AddScoped<FacturasSRI.Core.Services.SriResponseParserService>();
+
 builder.Services.AddHttpClient("ApiClient", (serviceProvider, client) =>
 {
     var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();

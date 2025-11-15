@@ -1,15 +1,22 @@
-// En: FacturasSRI.Core/Services/XmlGeneratorService.cs
-
 using System;
 using System.IO;
 using System.Linq;
 using System.Xml.Serialization;
 using System.Xml;
-using FacturasSRI.Core.XmlModels.Factura;
-using FacturasSRI.Domain.Entities;
-using FacturasSRI.Domain.Enums; // <-- AÑADIDO
+using FacturasSRI.Domain.Enums; 
 using System.Globalization;
 using System.Collections.Generic;
+
+using FacturaDominio = FacturasSRI.Domain.Entities.Factura;
+using ClienteDominio = FacturasSRI.Domain.Entities.Cliente;
+
+using FacturaXml = FacturasSRI.Core.XmlModels.Factura.Factura;
+using InfoTributariaXml = FacturasSRI.Core.XmlModels.Factura.InfoTributaria;
+using InfoFacturaXml = FacturasSRI.Core.XmlModels.Factura.FacturaInfoFactura;
+using DetalleXml = FacturasSRI.Core.XmlModels.Factura.FacturaDetallesDetalle;
+using TotalImpuestoXml = FacturasSRI.Core.XmlModels.Factura.FacturaInfoFacturaTotalConImpuestosTotalImpuesto;
+using ImpuestoDetalleXml = FacturasSRI.Core.XmlModels.Factura.Impuesto;
+using FacturasSRI.Core.XmlModels.Factura;
 
 namespace FacturasSRI.Core.Services
 {
@@ -17,155 +24,133 @@ namespace FacturasSRI.Core.Services
     {
         private readonly FirmaDigitalService _firmaService;
 
-        // === DATOS FICTICIOS DE TU EMPRESA (EMISOR) ===
         private const string RUC_EMISOR = "1799999999001";
         private const string RAZON_SOCIAL_EMISOR = "Aether Tecnologías";
         private const string NOMBRE_COMERCIAL_EMISOR = "Aether Tech";
         private const string DIRECCION_MATRIZ_EMISOR = "Av. de los Shyris N37-271 y Holanda, Edificio Shyris Center, Quito, Ecuador";
         private const string COD_ESTABLECIMIENTO = "001";
         private const string COD_PUNTO_EMISION = "001";
-        private const string OBLIGADO_CONTABILIDAD = "SI";
-        private const string TIPO_AMBIENTE = "1"; // 1 = Pruebas, 2 = Producción
+        private const string OBLIGADO_CONTABILIDAD_STRING = "SI";
+        private const string TIPO_AMBIENTE = "1"; 
         
-        // Formato de cultura "invariante" para que "100.00" no se escriba como "100,00"
         private readonly CultureInfo _cultureInfo = CultureInfo.InvariantCulture;
 
-        // Asumimos que este servicio será inyectado
         public XmlGeneratorService(FirmaDigitalService firmaService)
         {
             _firmaService = firmaService;
         }
 
-        /// <summary>
-        /// Orquestador principal. Genera, firma y devuelve el XML listo.
-        /// </summary>
         public string GenerarYFirmarFactura(
             string claveAcceso,
-            Factura facturaDominio,
-            Cliente clienteDominio
+            FacturaDominio facturaDominio, 
+            ClienteDominio clienteDominio
             )
         {
-            // 1. Generar el objeto 'factura' (el modelo XML)
-            factura facturaXml = GenerarXmlFactura(claveAcceso, facturaDominio, clienteDominio);
-
-            // 2. Convertir ese objeto a un string XML (sin firmar)
+            FacturaXml facturaXml = GenerarXmlFactura(claveAcceso, facturaDominio, clienteDominio);
             string xmlSinFirmar = SerializarObjeto(facturaXml);
 
-            // 3. Firmar el XML
             string rutaCertificado = @"C:\Users\THINKPAD\Desktop\certificado_prueba_sri.p12";
-            string passwordCertificado = "TuPasswordSegura123"; // <-- ¡LA CONTRASEÑA QUE CREASTE!
+            string passwordCertificado = "TuPasswordSegura123"; 
 
             string xmlFirmado = _firmaService.FirmarXml(xmlSinFirmar, rutaCertificado, passwordCertificado);
 
             return xmlFirmado;
         }
 
-
-        /// <summary>
-        /// El "Mapper". Convierte tus datos de dominio al objeto XML del SRI.
-        /// </summary>
-        private factura GenerarXmlFactura(
+        private FacturaXml GenerarXmlFactura( 
             string claveAcceso,
-            Factura facturaDominio,
-            Cliente clienteDominio
+            FacturaDominio facturaDominio, 
+            ClienteDominio clienteDominio
             )
         {
-            // El secuencial del SRI son 9 dígitos.
             string secuencialFormateado = facturaDominio.NumeroFactura.PadLeft(9, '0');
 
-            // --- LÓGICA DE IMPUESTOS (AGRUPACIÓN) ---
-            // El SRI pide un resumen de impuestos. Agrupamos todos los impuestos de 
-            // todas las líneas de detalle por su tipo (IVA 0, IVA 12, etc.)
-            var gruposImpuestos = facturaDominio.Detalles
-                // 1. Obtenemos pares de (Detalle, Impuesto) por cada producto
-                .SelectMany(d => d.Producto.ProductoImpuestos.Select(pi => new { Detalle = d, Impuesto = pi.Impuesto }))
-                // 2. Agrupamos por el objeto Impuesto (por su ID)
-                .GroupBy(x => x.Impuesto)
-                // 3. Creamos el objeto 'totalConImpuesto' que pide el SRI
-                .Select(g => new totalConImpuesto
-                {
-                    codigo = "2", // Asumimos que todo es IVA (Código SRI para IVA)
-                    codigoPorcentaje = g.Key.CodigoSRI, // "0", "2", "3" (según tus datos)
-                    baseImponible = g.Sum(x => x.Detalle.Subtotal).ToString("F2", _cultureInfo),
-                    valor = g.Sum(x => x.Detalle.ValorIVA).ToString("F2", _cultureInfo)
-                })
-                .ToArray();
-
-            // --- CONSTRUCCIÓN DEL OBJETO XML ---
-            var facturaXml = new factura
+            var facturaXml = new FacturaXml 
             {
-                id = "comprobante",
-                version = "1.0.0", // Revisa el XSD si es necesario
-                
-                // === 1. INFORMACIÓN TRIBUTARIA (Tu empresa ficticia) ===
-                infoTributaria = new infoTributaria
-                {
-                    ambiente = TIPO_AMBIENTE,
-                    tipoEmision = "1", // 1 = Emisión Normal
-                    razonSocial = RAZON_SOCIAL_EMISOR,
-                    nombreComercial = NOMBRE_COMERCIAL_EMISOR,
-                    ruc = RUC_EMISOR,
-                    claveAcceso = claveAcceso,
-                    codDoc = "01", // 01 = Factura
-                    estab = COD_ESTABLECIMIENTO,
-                    ptoEmi = COD_PUNTO_EMISION,
-                    secuencial = secuencialFormateado,
-                    dirMatriz = DIRECCION_MATRIZ_EMISOR
-                },
-
-                // === 2. INFORMACIÓN DE LA FACTURA (Cliente, Totales) ===
-                infoFactura = new facturaInfoFactura
-                {
-                    fechaEmision = facturaDominio.FechaEmision.ToString("dd/MM/yyyy"),
-                    dirEstablecimiento = DIRECCION_MATRIZ_EMISOR, 
-                    obligadoContabilidad = OBLIGADO_CONTABILIDAD,
-                    
-                    // --- DATOS DEL CLIENTE (MAPEADOS) ---
-                    tipoIdentificacionComprador = MapearTipoIdentificacion(clienteDominio.TipoIdentificacion),
-                    razonSocialComprador = clienteDominio.RazonSocial,
-                    identificacionComprador = clienteDominio.NumeroIdentificacion,
-                    
-                    // --- TOTALES (MAPEADOS) ---
-                    totalSinImpuesto = facturaDominio.SubtotalSinImpuestos.ToString("F2", _cultureInfo),
-                    totalDescuento = facturaDominio.TotalDescuento.ToString("F2", _cultureInfo),
-                    propina = "0.00",
-                    importeTotal = facturaDominio.Total.ToString("F2", _cultureInfo),
-                    
-                    // --- DESGLOSE DE IMPUESTOS (GENERADO) ---
-                    totalConImpuestos = gruposImpuestos
-                },
-
-                // === 3. DETALLES DE LA FACTURA (Productos) ===
-                detalles = facturaDominio.Detalles.Select(detalle => new facturaDetalle
-                {
-                    // --- DATOS DEL PRODUCTO (MAPEADOS) ---
-                    codigoPrincipal = detalle.Producto.CodigoPrincipal,
-                    descripcion = detalle.Producto.Nombre,
-                    cantidad = detalle.Cantidad.ToString("F2", _cultureInfo),
-                    precioUnitario = detalle.PrecioVentaUnitario.ToString("F2", _cultureInfo),
-                    descuento = detalle.Descuento.ToString("F2", _cultureInfo),
-                    precioTotalSinImpuesto = detalle.Subtotal.ToString("F2", _cultureInfo),
-
-                    // --- IMPUESTOS POR DETALLE (MAPEADOS) ---
-                    // Por cada detalle, creamos su lista de impuestos
-                    impuestos = detalle.Producto.ProductoImpuestos.Select(pi => new impuesto
-                    {
-                        codigo = "2", // Asumimos IVA
-                        codigoPorcentaje = pi.Impuesto.CodigoSRI, // "0", "2", etc.
-                        tarifa = pi.Impuesto.Porcentaje.ToString("F2", _cultureInfo),
-                        baseImponible = detalle.Subtotal.ToString("F2", _cultureInfo),
-                        valor = detalle.ValorIVA.ToString("F2", _cultureInfo)
-                    }).ToArray()
-
-                }).ToArray()
+                Id = "comprobante",
+                Version = "1.0.0", 
             };
+            
+            facturaXml.InfoTributaria = new InfoTributariaXml 
+            {
+                Ambiente = TIPO_AMBIENTE,
+                TipoEmision = "1", 
+                RazonSocial = RAZON_SOCIAL_EMISOR,
+                NombreComercial = NOMBRE_COMERCIAL_EMISOR,
+                Ruc = RUC_EMISOR,
+                ClaveAcceso = claveAcceso,
+                CodDoc = "01", 
+                Estab = COD_ESTABLECIMIENTO,
+                PtoEmi = COD_PUNTO_EMISION,
+                Secuencial = secuencialFormateado,
+                DirMatriz = DIRECCION_MATRIZ_EMISOR
+            };
+
+            facturaXml.InfoFactura = new InfoFacturaXml 
+            {
+                FechaEmision = facturaDominio.FechaEmision.ToString("dd/MM/yyyy"),
+                DirEstablecimiento = DIRECCION_MATRIZ_EMISOR, 
+                ObligadoContabilidad = (OBLIGADO_CONTABILIDAD_STRING == "SI" ? ObligadoContabilidad.SI : ObligadoContabilidad.NO),
+                
+                TipoIdentificacionComprador = MapearTipoIdentificacion(clienteDominio.TipoIdentificacion),
+                RazonSocialComprador = clienteDominio.RazonSocial,
+                IdentificacionComprador = clienteDominio.NumeroIdentificacion,
+                
+                TotalSinImpuesto = facturaDominio.SubtotalSinImpuestos,
+                TotalDescuento = facturaDominio.TotalDescuento,
+                Propina = 0.00m,
+                ImporteTotal = facturaDominio.Total
+            };
+            
+            var gruposImpuestos = facturaDominio.Detalles
+                .SelectMany(d => d.Producto.ProductoImpuestos.Select(pi => new { Detalle = d, Impuesto = pi.Impuesto }))
+                .GroupBy(x => x.Impuesto)
+                .Select(g => new TotalImpuestoXml 
+                {
+                    Codigo = "2", 
+                    CodigoPorcentaje = g.Key.CodigoSRI, 
+                    BaseImponible = g.Sum(x => x.Detalle.Subtotal),
+                    Valor = g.Sum(x => x.Detalle.ValorIVA)
+                });
+
+            foreach (var grupo in gruposImpuestos)
+            {
+                facturaXml.InfoFactura.TotalConImpuestos.Add(grupo);
+            }
+
+            foreach (var detalle in facturaDominio.Detalles)
+            {
+                var detalleXml = new DetalleXml
+                {
+                    CodigoPrincipal = detalle.Producto.CodigoPrincipal,
+                    Descripcion = detalle.Producto.Nombre,
+                    Cantidad = detalle.Cantidad,
+                    PrecioUnitario = detalle.PrecioVentaUnitario,
+                    Descuento = detalle.Descuento,
+                    PrecioTotalSinImpuesto = detalle.Subtotal
+                };
+
+                var impuestosDetalle = detalle.Producto.ProductoImpuestos
+                    .Select(pi => new ImpuestoDetalleXml 
+                    {
+                        Codigo = "2", 
+                        CodigoPorcentaje = pi.Impuesto.CodigoSRI, 
+                        Tarifa = pi.Impuesto.Porcentaje,
+                        BaseImponible = detalle.Subtotal,
+                        Valor = detalle.ValorIVA
+                    });
+
+                foreach (var impuesto in impuestosDetalle)
+                {
+                    detalleXml.Impuestos.Add(impuesto);
+                }
+                
+                facturaXml.Detalles.Add(detalleXml);
+            }
 
             return facturaXml;
         }
 
-        /// <summary>
-        /// Helper para convertir un objeto C# (como 'factura') en un string XML.
-        /// </summary>
         private string SerializarObjeto(object objeto)
         {
             using (var stringWriter = new StringWriter())
@@ -173,7 +158,7 @@ namespace FacturasSRI.Core.Services
                 var settings = new XmlWriterSettings
                 {
                     Indent = true, 
-                    Encoding = new System.Text.UTF8Encoding(false) // Sin BOM
+                    Encoding = new System.Text.UTF8Encoding(false) 
                 };
 
                 using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
@@ -189,21 +174,18 @@ namespace FacturasSRI.Core.Services
             }
         }
 
-        /// <summary>
-        /// Helper para traducir tu Enum de Dominio a los códigos del SRI.
-        /// </summary>
         private string MapearTipoIdentificacion(TipoIdentificacion tipo)
         {
             switch (tipo)
             {
                 case TipoIdentificacion.Cedula:
-                    return "05"; // Cédula
+                    return "05"; 
                 case TipoIdentificacion.RUC:
-                    return "04"; // RUC
+                    return "04"; 
                 case TipoIdentificacion.Pasaporte:
-                    return "06"; // Pasaporte
+                    return "06"; 
                 case TipoIdentificacion.ConsumidorFinal:
-                    return "07"; // Consumidor Final
+                    return "07"; 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(tipo), $"Tipo de identificación no soportado por el SRI: {tipo}.");
             }
