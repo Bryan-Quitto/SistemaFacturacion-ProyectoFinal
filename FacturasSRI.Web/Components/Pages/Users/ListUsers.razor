@@ -65,63 +65,67 @@
 </div>
 
 
+
+
+
 @if (showEditModal)
 {
-    <div class="modal fade show" style="display: block;" tabindex="-1">
+    <div class="modal fade show" style="display:block" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Editar Usuario: @editingUserModel.PrimerNombre @editingUserModel.PrimerApellido</h5>
+                    <h5 class="modal-title">Editar Usuario</h5>
                     <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
                 </div>
                 <div class="modal-body">
-                    <EditForm Model="@editingUserModel" OnValidSubmit="@HandleUpdateUser">
+                    <EditForm Model="@editingUserModel" OnValidSubmit="HandleUpdateUser">
                         <DataAnnotationsValidator />
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Primer Nombre</label>
-                                <InputText class="form-control" @bind-Value="editingUserModel.PrimerNombre" />
-                                <ValidationMessage For="@(() => editingUserModel.PrimerNombre)" />
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Primer Nombre</label>
+                                    <InputText class="form-control" @bind-Value="editingUserModel.PrimerNombre" />
+                                    <ValidationMessage For="@(() => editingUserModel.PrimerNombre)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Segundo Nombre</label>
+                                    <InputText class="form-control" @bind-Value="editingUserModel.SegundoNombre" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Primer Apellido</label>
+                                    <InputText class="form-control" @bind-Value="editingUserModel.PrimerApellido" />
+                                    <ValidationMessage For="@(() => editingUserModel.PrimerApellido)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Segundo Apellido</label>
+                                    <InputText class="form-control" @bind-Value="editingUserModel.SegundoApellido" />
+                                </div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Segundo Nombre</label>
-                                <InputText class="form-control" @bind-Value="editingUserModel.SegundoNombre" />
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Primer Apellido</label>
-                                <InputText class="form-control" @bind-Value="editingUserModel.PrimerApellido" />
-                                <ValidationMessage For="@(() => editingUserModel.PrimerApellido)" />
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Segundo Apellido</label>
-                                <InputText class="form-control" @bind-Value="editingUserModel.SegundoApellido" />
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Correo Electrónico</label>
-                                <InputText type="email" class="form-control" @bind-Value="editingUserModel.Email" readonly />
-                                <ValidationMessage For="@(() => editingUserModel.Email)" />
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Rol</label>
-                                @if (allRoles.Any())
-                                {
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Correo Electrónico</label>
+                                    <InputText class="form-control" @bind-Value="editingUserModel.Email" />
+                                    <ValidationMessage For="@(() => editingUserModel.Email)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Rol</label>
                                     <InputSelect class="form-select" @bind-Value="editingUserModel.RoleId">
-                                        <option value="@Guid.Empty">Seleccione un rol...</option>
-                                        @foreach (var rol in allRoles)
+                                        <option value="@Guid.Empty">-- Seleccione un rol --</option>
+                                        @foreach (var role in allRoles)
                                         {
-                                            <option value="@rol.Id">@rol.Nombre</option>
+                                            <option value="@role.Id">@role.Nombre</option>
                                         }
                                     </InputSelect>
                                     <ValidationMessage For="@(() => editingUserModel.RoleId)" />
-                                }
-                            </div>
-                            <div class="col-md-6 mb-3 form-check">
-                                <InputCheckbox class="form-check-input" @bind-Value="editingUserModel.EstaActivo" />
-                                <label class="form-check-label">Está Activo</label>
+                                </div>
+                                <div class="mb-3 form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="editingUserModel.EstaActivo" />
+                                    <label class="form-check-label">Está Activo</label>
+                                </div>
                             </div>
                         </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">Cancelar</button>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-secondary me-2" @onclick="CloseEditModal">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar Cambios</button>
                         </div>
                     </EditForm>
@@ -132,7 +136,6 @@
     <div class="modal-backdrop fade show"></div>
 }
 
-
 <ConfirmationModal IsVisible="showConfirmationModal"
                    Title="@confirmationModalTitle"
                    Message="@confirmationModalMessage"
@@ -142,7 +145,7 @@
 @code {
     private List<UserDto> allUsers = new();
     private List<RoleDto> allRoles = new();
-    
+
     private bool showEditModal = false;
     private EditUserModel editingUserModel = new();
 
@@ -269,7 +272,7 @@
         public string Email { get; set; } = string.Empty;
 
         public bool EstaActivo { get; set; }
-        
+
         public Guid RoleId { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

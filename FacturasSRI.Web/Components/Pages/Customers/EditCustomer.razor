@@ -1,0 +1,134 @@
+@page "/customers/edit/{CustomerId:guid}"
+@attribute [Authorize(Policy = "VendedorPolicy")]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@using Microsoft.AspNetCore.Components.Authorization
+@using FacturasSRI.Web.Components.Shared
+@inject ICustomerService CustomerService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IUserService UserService
+
+<PageTitle>Editar Cliente</PageTitle>
+
+@if (customer == null && !string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (customer == null)
+{
+    <p><em>Cargando cliente...</em></p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>Editar Cliente: @customer.RazonSocial</h1>
+            <p class="text-muted">Modifica los detalles del cliente seleccionado.</p>
+        </div>
+        <button class="btn btn-secondary" @onclick="GoBack">
+            <i class="bi bi-arrow-left"></i> Volver
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <EditForm Model="@customer" OnValidSubmit="SaveChanges">
+                <DataAnnotationsValidator />
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Razón Social</label>
+                            <InputText class="form-control" @bind-Value="customer.RazonSocial" />
+                            <ValidationMessage For="@(() => customer.RazonSocial)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Número de Identificación</label>
+                            <InputText class="form-control" @bind-Value="customer.NumeroIdentificacion" />
+                            <ValidationMessage For="@(() => customer.NumeroIdentificacion)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Correo Electrónico</label>
+                            <InputText class="form-control" @bind-Value="customer.Email" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Dirección</label>
+                            <InputText class="form-control" @bind-Value="customer.Direccion" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Teléfono</label>
+                            <InputText class="form-control" @bind-Value="customer.Telefono" />
+                        </div>
+                        <div class="mb-3 form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="customer.EstaActivo" />
+                            <label class="form-check-label">Está Activo</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="button" class="btn btn-secondary me-2" @onclick="GoBack">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid CustomerId { get; set; }
+
+    private CustomerDto? customer;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            customer = await CustomerService.GetCustomerByIdAsync(CustomerId);
+            if (customer == null)
+            {
+                errorMessage = "No se encontró el cliente solicitado.";
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar el cliente: {ex.Message}";
+        }
+    }
+
+    private async Task SaveChanges()
+    {
+        if (customer != null)
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var userIdClaim = user.FindFirst(c => c.Type == "sub") ?? user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out Guid currentUserId))
+                {
+                    customer.UsuarioIdCreador = currentUserId; // This is actually the modifier's ID
+                    var userDto = await UserService.GetUserByIdAsync(currentUserId);
+                    if (userDto != null)
+                    {
+                        customer.UltimaModificacionPor = $"{userDto.PrimerNombre} {userDto.PrimerApellido}";
+                    }
+                }
+            }
+
+            await CustomerService.UpdateCustomerAsync(customer);
+            Navigation.NavigateTo("/customers");
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/customers");
+    }
+}

@@ -1,0 +1,132 @@
+@page "/users/edit/{UserId:guid}"
+@attribute [Authorize(Roles = "Administrador")]
+@using System.ComponentModel.DataAnnotations
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Web.Components.Shared
+@inject IUserService UserService
+@inject IRoleService RoleService
+@inject NavigationManager Navigation
+
+<PageTitle>Editar Usuario</PageTitle>
+
+@if (user == null && !string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (user == null)
+{
+    <p><em>Cargando usuario...</em></p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>Editar Usuario: @user.PrimerNombre @user.PrimerApellido</h1>
+            <p class="text-muted">Modifica los detalles del usuario seleccionado.</p>
+        </div>
+        <button class="btn btn-secondary" @onclick="GoBack">
+            <i class="bi bi-arrow-left"></i> Volver
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <EditForm Model="@user" OnValidSubmit="SaveChanges">
+                <DataAnnotationsValidator />
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Primer Nombre</label>
+                        <InputText class="form-control" @bind-Value="user.PrimerNombre" />
+                        <ValidationMessage For="@(() => user.PrimerNombre)" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Segundo Nombre</label>
+                        <InputText class="form-control" @bind-Value="user.SegundoNombre" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Primer Apellido</label>
+                        <InputText class="form-control" @bind-Value="user.PrimerApellido" />
+                        <ValidationMessage For="@(() => user.PrimerApellido)" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Segundo Apellido</label>
+                        <InputText class="form-control" @bind-Value="user.SegundoApellido" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Correo Electrónico</label>
+                        <InputText type="email" class="form-control" @bind-Value="user.Email" readonly />
+                        <ValidationMessage For="@(() => user.Email)" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Rol</label>
+                        @if (allRoles.Any())
+                        {
+                            <InputSelect class="form-select" @bind-Value="selectedRoleId">
+                                <option value="@Guid.Empty">Seleccione un rol...</option>
+                                @foreach (var rol in allRoles)
+                                {
+                                    <option value="@rol.Id">@rol.Nombre</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => selectedRoleId)" />
+                        }
+                    </div>
+                    <div class="col-md-6 mb-3 form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="user.EstaActivo" />
+                        <label class="form-check-label">Está Activo</label>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="button" class="btn btn-secondary me-2" @onclick="GoBack">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid UserId { get; set; }
+
+    private UserDto? user;
+    private List<RoleDto> allRoles = new();
+    private Guid selectedRoleId;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            user = await UserService.GetUserByIdAsync(UserId);
+            if (user == null)
+            {
+                errorMessage = "No se encontró el usuario solicitado.";
+                return;
+            }
+            allRoles = await RoleService.GetRolesAsync();
+            selectedRoleId = user.RolesId.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar el usuario: {ex.Message}";
+        }
+    }
+
+    private async Task SaveChanges()
+    {
+        if (user != null)
+        {
+            user.RolesId = new List<Guid> { selectedRoleId };
+            await UserService.UpdateUserAsync(user);
+            Navigation.NavigateTo("/users");
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/users");
+    }
+}

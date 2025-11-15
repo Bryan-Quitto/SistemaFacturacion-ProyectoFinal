@@ -47,7 +47,7 @@
                 <td>@customer.UltimaModificacionPor</td>
                 <td>@(customer.FechaModificacion.HasValue ? customer.FechaModificacion.Value.ToShortDateString() : "N/A")</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary" @onclick="() => OpenEditModal(customer)">Editar</button>
+                    <a href="@($"/customers/edit/{customer.Id}")" class="btn btn-sm btn-secondary">Editar</a>
                     <button class="btn btn-sm @(customer.EstaActivo ? "btn-danger" : "btn-success")" @onclick="() => HandleDeleteCustomer(customer.Id)">
                         @(customer.EstaActivo ? "Desactivar" : "Activar")
                     </button>
@@ -56,10 +56,7 @@
         }
     </tbody>
 </table>
-@if (customerToEdit != null)
-{
-    <EditCustomerModal Customer="customerToEdit" IsVisible="isEditModalVisible" OnSave="HandleUpdateCustomer" OnClose="CloseEditModal" />
-}
+
 
 
 <ConfirmationModal IsVisible="showConfirmationModal"
@@ -70,8 +67,6 @@
 
 @code {
     private List<CustomerDto> allCustomers = new(); // Holds all customers
-    private CustomerDto? customerToEdit;
-    private bool isEditModalVisible = false;
 
     // Confirmation Modal State
     private bool showConfirmationModal = false;
@@ -133,56 +128,7 @@
         customerToToggleId = Guid.Empty;
     }
 
-    private async Task HandleUpdateCustomer(CustomerDto customer)
-    {
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
 
-        if (user.Identity?.IsAuthenticated == true)
-        {
-            var userIdClaim = user.FindFirst(c => c.Type == "sub") ?? user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier);
-            if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out Guid currentUserId))
-            {
-                customer.UsuarioIdCreador = currentUserId; // This is actually the modifier's ID
-                var userDto = await UserService.GetUserByIdAsync(currentUserId);
-                if (userDto != null)
-                {
-                    customer.UltimaModificacionPor = $"{userDto.PrimerNombre} {userDto.PrimerApellido}";
-                }
-            }
-        }
-
-        await CustomerService.UpdateCustomerAsync(customer);
-        isEditModalVisible = false;
-        customerToEdit = null;
-        await LoadCustomers();
-    }
-    private void OpenEditModal(CustomerDto customer)
-    {
-        customerToEdit = new CustomerDto
-        {
-            Id = customer.Id,
-            RazonSocial = customer.RazonSocial,
-            NumeroIdentificacion = customer.NumeroIdentificacion,
-            Email = customer.Email,
-            Direccion = customer.Direccion,
-            Telefono = customer.Telefono,
-            TipoIdentificacion = customer.TipoIdentificacion,
-            EstaActivo = customer.EstaActivo,
-            UsuarioIdCreador = customer.UsuarioIdCreador,
-            FechaCreacion = customer.FechaCreacion,
-            FechaModificacion = customer.FechaModificacion,
-            UsuarioModificadorId = customer.UsuarioModificadorId,
-            UltimaModificacionPor = customer.UltimaModificacionPor
-        };
-        isEditModalVisible = true;
-    }
-
-    private void CloseEditModal()
-    {
-        isEditModalVisible = false;
-        customerToEdit = null;
-    }
 
     private void GoToCreateCustomer()
     {

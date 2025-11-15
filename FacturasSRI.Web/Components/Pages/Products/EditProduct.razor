@@ -1,0 +1,148 @@
+@page "/products/edit/{ProductId:guid}"
+@attribute [Authorize]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@inject IProductService ProductService
+@inject NavigationManager Navigation
+
+<PageTitle>Editar Producto</PageTitle>
+
+@if (product == null && !string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (product == null)
+{
+    <p><em>Cargando producto...</em></p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>Editar Producto: @product.Nombre</h1>
+            <p class="text-muted">Modifica los detalles del producto seleccionado.</p>
+        </div>
+        <button class="btn btn-secondary" @onclick="GoBack">
+            <i class="bi bi-arrow-left"></i> Volver
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <EditForm Model="@product" OnValidSubmit="SaveChanges">
+                <DataAnnotationsValidator />
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Nombre</label>
+                            <InputText class="form-control" @bind-Value="product.Nombre" />
+                            <ValidationMessage For="@(() => product.Nombre)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Código Principal</label>
+                            <InputText class="form-control" @bind-Value="product.CodigoPrincipal" />
+                            <ValidationMessage For="@(() => product.CodigoPrincipal)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción</label>
+                            <InputText class="form-control" @bind-Value="product.Descripcion" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Precio de Venta</label>
+                            <InputNumber class="form-control" @bind-Value="product.PrecioVentaUnitario" />
+                            <ValidationMessage For="@(() => product.PrecioVentaUnitario)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Marca</label>
+                            <InputText class="form-control" @bind-Value="product.Marca" />
+                            <ValidationMessage For="@(() => product.Marca)" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Categoría</label>
+                            <InputText class="form-control" list="categorias-list" @bind-Value="selectedCategoriaNombre" />
+                            <datalist id="categorias-list">
+                                @foreach (var categoria in todasLasCategorias)
+                                {
+                                    <option value="@categoria.Nombre"></option>
+                                }
+                            </datalist>
+                            <ValidationMessage For="@(() => product.CategoriaId)" />
+                        </div>
+                        <div class="mb-3 form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="product.ManejaInventario" />
+                            <label class="form-check-label">Maneja Inventario</label>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="product.ManejaLotes" />
+                            <label class="form-check-label">Maneja Lotes</label>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="product.IsActive" />
+                            <label class="form-check-label">Está Activo</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="button" class="btn btn-secondary me-2" @onclick="GoBack">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid ProductId { get; set; }
+
+    private ProductDto? product;
+    private string? errorMessage;
+    private List<CategoriaDto> todasLasCategorias = new();
+    private string selectedCategoriaNombre = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            product = await ProductService.GetProductByIdAsync(ProductId);
+            if (product == null)
+            {
+                errorMessage = "No se encontró el producto solicitado.";
+                return;
+            }
+
+            todasLasCategorias = await ProductService.GetAllCategoriasAsync();
+            selectedCategoriaNombre = product.CategoriaNombre;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar el producto: {ex.Message}";
+        }
+    }
+
+    private async Task SaveChanges()
+    {
+        if (product != null)
+        {
+            var selectedCategoria = todasLasCategorias.FirstOrDefault(c =>
+                c.Nombre.Trim().Equals(selectedCategoriaNombre.Trim(), StringComparison.CurrentCultureIgnoreCase));
+
+            if (selectedCategoria != null)
+            {
+                product.CategoriaId = selectedCategoria.Id;
+            }
+
+            await ProductService.UpdateProductAsync(product);
+            Navigation.NavigateTo("/products");
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/products");
+    }
+}

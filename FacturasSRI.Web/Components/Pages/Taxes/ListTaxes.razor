@@ -36,7 +36,7 @@
                 <td>@tax.CodigoSRI</td>
                 <td>@tax.Porcentaje</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary" @onclick="() => OpenEditModal(tax)">Editar</button>
+                    <a href="@($"/taxes/edit/{tax.Id}")" class="btn btn-sm btn-secondary">Editar</a>
                     <button class="btn btn-sm @(tax.EstaActivo ? "btn-danger" : "btn-success")" @onclick="() => HandleDeleteTax(tax.Id)">
                         @(tax.EstaActivo ? "Desactivar" : "Activar")
                     </button>
@@ -45,10 +45,7 @@
         }
     </tbody>
 </table>
-@if (taxToEdit != null)
-{
-    <EditTaxModal Tax="taxToEdit" IsVisible="isEditModalVisible" OnSave="HandleUpdateTax" OnClose="CloseEditModal" />
-}
+
 
 <ConfirmationModal IsVisible="showConfirmationModal"
                    Title="@confirmationModalTitle"
@@ -58,8 +55,6 @@
 
 @code {
     private List<TaxDto> allTaxes = new(); // Holds all taxes
-    private TaxDto? taxToEdit;
-    private bool isEditModalVisible = false;
 
     // Confirmation Modal State
     private bool showConfirmationModal = false;
@@ -121,32 +116,7 @@
         taxToToggleId = Guid.Empty;
     }
 
-    private async Task HandleUpdateTax(TaxDto tax)
-    {
-        await TaxService.UpdateTaxAsync(tax);
-        isEditModalVisible = false;
-        taxToEdit = null;
-        await LoadTaxes();
-    }
 
-    private void OpenEditModal(TaxDto tax)
-    {
-        taxToEdit = new TaxDto
-        {
-            Id = tax.Id,
-            Nombre = tax.Nombre,
-            CodigoSRI = tax.CodigoSRI,
-            Porcentaje = tax.Porcentaje,
-            EstaActivo = tax.EstaActivo
-        };
-        isEditModalVisible = true;
-    }
-
-    private void CloseEditModal()
-    {
-        isEditModalVisible = false;
-        taxToEdit = null;
-    }
 
     private void GoToCreateTax()
     {

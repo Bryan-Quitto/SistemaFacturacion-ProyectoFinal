@@ -1,0 +1,106 @@
+@page "/taxes/edit/{TaxId:guid}"
+@attribute [Authorize(Roles = "Administrador")]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@using Microsoft.AspNetCore.Components.Authorization
+@using FacturasSRI.Web.Components.Shared
+@inject ITaxService TaxService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IUserService UserService
+
+<PageTitle>Editar Impuesto</PageTitle>
+
+@if (tax == null && !string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (tax == null)
+{
+    <p><em>Cargando impuesto...</em></p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>Editar Impuesto: @tax.Nombre</h1>
+            <p class="text-muted">Modifica los detalles del impuesto seleccionado.</p>
+        </div>
+        <button class="btn btn-secondary" @onclick="GoBack">
+            <i class="bi bi-arrow-left"></i> Volver
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <EditForm Model="@tax" OnValidSubmit="SaveChanges">
+                <DataAnnotationsValidator />
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Nombre</label>
+                            <InputText class="form-control" @bind-Value="tax.Nombre" />
+                            <ValidationMessage For="@(() => tax.Nombre)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Código SRI</label>
+                            <InputText class="form-control" @bind-Value="tax.CodigoSRI" />
+                            <ValidationMessage For="@(() => tax.CodigoSRI)" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Porcentaje</label>
+                            <InputNumber class="form-control" @bind-Value="tax.Porcentaje" />
+                            <ValidationMessage For="@(() => tax.Porcentaje)" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="button" class="btn btn-secondary me-2" @onclick="GoBack">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid TaxId { get; set; }
+
+    private TaxDto? tax;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            tax = await TaxService.GetTaxByIdAsync(TaxId);
+            if (tax == null)
+            {
+                errorMessage = "No se encontró el impuesto solicitado.";
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar el impuesto: {ex.Message}";
+        }
+    }
+
+    private async Task SaveChanges()
+    {
+        if (tax != null)
+        {
+            await TaxService.UpdateTaxAsync(tax);
+            Navigation.NavigateTo("/taxes");
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/taxes");
+    }
+}

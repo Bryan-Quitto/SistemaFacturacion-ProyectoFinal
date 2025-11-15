@@ -80,9 +80,9 @@
                                         <a href="@($"/products/details/{product.Id}")" class="btn btn-sm btn-outline-secondary">
                                             <i class="bi bi-eye-fill"></i> Ver detalles
                                         </a>
-                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(product)">
+                                        <a href="@($"/products/edit/{product.Id}")" class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-pencil-square"></i> Editar
-                                        </button>
+                                        </a>
                                         <button
                                             class="btn btn-sm @(product.IsActive ? "btn-outline-danger" : "btn-outline-success")"
                                             @onclick="() => HandleDeleteProduct(product.Id)">
@@ -100,12 +100,6 @@
     </div>
 </div>
 
-
-@if (productToEdit != null)
-{
-    <EditProductModal Product="productToEdit" IsVisible="isEditModalVisible" OnSave="HandleUpdateProductInModal"
-        OnClose="CloseEditModal" />
-}
 
 <ConfirmationModal IsVisible="showConfirmationModal" Title="@confirmationModalTitle" Message="@confirmationModalMessage"
     OnConfirm="ConfirmToggleProductStatus" OnCancel="CancelToggleProductStatus" />
@@ -147,12 +141,8 @@
 }
 
 @code {
-    public EventCallback<ProductDto> OnSave { get; set; }
     private List<ProductDto>? allProducts; // Holds all products
     private string? errorMessage;
-
-    private ProductDto? productToEdit;
-    private bool isEditModalVisible = false;
 
     // Confirmation Modal State
     private bool showConfirmationModal = false;
@@ -288,39 +278,7 @@
         productToToggleId = Guid.Empty;
     }
 
-    private async Task HandleUpdateProductInModal(ProductDto product)
-    {
-        await ProductService.UpdateProductAsync(product);
-        isEditModalVisible = false;
-        productToEdit = null;
-        await LoadProducts();
-    }
 
-    private void OpenEditModal(ProductDto product)
-    {
-        productToEdit = new ProductDto
-        {
-            Id = product.Id,
-            Nombre = product.Nombre,
-            CodigoPrincipal = product.CodigoPrincipal,
-            Descripcion = product.Descripcion,
-            PrecioVentaUnitario = product.PrecioVentaUnitario,
-            ManejaInventario = product.ManejaInventario,
-            ManejaLotes = product.ManejaLotes,
-            IsActive = product.IsActive, // Initialize IsActive
-            Marca = product.Marca,
-            CategoriaId = product.CategoriaId,
-            CategoriaNombre = product.CategoriaNombre
-        };
-        isEditModalVisible = true;
-    }
-
-    private async Task CloseEditModal()
-    {
-        isEditModalVisible = false;
-        productToEdit = null;
-        await LoadProducts();
-    }
 
     private void GoToCreateProduct()
     {
