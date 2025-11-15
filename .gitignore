@@ -44,3 +44,6 @@ appsettings.Development.json
 # Ignorar el archivo de configuración de lanzamiento (launchSettings.json).
 # Este archivo a menudo contiene perfiles y configuraciones específicas del entorno local.
 **/Properties/launchSettings.json
+
+# Ignorar el appsettings de Infraestructura
+FacturasSRI.Infrastructure/appsettings.json
