@@ -31,7 +31,7 @@ namespace FacturasSRI.Infrastructure.Persistence
         public DbSet<Secuencial> Secuenciales { get; set; }
         public DbSet<Usuario> Usuarios { get; set; }
         public DbSet<UsuarioRol> UsuarioRoles { get; set; }
-        public DbSet<Proveedor> Proveedores { get; set; } // Added
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -52,7 +52,6 @@ namespace FacturasSRI.Infrastructure.Persistence
             modelBuilder.Entity<Rol>().ToTable("Roles");
             modelBuilder.Entity<Secuencial>().ToTable("Secuenciales");
             modelBuilder.Entity<Usuario>().ToTable("Usuarios");
-            modelBuilder.Entity<Proveedor>().ToTable("Proveedores"); // Added
 
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(FacturasSRIDbContext).Assembly);
             
@@ -62,55 +61,43 @@ namespace FacturasSRI.Infrastructure.Persistence
             var adminUserId = new Guid("a9b1b4d3-3f7b-4e6a-9f6b-1c2c3d4e5f6b");
             var defaultProveedorId = new Guid("c1d2e3f4-5a6b-7c8d-9e0f-1a2b3c4d5e6f"); // New GUID for default supplier
 
-            modelBuilder.Entity<Rol>().HasData(
-                new Rol {
-                    Id = adminRoleId,
-                    Nombre = "Administrador",
-                    Descripcion = "Acceso total al sistema.",
-                    EstaActivo = true
-                },
-                new Rol {
-                    Id = vendedorRoleId,
-                    Nombre = "Vendedor",
-                    Descripcion = "Puede gestionar clientes y facturas.",
-                    EstaActivo = true
-                },
-                new Rol {
-                    Id = bodegueroRoleId,
-                    Nombre = "Bodeguero",
-                    Descripcion = "Puede gestionar productos, compras e inventario.",
-                    EstaActivo = true
-                }
-            );
+            // modelBuilder.Entity<Rol>().HasData(
+            //     new Rol {
+            //         Id = adminRoleId,
+            //         Nombre = "Administrador",
+            //         Descripcion = "Acceso total al sistema.",
+            //         EstaActivo = true
+            //     },
+            //     new Rol {
+            //         Id = vendedorRoleId,
+            //         Nombre = "Vendedor",
+            //         Descripcion = "Puede gestionar clientes y facturas.",
+            //         EstaActivo = true
+            //     },
+            //     new Rol {
+            //         Id = bodegueroRoleId,
+            //         Nombre = "Bodeguero",
+            //         Descripcion = "Puede gestionar productos, compras e inventario.",
+            //         EstaActivo = true
+            //     }
+            // );
             
-            modelBuilder.Entity<Usuario>().HasData(new Usuario
-            {
-                Id = adminUserId,
-                PrimerNombre = "Admin",
-                PrimerApellido = "Aether",
-                Email = "admin@facturassri.com",
-                PasswordHash = "$2a$11$KnYr45JSbCoMg4Jtkg0GXegC7SegKYTidLxFYYljNwtLH0l024qLG",
-                EstaActivo = true
-            });
+            // modelBuilder.Entity<Usuario>().HasData(new Usuario
+            // {
+            //     Id = adminUserId,
+            //     PrimerNombre = "Admin",
+            //     PrimerApellido = "Aether",
+            //     Email = "admin@facturassri.com",
+            //     PasswordHash = "$2a$11$KnYr45JSbCoMg4Jtkg0GXegC7SegKYTidLxFYYljNwtLH0l024qLG",
+            //     EstaActivo = true
+            // });
 
-            modelBuilder.Entity<UsuarioRol>().HasData(new UsuarioRol
-            {
-                UsuarioId = adminUserId,
-                RolId = adminRoleId
-            });
+            // modelBuilder.Entity<UsuarioRol>().HasData(new UsuarioRol
+            // {
+            //     UsuarioId = adminUserId,
+            //     RolId = adminRoleId
+            // });
 
-            modelBuilder.Entity<Proveedor>().HasData(new Proveedor // Added default supplier
-            {
-                Id = defaultProveedorId,
-                RUC = "9999999999001",
-                RazonSocial = "Proveedor General",
-                Direccion = "N/A",
-                Telefono = "N/A",
-                Email = "proveedor.general@example.com",
-                EstaActivo = true,
-                FechaCreacion = DateTime.UtcNow,
-                UsuarioIdCreador = adminUserId // Assuming admin user created this
-            });
         }
     }
 }

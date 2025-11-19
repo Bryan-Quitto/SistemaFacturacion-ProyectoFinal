@@ -14,6 +14,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Localization;
 using FacturasSRI.Web;
 using SendGrid.Extensions.DependencyInjection;
+using Supabase;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +38,17 @@ builder.Services.AddSendGrid(options => {
     options.ApiKey = builder.Configuration.GetSection("SendGrid").GetValue<string>("ApiKey");
 });
 
+builder.Services.AddSingleton(provider =>
+{
+    var url = builder.Configuration["Supabase:Url"];
+    var key = builder.Configuration["Supabase:ServiceRoleKey"];
+    if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(key))
+    {
+        throw new InvalidOperationException("Supabase URL and Service Role Key must be configured in appsettings.");
+    }
+    return new Supabase.Client(url, key);
+});
+
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
@@ -46,7 +58,7 @@ builder.Services.AddScoped<ITaxService, TaxService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IAjusteInventarioService, AjusteInventarioService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
-builder.Services.AddScoped<IProveedorService, ProveedorService>(); // Added
+
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IValidationService, ValidationService>();
 
@@ -127,6 +139,9 @@ app.UseRequestLocalization(new RequestLocalizationOptions
 app.UseStaticFiles();
 
 app.UseStatusCodePagesWithReExecute("/NotFound"); // Handle 404s by re-executing to Blazor's NotFound route
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseAntiforgery();
 

@@ -3,6 +3,7 @@ using System;
 using FacturasSRI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FacturasSRI.Infrastructure.Migrations
 {
     [DbContext(typeof(FacturasSRIDbContext))]
-    partial class FacturasSRIDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251119044512_AddProductoToCuentasPorPagar")]
+    partial class AddProductoToCuentasPorPagar
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -71,6 +74,48 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Categorias");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("9fad1530-eff0-4b60-bd2d-ebd5cecf1951"),
+                            Nombre = "Computadores y Laptops"
+                        },
+                        new
+                        {
+                            Id = new Guid("0bcd16a0-ef2f-463c-8aba-a3dfb5bcf471"),
+                            Nombre = "Componentes de PC"
+                        },
+                        new
+                        {
+                            Id = new Guid("ffa5172c-2633-4b2f-8f8c-e609954306f5"),
+                            Nombre = "Periféricos"
+                        },
+                        new
+                        {
+                            Id = new Guid("24981466-8fdc-4f65-a63e-c699b6f75da6"),
+                            Nombre = "Redes y Conectividad"
+                        },
+                        new
+                        {
+                            Id = new Guid("1023960d-ec62-4ff9-8009-e42f494df014"),
+                            Nombre = "Impresión y Suministros"
+                        },
+                        new
+                        {
+                            Id = new Guid("d60ae813-4fc4-427d-90e3-7bcd38404739"),
+                            Nombre = "Software y Licencias"
+                        },
+                        new
+                        {
+                            Id = new Guid("a1cafa86-4b8f-491d-a9d1-8239bab71a45"),
+                            Nombre = "Servidores y Enterprise"
+                        },
+                        new
+                        {
+                            Id = new Guid("c2cbcaab-3dfb-4ce6-88f8-4aa60e55f9f7"),
+                            Nombre = "Accesorios y Cables"
+                        });
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Cliente", b =>
@@ -172,9 +217,6 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<int>("Cantidad")
-                        .HasColumnType("integer");
 
                     b.Property<string>("ComprobantePath")
                         .HasColumnType("text");

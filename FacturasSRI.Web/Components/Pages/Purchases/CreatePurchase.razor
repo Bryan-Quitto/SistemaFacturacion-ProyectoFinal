@@ -1,17 +1,22 @@
 @page "/purchases/create"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Administrador, Bodeguero")]
+
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Forms
 @inject IPurchaseService PurchaseService
 @inject IProductService ProductService
-@inject IProveedorService ProveedorService // Added
 @inject NavigationManager Navigation
-@using System.Security.Claims
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject Supabase.Client Supabase
 
 <PageTitle>Registrar Compra</PageTitle>
 
-<h1>Registrar Compra</h1>
+<div class="page-header">
+    <h1>Registrar Nueva Compra</h1>
+    <p>Complete los datos para registrar el ingreso de mercancía.</p>
+</div>
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
@@ -20,77 +25,82 @@
     </div>
 }
 
-<div class="mb-3">
-    <EditForm Model="@newPurchase" OnValidSubmit="@HandleAddPurchase">
-        <DataAnnotationsValidator />
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="product" class="form-label">Producto</label>
-                    <InputSelect id="product" class="form-select" @bind-Value="newPurchase.ProductoId" disabled="@isSubmitting">
-                        <option value="">Seleccione un producto</option>
-                        @foreach (var product in products)
+<div class="card">
+    <div class="card-body">
+        <EditForm Model="@newPurchase" OnValidSubmit="@HandleAddPurchase">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="product" class="form-label">Producto</label>
+                        <InputSelect id="product" class="form-select" @bind-Value="newPurchase.ProductoId" disabled="@isSubmitting">
+                            <option value="">Seleccione un producto</option>
+                            @foreach (var product in products)
+                            {
+                                <option value="@product.Id">@product.Nombre</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => newPurchase.ProductoId)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="nombreProveedor" class="form-label">Nombre del Proveedor</label>
+                        <InputText id="nombreProveedor" class="form-control" @bind-Value="newPurchase.NombreProveedor" disabled="@isSubmitting" />
+                        <ValidationMessage For="@(() => newPurchase.NombreProveedor)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="comprobante" class="form-label">Comprobante de Compra (PDF)</label>
+                        <InputFile id="comprobante" class="form-control" OnChange="@OnInputFileChange" disabled="@isSubmitting" accept=".pdf" />
+                        @if (!string.IsNullOrEmpty(fileValidationMessage))
                         {
-                            <option value="@product.Id">@product.Nombre</option>
+                            <div class="text-danger small mt-1">@fileValidationMessage</div>
                         }
-                    </InputSelect>
-                    <ValidationMessage For="@(() => newPurchase.ProductoId)" />
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label for="cantidad" class="form-label">Cantidad</label>
-                    <InputNumber id="cantidad" class="form-control" @bind-Value="newPurchase.Cantidad" disabled="@isSubmitting" />
-                    <ValidationMessage For="@(() => newPurchase.Cantidad)" />
-                </div>
-                <div class="mb-3">
-                    <label for="precioCosto" class="form-label">Precio de Costo</label>
-                    <InputNumber id="precioCosto" class="form-control" @bind-Value="newPurchase.PrecioCosto" disabled="@isSubmitting" />
-                    <ValidationMessage For="@(() => newPurchase.PrecioCosto)" />
-                </div>
-                <div class="mb-3">
-                    <label for="fechaCaducidad" class="form-label">Fecha de Caducidad</label>
-                    <InputDate id="fechaCaducidad" class="form-control" @bind-Value="newPurchase.FechaCaducidad" disabled="@isSubmitting" />
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="cantidad" class="form-label">Cantidad</label>
+                        <InputNumber id="cantidad" class="form-control" @bind-Value="newPurchase.Cantidad" disabled="@isSubmitting" />
+                        <ValidationMessage For="@(() => newPurchase.Cantidad)" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="precioCosto" class="form-label">Precio de Costo (Unitario)</label>
+                        <InputNumber id="precioCosto" class="form-control" @bind-Value="newPurchase.PrecioCosto" disabled="@isSubmitting" />
+                        <ValidationMessage For="@(() => newPurchase.PrecioCosto)" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="fechaCaducidad" class="form-label">Fecha de Caducidad (Opcional)</label>
+                        <InputDate id="fechaCaducidad" class="form-control" @bind-Value="newPurchase.FechaCaducidad" disabled="@isSubmitting" />
+                    </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label for="proveedor" class="form-label">Proveedor</label>
-                    <InputSelect id="proveedor" class="form-select" @bind-Value="newPurchase.ProveedorId" disabled="@isSubmitting">
-                        <option value="">Seleccione un proveedor</option>
-                        @foreach (var prov in proveedores)
-                        {
-                            <option value="@prov.Id">@prov.RazonSocial</option>
-                        }
-                    </InputSelect>
-                    <ValidationMessage For="@(() => newPurchase.ProveedorId)" />
-                </div>
-                <div class="mb-3">
-                    <label for="numeroFactura" class="form-label">Número de Factura</label>
-                    <InputText id="numeroFactura" class="form-control" @bind-Value="newPurchase.NumeroFactura" disabled="@isSubmitting" />
-                    <ValidationMessage For="@(() => newPurchase.NumeroFactura)" />
-                </div>
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span> Registrando...</span>
+                    }
+                    else
+                    {
+                        <span><i class="bi bi-floppy-fill me-2"></i>Registrar Compra</span>
+                    }
+                </button>
             </div>
-        </div>
-        <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
-            @if (isSubmitting)
-            {
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                <span> Registrando...</span>
-            }
-            else
-            {
-                <span>Registrar Compra</span>
-            }
-        </button>
-    </EditForm>
+        </EditForm>
+    </div>
 </div>
 
 @code {
     private List<ProductDto> products = new();
-    private List<ProveedorDto> proveedores = new(); // Added
     private PurchaseDto newPurchase = new();
     private string? statusMessage;
     private bool isSuccess;
     private bool isSubmitting = false;
+
+    private IBrowserFile? comprobanteFile;
+    private string? fileValidationMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -98,13 +108,32 @@
         {
             var allProducts = await ProductService.GetActiveProductsAsync();
             products = allProducts.Where(p => p.ManejaInventario).ToList();
-
-            proveedores = await ProveedorService.GetProveedoresAsync(); // Added
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error al cargar datos: {ex.Message}"; // Modified
+            statusMessage = $"Error al cargar datos iniciales: {ex.Message}";
             isSuccess = false;
+        }
+    }
+
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        fileValidationMessage = null;
+        comprobanteFile = e.GetMultipleFiles(1).FirstOrDefault();
+
+        if (comprobanteFile != null)
+        {
+            if (comprobanteFile.ContentType != "application/pdf")
+            {
+                fileValidationMessage = "Error: El archivo seleccionado no es un PDF.";
+                comprobanteFile = null;
+                return;
+            }
+            if (comprobanteFile.Size > 5 * 1024 * 1024) // 5MB limit
+            {
+                fileValidationMessage = "Error: El archivo es demasiado grande (máximo 5MB).";
+                comprobanteFile = null;
+            }
         }
     }
 
@@ -112,6 +141,7 @@
     {
         isSubmitting = true;
         statusMessage = null;
+        isSuccess = false;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
@@ -119,34 +149,59 @@
 
         if (string.IsNullOrEmpty(userId))
         {
-            isSuccess = false;
             statusMessage = "No se pudo identificar al usuario. Por favor, inicie sesión de nuevo.";
             isSubmitting = false;
             return;
         }
+        
+        if (comprobanteFile == null)
+        {
+            statusMessage = "Error: Debe adjuntar el comprobante en formato PDF para registrar la compra.";
+            isSubmitting = false;
+            return;
+        }
 
+        if (!string.IsNullOrEmpty(fileValidationMessage))
+        {
+           statusMessage = fileValidationMessage;
+           isSubmitting = false;
+           return;
+        }
+        
         newPurchase.UsuarioIdCreador = Guid.Parse(userId);
 
         try
         {
+            // 1. Upload file to Supabase
+            var fileExtension = Path.GetExtension(comprobanteFile.Name);
+            var fileName = $"{Guid.NewGuid()}{fileExtension}";
+            var bucketPath = $"{userId}/{fileName}";
+
+            await using var memoryStream = new MemoryStream();
+            await comprobanteFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024).CopyToAsync(memoryStream);
+            
+            await Supabase.Storage.From("comprobantes-compra").Upload(memoryStream.ToArray(), bucketPath);
+            
+            newPurchase.ComprobantePath = bucketPath;
+
+            // 2. Create purchase record in DB
             var success = await PurchaseService.CreatePurchaseAsync(newPurchase);
             if(success)
             {
                 isSuccess = true;
                 statusMessage = "¡Compra registrada exitosamente!";
                 newPurchase = new();
+                comprobanteFile = null; 
                 StateHasChanged();
             }
             else
             {
-                isSuccess = false;
-                statusMessage = "Ocurrió un error al registrar la compra. Verifique los datos.";
+                statusMessage = "Ocurrió un error desconocido al registrar la compra en la base de datos.";
             }
         }
-        catch (Exception ex) // Modified
+        catch (Exception ex)
         {
-            isSuccess = false;
-            statusMessage = $"Ocurrió un error al registrar la compra: {ex.Message}"; // Modified
+            statusMessage = $"Ocurrió un error al procesar la compra: {ex.Message}";
         }
         finally
         {

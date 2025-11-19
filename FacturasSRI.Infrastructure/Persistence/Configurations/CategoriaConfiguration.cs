@@ -1,7 +1,6 @@
 using FacturasSRI.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using System;
 
 namespace FacturasSRI.Infrastructure.Persistence.Configurations
 {
@@ -12,13 +11,19 @@ namespace FacturasSRI.Infrastructure.Persistence.Configurations
             builder.HasKey(c => c.Id);
             builder.Property(c => c.Nombre).IsRequired().HasMaxLength(100);
 
-            builder.HasData(
-                new Categoria { Id = Guid.NewGuid(), Nombre = "Electrónica" },
-                new Categoria { Id = Guid.NewGuid(), Nombre = "Ropa y Accesorios" },
-                new Categoria { Id = Guid.NewGuid(), Nombre = "Alimentos y Bebidas" },
-                new Categoria { Id = Guid.NewGuid(), Nombre = "Hogar y Jardín" },
-                new Categoria { Id = Guid.NewGuid(), Nombre = "Salud y Belleza" }
+            // Categorías tecnológicas para Aether Tech
+           /* 
+           builder.HasData(
+                new Categoria { Id = Guid.NewGuid(), Nombre = "Computadores y Laptops" },
+                new Categoria { Id = Guid.NewGuid(), Nombre = "Componentes de PC" }, // RAM, Discos, Procesadores
+                new Categoria { Id = Guid.NewGuid(), Nombre = "Periféricos" }, // Teclados, Mouse, Monitores
+                new Categoria { Id = Guid.NewGuid(), Nombre = "Redes y Conectividad" }, // Routers, Cables, Switch
+                new Categoria { Id = Guid.NewGuid(), Nombre = "Impresión y Suministros" },
+                new Categoria { Id = Guid.NewGuid(), Nombre = "Software y Licencias" },
+                new Categoria { Id = Guid.NewGuid(), Nombre = "Servidores y Enterprise" },
+                new Categoria { Id = Guid.NewGuid(), Nombre = "Accesorios y Cables" }
             );
+            */
         }
     }
 }

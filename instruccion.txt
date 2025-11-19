@@ -1,0 +1,119 @@
+Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (120ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT c."Id" AS "CuentaPorPagarId", CASE
+          WHEN l."Id" IS NOT NULL THEN l."Id"
+          ELSE '00000000-0000-0000-0000-000000000000'
+      END AS "LoteId", p."Nombre" AS "ProductName", c."Cantidad" AS "CantidadComprada", CASE
+          WHEN l."Id" IS NOT NULL THEN l."CantidadDisponible"
+          ELSE p."StockTotal"
+      END AS "CantidadDisponible", CASE
+          WHEN c."Cantidad" > 0 THEN c."MontoTotal" / c."Cantidad"::numeric
+          ELSE 0.0
+      END AS "PrecioCompraUnitario", c."MontoTotal" AS "ValorTotalCompra", c."FechaEmision" AS "FechaCompra", l."FechaCaducidad", c."NombreProveedor", c."ComprobantePath", CASE
+          WHEN u."Id" IS NOT NULL THEN COALESCE(u."PrimerNombre", '') || ' ' || COALESCE(u."PrimerApellido", '')
+          ELSE 'N/A'
+      END AS "CreadoPor"
+      FROM "CuentasPorPagar" AS c
+      INNER JOIN "Productos" AS p ON c."ProductoId" = p."Id"
+      LEFT JOIN "Usuarios" AS u ON c."UsuarioIdCreador" = u."Id"
+      LEFT JOIN "Lotes" AS l ON c."LoteId" = l."Id"
+      ORDER BY c."FechaCreacion" DESC
+info: System.Net.Http.HttpClient.ApiClient.LogicalHandler[100]
+      Start processing HTTP request GET http://localhost:5000/api/dashboard/stats
+info: System.Net.Http.HttpClient.ApiClient.ClientHandler[100]
+      Sending HTTP request GET http://localhost:5000/api/dashboard/stats
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (102ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT count(*)::int
+      FROM "Facturas" AS f
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (97ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT count(*)::int
+      FROM "Clientes" AS c
+      WHERE c."EstaActivo"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (103ms) [Parameters=[@__primerDiaDelMes_0='?' (DbType = DateTime), @__primerDiaDelSiguienteMes_1='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      SELECT COALESCE(sum(f."Total"), 0.0)
+      FROM "Facturas" AS f
+      WHERE f."FechaEmision" >= @__primerDiaDelMes_0 AND f."FechaEmision" < @__primerDiaDelSiguienteMes_1
+info: System.Net.Http.HttpClient.ApiClient.ClientHandler[101]
+      Received HTTP response headers after 527.5418ms - 200
+info: System.Net.Http.HttpClient.ApiClient.LogicalHandler[101]
+      End processing HTTP request after 537.9185ms - 200
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (102ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT c."Id", c."Nombre"
+      FROM "Categorias" AS c
+      ORDER BY c."Nombre"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (103ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT t."Marca"
+      FROM (
+          SELECT DISTINCT p."Marca"
+          FROM "Productos" AS p
+          WHERE p."Marca" <> ''
+      ) AS t
+      ORDER BY t."Marca"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (102ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT p."Id", p."CodigoPrincipal", p."Nombre", p."Descripcion", p."PrecioVentaUnitario", p."ManejaInventario", p."ManejaLotes", CASE
+          WHEN p."ManejaLotes" THEN (
+              SELECT COALESCE(sum(l."CantidadDisponible"), 0)::int
+              FROM "Lotes" AS l
+              WHERE p."Id" = l."ProductoId")
+          ELSE p."StockTotal"
+      END AS "StockTotal", CASE
+          WHEN u."Id" IS NOT NULL THEN COALESCE(u."PrimerNombre", '') || ' ' || COALESCE(u."PrimerApellido", '')
+          ELSE 'Usuario no encontrado'
+      END AS "CreadoPor", p."EstaActivo" AS "IsActive", p."Marca", p."CategoriaId", c."Nombre" AS "CategoriaNombre"
+      FROM "Productos" AS p
+      LEFT JOIN "Usuarios" AS u ON p."UsuarioIdCreador" = u."Id"
+      INNER JOIN "Categorias" AS c ON p."CategoriaId" = c."Id"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (98ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT p."Id", p."CodigoPrincipal", p."Nombre", p."Descripcion", p."PrecioVentaUnitario", p."ManejaInventario", p."ManejaLotes", CASE
+          WHEN p."ManejaLotes" THEN (
+              SELECT COALESCE(sum(l."CantidadDisponible"), 0)::int
+              FROM "Lotes" AS l
+              WHERE p."Id" = l."ProductoId")
+          ELSE p."StockTotal"
+      END AS "StockTotal", CASE
+          WHEN u."Id" IS NOT NULL THEN COALESCE(u."PrimerNombre", '') || ' ' || COALESCE(u."PrimerApellido", '')
+          ELSE 'Usuario no encontrado'
+      END AS "CreadoPor", p."EstaActivo" AS "IsActive", p."Marca", p."CategoriaId", c."Nombre" AS "CategoriaNombre"
+      FROM "Productos" AS p
+      LEFT JOIN "Usuarios" AS u ON p."UsuarioIdCreador" = u."Id"
+      INNER JOIN "Categorias" AS c ON p."CategoriaId" = c."Id"
+      WHERE p."EstaActivo"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (99ms) [Parameters=[@__get_Item_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT p."Id", p."CategoriaId", p."CodigoPrincipal", p."Descripcion", p."EstaActivo", p."FechaCreacion", p."FechaModificacion", p."ManejaInventario", p."ManejaLotes", p."Marca", p."Nombre", p."PrecioVentaUnitario", p."StockTotal", p."TipoProducto", p."UsuarioIdCreador"     
+      FROM "Productos" AS p
+      WHERE p."Id" = @__get_Item_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (105ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?' (DbType = Int32), @p2='?', @p3='?' (DbType = DateTime), @p4='?' (DbType = DateTime), @p5='?' (DbType = DateTime), @p6='?' (DbType = Guid), @p7='?' (DbType = Decimal), @p8='?', @p9='?' (DbType = Boolean), @p10='?' (DbType = Guid), @p11='?' (DbType = Decimal), @p12='?' (DbType = Guid), @p14='?' (DbType = Guid), @p13='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "CuentasPorPagar" ("Id", "Cantidad", "ComprobantePath", "FechaCreacion", "FechaEmision", "FechaVencimiento", "LoteId", "MontoTotal", "NombreProveedor", "Pagada", "ProductoId", "SaldoPendiente", "UsuarioIdCreador")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12);
+      UPDATE "Productos" SET "StockTotal" = @p13
+      WHERE "Id" = @p14;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (102ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT c."Id" AS "CuentaPorPagarId", CASE
+          WHEN l."Id" IS NOT NULL THEN l."Id"
+          ELSE '00000000-0000-0000-0000-000000000000'
+      END AS "LoteId", p."Nombre" AS "ProductName", c."Cantidad" AS "CantidadComprada", CASE
+          WHEN l."Id" IS NOT NULL THEN l."CantidadDisponible"
+          ELSE p."StockTotal"
+      END AS "CantidadDisponible", CASE
+          WHEN c."Cantidad" > 0 THEN c."MontoTotal" / c."Cantidad"::numeric
+          ELSE 0.0
+      END AS "PrecioCompraUnitario", c."MontoTotal" AS "ValorTotalCompra", c."FechaEmision" AS "FechaCompra", l."FechaCaducidad", c."NombreProveedor", c."ComprobantePath", CASE
+          WHEN u."Id" IS NOT NULL THEN COALESCE(u."PrimerNombre", '') || ' ' || COALESCE(u."PrimerApellido", '')
+          ELSE 'N/A'
+      END AS "CreadoPor"
+      FROM "CuentasPorPagar" AS c
+      INNER JOIN "Productos" AS p ON c."ProductoId" = p."Id"
+      LEFT JOIN "Usuarios" AS u ON c."UsuarioIdCreador" = u."Id"
+      LEFT JOIN "Lotes" AS l ON c."LoteId" = l."Id"
+      ORDER BY c."FechaCreacion" DESC

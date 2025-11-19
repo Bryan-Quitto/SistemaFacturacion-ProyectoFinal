@@ -3,6 +3,7 @@ using System;
 using FacturasSRI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FacturasSRI.Infrastructure.Migrations
 {
     [DbContext(typeof(FacturasSRIDbContext))]
-    partial class FacturasSRIDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251119034404_SimplifyPurchaseAndRemoveSuppliers")]
+    partial class SimplifyPurchaseAndRemoveSuppliers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -71,6 +74,48 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Categorias");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("0f1e46b4-5d04-4a0f-b723-1cd5c60d3317"),
+                            Nombre = "Computadores y Laptops"
+                        },
+                        new
+                        {
+                            Id = new Guid("96177625-2856-46b1-8ae2-b5546808218d"),
+                            Nombre = "Componentes de PC"
+                        },
+                        new
+                        {
+                            Id = new Guid("b796f9ef-23d9-4d01-8ed8-95090516b802"),
+                            Nombre = "Periféricos"
+                        },
+                        new
+                        {
+                            Id = new Guid("f7b49ca0-3525-4e95-885c-ab7812465878"),
+                            Nombre = "Redes y Conectividad"
+                        },
+                        new
+                        {
+                            Id = new Guid("0771c970-05a4-4224-83db-c4d3a7d00513"),
+                            Nombre = "Impresión y Suministros"
+                        },
+                        new
+                        {
+                            Id = new Guid("5a91a6f6-8ce9-44e5-b0d2-69dea6b48551"),
+                            Nombre = "Software y Licencias"
+                        },
+                        new
+                        {
+                            Id = new Guid("a9e8fa2f-c82f-4889-8833-c46104c6606e"),
+                            Nombre = "Servidores y Enterprise"
+                        },
+                        new
+                        {
+                            Id = new Guid("84775e6f-7a08-4b7b-8696-e9c317d28d72"),
+                            Nombre = "Accesorios y Cables"
+                        });
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Cliente", b =>
@@ -173,9 +218,6 @@ namespace FacturasSRI.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Cantidad")
-                        .HasColumnType("integer");
-
                     b.Property<string>("ComprobantePath")
                         .HasColumnType("text");
 
@@ -201,9 +243,6 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.Property<bool>("Pagada")
                         .HasColumnType("boolean");
 
-                    b.Property<Guid>("ProductoId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("SaldoPendiente")
                         .HasColumnType("numeric");
 
@@ -213,8 +252,6 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("LoteId");
-
-                    b.HasIndex("ProductoId");
 
                     b.ToTable("CuentasPorPagar", (string)null);
                 });
@@ -643,6 +680,29 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Roles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("d3b1b4a9-2f7b-4e6a-9f6b-1c2c3d4e5f6a"),
+                            Descripcion = "Acceso total al sistema.",
+                            EstaActivo = true,
+                            Nombre = "Administrador"
+                        },
+                        new
+                        {
+                            Id = new Guid("e2a87c46-e5b3-4f9e-8c6e-1f2a3b4c5d6e"),
+                            Descripcion = "Puede gestionar clientes y facturas.",
+                            EstaActivo = true,
+                            Nombre = "Vendedor"
+                        },
+                        new
+                        {
+                            Id = new Guid("f5b8c9d0-1a2b-3c4d-5e6f-7a8b9c0d1e2f"),
+                            Descripcion = "Puede gestionar productos, compras e inventario.",
+                            EstaActivo = true,
+                            Nombre = "Bodeguero"
+                        });
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Secuencial", b =>
@@ -713,6 +773,18 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Usuarios", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("a9b1b4d3-3f7b-4e6a-9f6b-1c2c3d4e5f6b"),
+                            Email = "admin@facturassri.com",
+                            EstaActivo = true,
+                            FechaCreacion = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            PasswordHash = "$2a$11$KnYr45JSbCoMg4Jtkg0GXegC7SegKYTidLxFYYljNwtLH0l024qLG",
+                            PrimerApellido = "Aether",
+                            PrimerNombre = "Admin"
+                        });
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.UsuarioRol", b =>
@@ -728,6 +800,13 @@ namespace FacturasSRI.Infrastructure.Migrations
                     b.HasIndex("RolId");
 
                     b.ToTable("UsuarioRoles");
+
+                    b.HasData(
+                        new
+                        {
+                            UsuarioId = new Guid("a9b1b4d3-3f7b-4e6a-9f6b-1c2c3d4e5f6b"),
+                            RolId = new Guid("d3b1b4a9-2f7b-4e6a-9f6b-1c2c3d4e5f6a")
+                        });
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.AjusteInventario", b =>
@@ -764,15 +843,7 @@ namespace FacturasSRI.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("LoteId");
 
-                    b.HasOne("FacturasSRI.Domain.Entities.Producto", "Producto")
-                        .WithMany()
-                        .HasForeignKey("ProductoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Lote");
-
-                    b.Navigation("Producto");
                 });
 
             modelBuilder.Entity("FacturasSRI.Domain.Entities.Factura", b =>

@@ -14,12 +14,11 @@ namespace FacturasSRI.Application.Dtos
         [Range(0.01, double.MaxValue, ErrorMessage = "El precio debe ser mayor que cero.")]
         public decimal PrecioCosto { get; set; }
         public DateTime? FechaCaducidad { get; set; }
-
+        
         [Required]
-        public Guid ProveedorId { get; set; } // Changed from string Proveedor
+        public string NombreProveedor { get; set; } = string.Empty;
+        public string? ComprobantePath { get; set; }
 
-        [Required]
-        public string NumeroFactura { get; set; } = string.Empty;
         public Guid UsuarioIdCreador { get; set; }
     }
 }

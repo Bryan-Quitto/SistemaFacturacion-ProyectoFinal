@@ -6,10 +6,16 @@
 
 <PageTitle>Historial de Compras</PageTitle>
 
-<div class="page-header">
-    <h1>Historial de Compras</h1>
-    <p>Consulta todos los lotes de productos que han sido ingresados al inventario.</p>
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1>Historial de Compras</h1>
+        <p>Consulta todos los lotes de productos que han sido ingresados al inventario.</p>
+    </div>
+    <a href="/purchases/create" class="btn btn-primary">
+        <i class="bi bi-plus-circle-fill me-2"></i>Registrar Nueva Compra
+    </a>
 </div>
+
 
 <div class="mb-3">
     <input type="text" class="form-control" placeholder="Buscar compras por producto o proveedor..." @bind-value="searchTerm" @bind-value:event="oninput" />
@@ -19,7 +25,7 @@
 {
     <p><em>Cargando historial de compras...</em></p>
 }
-else if (FilteredPurchases.Any()) // Use FilteredPurchases
+else if (FilteredPurchases.Any())
 {
     <div class="card">
         <div class="card-body">
@@ -35,21 +41,34 @@ else if (FilteredPurchases.Any()) // Use FilteredPurchases
                             <th class="text-end">Precio Unit.</th>
                             <th class="text-end">Valor Total</th>
                             <th>Fecha Caducidad</th>
+                            <th>Comprobante</th>
                             <th>Creado Por</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var purchase in FilteredPurchases) // Use FilteredPurchases
+                        @foreach (var purchase in FilteredPurchases)
                         {
                             <tr>
                                 <td>@purchase.FechaCompra.ToLocalTime().ToString("g")</td>
                                 <td>@purchase.ProductName</td>
-                                <td>@purchase.Proveedor</td>
+                                <td>@purchase.NombreProveedor</td>
                                 <td class="text-end">@purchase.CantidadComprada</td>
                                 <td class="text-end fw-bold">@purchase.CantidadDisponible</td>
                                 <td class="text-end">@purchase.PrecioCompraUnitario.ToString("C")</td>
                                 <td class="text-end">@purchase.ValorTotalCompra.ToString("C")</td>
                                 <td>@(purchase.FechaCaducidad?.ToLocalTime().ToString("d") ?? "N/A")</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(purchase.ComprobantePath))
+                                    {
+                                        <a href="@($"/api/downloads/purchase-receipt/{purchase.CuentaPorPagarId}")" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-file-earmark-pdf"></i> Ver PDF
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">N/A</span>
+                                    }
+                                </td>
                                 <td>@purchase.CreadoPor</td>
                             </tr>
                         }
@@ -64,25 +83,27 @@ else
     <p>No se han registrado compras todavía.</p>
 }
 @code {
-    private List<PurchaseListItemDto> allPurchases = new(); // Holds all purchases
+    private List<PurchaseListItemDto> allPurchases = new();
     private bool isLoading = true;
 
-    private string searchTerm = string.Empty; // New property for search
+    private string searchTerm = string.Empty;
 
     private List<PurchaseListItemDto> FilteredPurchases => string.IsNullOrWhiteSpace(searchTerm)
         ? allPurchases
         : allPurchases.Where(p => p.ProductName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                                  p.Proveedor.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                                  p.NombreProveedor.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
                       .ToList();
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            allPurchases = await PurchaseService.GetPurchasesAsync(); // Load all purchases
+            isLoading = true;
+            allPurchases = await PurchaseService.GetPurchasesAsync();
         }
         catch (Exception)
         {
+            // Optional: log the error
         }
         finally
         {
