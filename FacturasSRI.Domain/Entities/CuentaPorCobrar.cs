@@ -8,7 +8,7 @@ namespace FacturasSRI.Domain.Entities
         public Guid Id { get; set; }
         public Guid FacturaId { get; set; }
         public virtual Factura Factura { get; set; } = null!;
-        public Guid ClienteId { get; set; }
+        public Guid? ClienteId { get; set; }
         public virtual Cliente Cliente { get; set; } = null!;
         public DateTime FechaEmision { get; set; }
         public DateTime FechaVencimiento { get; set; }

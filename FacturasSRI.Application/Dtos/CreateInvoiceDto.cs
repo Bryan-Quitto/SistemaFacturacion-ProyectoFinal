@@ -10,7 +10,9 @@ namespace FacturasSRI.Application.Dtos
         public Guid UsuarioIdCreador { get; set; }
         public List<InvoiceItemDto> Items { get; set; } = new();
 
-        // Optional fields for ConsumidorFinal
+        public bool EsConsumidorFinal { get; set; }
+
+        // Optional fields for new customers
         public TipoIdentificacion? TipoIdentificacionComprador { get; set; }
         public string? RazonSocialComprador { get; set; }
         public string? IdentificacionComprador { get; set; }

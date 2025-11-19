@@ -92,7 +92,7 @@ namespace FacturasSRI.Core.Services
                 DirEstablecimiento = DIRECCION_MATRIZ_EMISOR, 
                 ObligadoContabilidad = OBLIGADO_CONTABILIDAD,
                 
-                TipoIdentificacionComprador = MapearTipoIdentificacion(clienteDominio.TipoIdentificacion),
+                TipoIdentificacionComprador = MapearTipoIdentificacion(clienteDominio.TipoIdentificacion, clienteDominio.NumeroIdentificacion),
                 RazonSocialComprador = clienteDominio.RazonSocial,
                 IdentificacionComprador = clienteDominio.NumeroIdentificacion,
                 
@@ -174,8 +174,13 @@ namespace FacturasSRI.Core.Services
             }
         }
 
-        private string MapearTipoIdentificacion(TipoIdentificacion tipo)
+        private string MapearTipoIdentificacion(TipoIdentificacion tipo, string numeroIdentificacion)
         {
+            if (numeroIdentificacion == "9999999999")
+            {
+                return "07"; // Consumidor Final
+            }
+
             switch (tipo)
             {
                 case TipoIdentificacion.Cedula:
@@ -184,10 +189,11 @@ namespace FacturasSRI.Core.Services
                     return "04"; 
                 case TipoIdentificacion.Pasaporte:
                     return "06"; 
-                case TipoIdentificacion.ConsumidorFinal:
-                    return "07"; 
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(tipo), $"Tipo de identificación no soportado por el SRI: {tipo}.");
+                    // Se retorna "07" por defecto si no es ninguna de las anteriores,
+                    // cubriendo el caso de un nuevo cliente sin tipo especificado pero que no es CF.
+                    // O se podría lanzar una excepción si se requiere que siempre sea explícito.
+                    return "07";
             }
         }
     }

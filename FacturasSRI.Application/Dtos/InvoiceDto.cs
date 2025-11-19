@@ -10,7 +10,7 @@ namespace FacturasSRI.Application.Dtos
         public DateTime FechaEmision { get; set; }
         public string NumeroFactura { get; set; } = string.Empty;
         public EstadoFactura Estado { get; set; } // Added
-        public Guid ClienteId { get; set; }
+        public Guid? ClienteId { get; set; }
         public decimal SubtotalSinImpuestos { get; set; }
         public decimal TotalDescuento { get; set; }
         public decimal TotalIVA { get; set; }

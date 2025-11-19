@@ -10,7 +10,7 @@ namespace FacturasSRI.Domain.Entities
         public DateTime FechaEmision { get; set; }
         public string NumeroFactura { get; set; } = string.Empty;
         public EstadoFactura Estado { get; set; }
-        public Guid ClienteId { get; set; }
+        public Guid? ClienteId { get; set; }
         public virtual Cliente Cliente { get; set; } = null!;
         public decimal SubtotalSinImpuestos { get; set; }
         public decimal TotalDescuento { get; set; }

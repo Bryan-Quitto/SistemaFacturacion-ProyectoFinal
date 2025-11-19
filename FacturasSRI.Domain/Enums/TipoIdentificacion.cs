@@ -4,7 +4,6 @@ namespace FacturasSRI.Domain.Enums
     {
         Cedula,
         RUC,
-        Pasaporte,
-        ConsumidorFinal
+        Pasaporte
     }
 }
