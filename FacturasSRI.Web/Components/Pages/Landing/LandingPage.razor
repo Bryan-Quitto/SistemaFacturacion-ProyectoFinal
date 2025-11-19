@@ -1,5 +1,7 @@
-@page "/Landing"
+@page "/"
 @layout EmptyLayout
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@using Microsoft.AspNetCore.Components.Authorization
 
 <PageTitle>Aether Tech | Facturación Inteligente para tu Negocio</PageTitle>
 <div class="d-flex flex-column min-vh-100 text-white" style="background: linear-gradient(135deg,#2444d1 ,#6172d3 );">
@@ -18,7 +20,14 @@
 
                 <!-- Botones de Acción -->
                 <div>
-                    <a href="/login" class="btn btn-outline-light">Iniciar Sesión</a>
+                    <AuthorizeView>
+                        <Authorized>
+                            <a href="/dashboard" class="btn btn-outline-light">Ir al Panel</a>
+                        </Authorized>
+                        <NotAuthorized>
+                            <a href="/login" class="btn btn-outline-light">Iniciar Sesión</a>
+                        </NotAuthorized>
+                    </AuthorizeView>
                 </div>
             </div>
         </div>
@@ -47,7 +56,14 @@
 
                 <!-- Botón de Llamado a la Acción -->
                 <div class="mt-4">
-                    <a href="/login" class="btn btn-light btn-lg px-4 fw-bold">Empieza Ahora</a>
+                    <AuthorizeView>
+                        <Authorized>
+                            <a href="/dashboard" class="btn btn-light btn-lg px-4 fw-bold">Ir al Panel</a>
+                        </Authorized>
+                        <NotAuthorized>
+                            <a href="/login" class="btn btn-light btn-lg px-4 fw-bold">Empieza Ahora</a>
+                        </NotAuthorized>
+                    </AuthorizeView>
                 </div>
             </div>
         </div>

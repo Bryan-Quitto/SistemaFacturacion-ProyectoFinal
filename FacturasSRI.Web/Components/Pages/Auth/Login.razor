@@ -79,7 +79,7 @@
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         if (authState.User.Identity != null && authState.User.Identity.IsAuthenticated)
         {
-            Navigation.NavigateTo(ReturnUrl ?? "/");
+            Navigation.NavigateTo(ReturnUrl ?? "/dashboard");
         }
     }
 
@@ -112,7 +112,7 @@
                 {
                     await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", result.Token);
                     ((ApiAuthenticationStateProvider)AuthenticationStateProvider).MarkUserAsAuthenticated(result.Token);
-                    Navigation.NavigateTo(ReturnUrl ?? "/");
+                    Navigation.NavigateTo(ReturnUrl ?? "/dashboard");
                 }
                 else
                 {

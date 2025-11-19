@@ -1,4 +1,4 @@
-﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using FacturasSRI.Web.Components
 
 <Router AppAssembly="typeof(Program).Assembly">
@@ -17,50 +17,27 @@
                 </div>
             </Authorizing>
             
-                        <NotAuthorized Context="authContext">
+            <NotAuthorized Context="authContext">
+                @{
+                    if (authContext.User.Identity?.IsAuthenticated ?? false)
+                    {
+                        <LayoutView Layout="typeof(Layout.EmptyLayout)">
+                            <FacturasSRI.Web.Components.Pages.Forbidden />
+                        </LayoutView>
+                    }
+                    else
+                    {
+                        <RedirectToLogin />
+                    }
+                }
+            </NotAuthorized>
             
-                            @{
-            
-                                var authenticationState = authContext.User.Identity?.IsAuthenticated ?? false;
-            
-                                if (authenticationState)
-            
-                                {
-            
-                                    <LayoutView Layout="typeof(Layout.EmptyLayout)">
-            
-                                        <FacturasSRI.Web.Components.Pages.Forbidden />
-            
-                                    </LayoutView>
-            
-                                }
-            
-                                else
-            
-                                {
-            
-                                    <RedirectToLogin />
-            
-                                }
-            
-                            }
-            
-                        </NotAuthorized>
-            
-                    </AuthorizeRouteView>
-            
-                    <FocusOnNavigate RouteData="routeData" Selector="h1" />
-            
-                </Found>
-            
-                <NotFound>
-            
-                    <LayoutView Layout="typeof(Layout.EmptyLayout)">
-            
-                        <FacturasSRI.Web.Components.Pages.NotFound />
-            
-                    </LayoutView>
-            
-                </NotFound>
-            
-            </Router>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(Layout.EmptyLayout)">
+            <FacturasSRI.Web.Components.Pages.NotFound />
+        </LayoutView>
+    </NotFound>
+</Router>

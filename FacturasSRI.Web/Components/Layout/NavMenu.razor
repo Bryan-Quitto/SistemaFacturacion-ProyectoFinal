@@ -13,7 +13,14 @@
 
     <nav class="nav-container">
         <div class="nav-item">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                <i class="bi bi-house-door-fill"></i>
+                @if (!IsCollapsed) { <span>Inicio</span> }
+            </NavLink>
+        </div>
+
+        <div class="nav-item">
+            <NavLink class="nav-link" href="/dashboard" Match="NavLinkMatch.All">
                 <i class="bi bi-grid-1x2-fill"></i>
                 @if (!IsCollapsed) { <span>Panel Principal</span> }
             </NavLink>
