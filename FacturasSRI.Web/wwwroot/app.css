@@ -554,4 +554,62 @@ input.invalid:focus {
     border-color: var(--error-color);
     /* Usamos la variable RGB que ya tenías definida para el 'box-shadow' */
     box-shadow: 0 0 0 0.25rem rgba(var(--accent-color-rgb), 0.25); 
+}/* ==========================================================================
+   Landing Page Styles
+   ========================================================================== */
+
+.landing-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: var(--background-color);
+    color: var(--text-color);
+}
+
+.landing-header {
+    background-color: #10164E;
+}
+
+.landing-header .btn-light {
+    background-color: var(--background-color);
+    color: var(--primary-dark);
+    border-color: var(--background-color);
+    font-weight: 700;
+}
+
+.landing-header .btn-light:hover {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+    color: var(--primary-dark);
+}
+
+.hero-section {
+    background: linear-gradient(135deg, var(--primary-dark), #3949AB);
+    padding: 4rem 0;
+}
+
+.features-section .feature-card {
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.features-section .feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--box-shadow-lg);
+}
+
+.features-section .icon-primary {
+    color: var(--primary-dark) !important;
+}
+
+.how-it-works-section {
+    border-top: 1px solid var(--border-color);
+    background-color: var(--secondary-color);
+}
+
+.landing-footer {
+    background-color: var(--primary-dark);
+    margin-top: auto;
 }

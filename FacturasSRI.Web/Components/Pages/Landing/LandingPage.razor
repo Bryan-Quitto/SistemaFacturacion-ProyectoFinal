@@ -5,11 +5,11 @@
 
 <PageTitle>Aether Tech | Portal de Facturación</PageTitle>
 
-<div class="main-wrapper">
+<div class="landing-wrapper">
     <!-- ============================================ -->
     <!-- HEADER / BARRA DE NAVEGACIÓN -->
     <!-- ============================================ -->
-    <header class="py-3 bg-dark text-white shadow-sm">
+    <header class="py-3 landing-header text-white shadow-sm">
         <div class="container">
             <div class="d-flex flex-wrap align-items-center justify-content-between">
                 <a href="/" class="d-flex align-items-center text-white text-decoration-none">
@@ -52,21 +52,21 @@
             <div class="row g-4">
                 <div class="col-md-4">
                     <div class="feature-card text-center p-4 h-100">
-                        <i class="bi bi-speedometer2 fs-1 text-primary"></i>
+                        <i class="bi bi-speedometer2 fs-1 icon-primary"></i>
                         <h4 class="fw-bold mt-3">Facturación Rápida</h4>
                         <p>Genere y envíe facturas autorizadas por el SRI en cuestión de segundos.</p>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="feature-card text-center p-4 h-100">
-                        <i class="bi bi-clipboard-data fs-1 text-primary"></i>
+                        <i class="bi bi-clipboard-data fs-1 icon-primary"></i>
                         <h4 class="fw-bold mt-3">Reportes Claros</h4>
                         <p>Visualice reportes de ventas, impuestos y cuentas por cobrar en tiempo real.</p>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="feature-card text-center p-4 h-100">
-                        <i class="bi bi-box-seam fs-1 text-primary"></i>
+                        <i class="bi bi-box-seam fs-1 icon-primary"></i>
                         <h4 class="fw-bold mt-3">Control de Inventario</h4>
                         <p>Mantenga un registro actualizado del stock de productos y servicios.</p>
                     </div>
@@ -78,7 +78,7 @@
     <!-- ============================================ -->
     <!-- SECCIÓN "CÓMO FUNCIONA" -->
     <!-- ============================================ -->
-    <section class="how-it-works-section py-5 bg-light">
+    <section class="how-it-works-section py-5">
         <div class="container">
             <div class="text-center mb-5">
                 <h2 class="fw-bold">Guía Rápida de Uso</h2>
@@ -109,56 +109,13 @@
     <!-- ============================================ -->
     <!-- FOOTER -->
     <!-- ============================================ -->
-    <footer class="text-center py-4 bg-dark text-white">
+    <footer class="text-center py-4 landing-footer text-white">
         <div class="container">
             <p class="mb-1">© @DateTime.Now.Year Aether Tecnologías. Todos los derechos reservados.</p>
             <p class="text-white-50 small mb-0">RUC: 1799999999001 | Matriz: Av. de los Shyris N37-271 y Holanda, Quito</p>
         </div>
     </footer>
 </div>
-
-<style>
-    .main-wrapper {
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-        background-color: #ffffff;
-        color: #333;
-    }
-    .hero-section {
-        background: linear-gradient(135deg, #2444d1, #6172d3);
-        padding: 4rem 0;
-    }
-    .features-section .feature-card {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .features-section .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .how-it-works-section {
-        border-top: 1px solid #dee2e6;
-    }
-    footer {
-        margin-top: auto;
-    }
-    .btn-light {
-        background-color: #ffffff;
-        color: #2444d1;
-        border-color: #ffffff;
-    }
-    .btn-light:hover {
-        background-color: #f0f0f0;
-        border-color: #f0f0f0;
-        color: #2444d1;
-    }
-    .text-primary {
-        color: #2444d1 !important;
-    }
-</style>
 
 @code {
     // No se necesita C# para esta página de presentación.
