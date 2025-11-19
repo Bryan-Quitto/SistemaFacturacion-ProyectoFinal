@@ -43,6 +43,18 @@ namespace FacturasSRI.Infrastructure.Services
                 Marca = productDto.Marca,
                 CategoriaId = productDto.CategoriaId
             };
+
+            var globalTax = await GetCurrentGlobalTaxAsync();
+            if (globalTax != null)
+            {
+                var newProductTax = new ProductoImpuesto
+                {
+                    ProductoId = product.Id,
+                    ImpuestoId = globalTax.Id
+                };
+                _context.ProductoImpuestos.Add(newProductTax);
+            }
+
             _context.Productos.Add(product);
             await _context.SaveChangesAsync();
             productDto.Id = product.Id;

@@ -24,6 +24,11 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<bool> CreatePurchaseAsync(PurchaseDto purchaseDto)
         {
+            if (purchaseDto.ProveedorId == Guid.Empty)
+            {
+                throw new InvalidOperationException("Debe seleccionar un proveedor para registrar la compra.");
+            }
+
             using (var transaction = await _context.Database.BeginTransactionAsync())
             {
                 try
