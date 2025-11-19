@@ -20,7 +20,6 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace FacturasSRI.Web.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
@@ -39,8 +38,11 @@ namespace FacturasSRI.Web.Controllers
 
         [HttpPost("login")]
         [AllowAnonymous]
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto loginRequest)
         {
+            _logger.LogInformation("Procesando solicitud de login para {Email}", loginRequest.Email);
+            
             var lockoutKey = $"lockout_{loginRequest.Email}";
             if (_cache.TryGetValue(lockoutKey, out _))
             {
@@ -62,7 +64,6 @@ namespace FacturasSRI.Web.Controllers
                 return Unauthorized("Credenciales inválidas.");
             }
 
-            // Add check for EstaActivo
             if (!user.EstaActivo)
             {
                 _logger.LogWarning("Intento de inicio de sesión de usuario inactivo: {Email}", loginRequest.Email);
@@ -86,15 +87,29 @@ namespace FacturasSRI.Web.Controllers
 
             var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = true,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
+            };
+
+            _logger.LogInformation("Llamando a HttpContext.SignInAsync para crear la cookie...");
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(claimsIdentity));
+                new ClaimsPrincipal(claimsIdentity),
+                authProperties);
+            _logger.LogInformation("Llamada a SignInAsync completada.");
+            
+            var cookiesHeader = HttpContext.Response.Headers["Set-Cookie"].ToString();
+            _logger.LogInformation("Encabezado Set-Cookie en la respuesta del servidor: {CookieHeader}", string.IsNullOrEmpty(cookiesHeader) ? "¡¡¡NO ENCONTRADO!!!" : cookiesHeader);
 
+            _logger.LogInformation("Generando token JWT...");
             var token = GenerateJwtToken(user);
+            _logger.LogInformation("Login exitoso. Devolviendo token.");
             
             return Ok(new { token });
         }
-
+        
         private void HandleFailedLogin(string email)
         {
             var failureCountKey = $"failures_{email}";

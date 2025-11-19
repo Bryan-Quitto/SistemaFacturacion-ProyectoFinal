@@ -10,5 +10,7 @@ namespace FacturasSRI.Application.Dtos
 
         [Required]
         public string Password { get; set; } = string.Empty;
+
+        public string? ReturnUrl { get; set; }
     }
 }

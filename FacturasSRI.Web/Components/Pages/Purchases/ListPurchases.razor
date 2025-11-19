@@ -3,6 +3,8 @@
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @inject IPurchaseService PurchaseService
+@inject IJSRuntime JSRuntime
+@inject ILogger<ListPurchases> Logger
 
 <PageTitle>Historial de Compras</PageTitle>
 
@@ -60,9 +62,9 @@ else if (FilteredPurchases.Any())
                                 <td>
                                     @if (!string.IsNullOrEmpty(purchase.ComprobantePath))
                                     {
-                                        <a href="@($"/api/downloads/purchase-receipt/{purchase.CuentaPorPagarId}")" target="_blank" class="btn btn-sm btn-outline-secondary">
-                                            <i class="bi bi-file-earmark-pdf"></i> Ver PDF
-                                        </a>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => DownloadFile(purchase.CuentaPorPagarId)">
+                                            <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
+                                        </button>
                                     }
                                     else
                                     {
@@ -100,14 +102,24 @@ else
         {
             isLoading = true;
             allPurchases = await PurchaseService.GetPurchasesAsync();
+            
+            Logger.LogInformation("Loaded {Count} purchases. IDs: {Ids}", 
+                allPurchases.Count, 
+                string.Join(", ", allPurchases.Select(p => p.CuentaPorPagarId)));
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Optional: log the error
+            Logger.LogError(ex, "Error loading purchases.");
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    private async Task DownloadFile(Guid purchaseId)
+    {
+        var url = $"/api/downloads/purchase-receipt/{purchaseId}";
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
     }
 }

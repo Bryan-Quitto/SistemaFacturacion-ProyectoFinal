@@ -15,6 +15,13 @@ using Microsoft.AspNetCore.Localization;
 using FacturasSRI.Web;
 using SendGrid.Extensions.DependencyInjection;
 using Supabase;
+using System.Linq;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+using System.IO;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,6 +96,16 @@ builder.Services.AddAuthentication("Cookies")
         options.LoginPath = "/login";
         options.AccessDeniedPath = "/forbidden";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.Events.OnRedirectToLogin = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api"))
+            {
+                context.Response.StatusCode = 401;
+                return Task.CompletedTask;
+            }
+            context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        };
     })
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
@@ -114,6 +131,15 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
+app.Use(async (context, next) =>
+{
+    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+    var headers = string.Join(", ", context.Request.Headers.Select(h => $"{h.Key}={h.Value}"));
+    logger.LogWarning(">>>>>> INCOMING REQUEST: {Method} {Path} | Headers: {Headers}",
+        context.Request.Method, context.Request.Path, headers);
+    await next.Invoke();
+});
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -124,24 +150,40 @@ app.UseHttpsRedirection();
 
 var supportedCultures = new[]
 {
-    new CultureInfo("es-EC") // Changed to es-EC for dollar currency symbol
+    new CultureInfo("es-EC")
 };
 
 app.UseRequestLocalization(new RequestLocalizationOptions
 {
-    DefaultRequestCulture = new RequestCulture("es-EC"), // Changed to es-EC
+    DefaultRequestCulture = new RequestCulture("es-EC"),
     SupportedCultures = supportedCultures,
     SupportedUICultures = supportedCultures
 });
 
-
-
 app.UseStaticFiles();
 
-app.UseStatusCodePagesWithReExecute("/NotFound"); // Handle 404s by re-executing to Blazor's NotFound route
+app.UseCookiePolicy();
+
+app.UseStatusCodePagesWithReExecute("/NotFound");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api"))
+    {
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        var user = context.User;
+        var claims = string.Join(", ", user.Claims.Select(c => $"{c.Type}={c.Value}"));
+
+        logger.LogWarning(">>>>>> API AUTH CHECK: IsAuthenticated={IsAuthenticated}, AuthType={AuthType}, Claims: [{Claims}]",
+            user.Identity?.IsAuthenticated ?? false,
+            user.Identity?.AuthenticationType ?? "null",
+            claims);
+    }
+    await next.Invoke();
+});
 
 app.UseAntiforgery();
 
@@ -150,5 +192,61 @@ app.MapControllers();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-    
-    app.Run();
+app.MapGet("/api/downloads/purchase-receipt/{id}", async (
+    Guid id,
+    HttpContext httpContext,
+    FacturasSRIDbContext dbContext,
+    Client supabase,
+    ILogger<Program> logger) =>
+{
+    logger.LogInformation("Descarga de comprobante solicitada desde Minimal API. ID: {Id}", id);
+    var cuentaPorPagar = await dbContext.CuentasPorPagar.FirstOrDefaultAsync(c => c.Id == id);
+
+    if (cuentaPorPagar == null || string.IsNullOrEmpty(cuentaPorPagar.ComprobantePath))
+    {
+        logger.LogWarning("Minimal API: No se encontró la cuenta por pagar o no tiene comprobante. ID: {Id}", id);
+        return Results.NotFound("El comprobante no fue encontrado.");
+    }
+
+    var user = httpContext.User;
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    var isAdmin = user.IsInRole("Administrador");
+
+    if (cuentaPorPagar.UsuarioIdCreador.ToString() != userId && !isAdmin)
+    {
+        logger.LogWarning("Minimal API: Acceso denegado para descargar el comprobante. Usuario: {UserId}, Creador: {CreatorId}", userId, cuentaPorPagar.UsuarioIdCreador);
+        return Results.Forbid();
+    }
+
+    try
+    {
+        logger.LogInformation("Minimal API: Descargando archivo desde Supabase: {Path}", cuentaPorPagar.ComprobantePath);
+        var fileBytes = await supabase.Storage
+            .From("comprobantes-compra")
+            .Download(cuentaPorPagar.ComprobantePath, null);
+        
+        var fileName = Path.GetFileName(cuentaPorPagar.ComprobantePath);
+
+        return Results.File(fileBytes, "application/pdf", fileDownloadName: fileName);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Minimal API: Ocurrió un error al intentar descargar el archivo desde Supabase. Path: {Path}", cuentaPorPagar.ComprobantePath);
+        return Results.StatusCode(500);
+    }
+})
+.RequireAuthorization(new AuthorizeAttribute { AuthenticationSchemes = "Cookies" });
+
+
+app.Run();
+
+namespace FacturasSRI.Web
+{
+    static class AntiforgeryExtensions
+    {
+        public static RouteHandlerBuilder IgnoreAntiforgeryToken(this RouteHandlerBuilder builder)
+        {
+            return builder.WithMetadata(new IgnoreAntiforgeryTokenAttribute());
+        }
+    }
+}
