@@ -1,10 +1,12 @@
 @page "/users"
 @attribute [Authorize(Roles = "Administrador")]
+@using System.Security.Claims
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Web.Components.Shared
 @inject IUserService UserService
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Lista de Usuarios</PageTitle>
 
@@ -34,24 +36,49 @@
                         <th>Nombre Completo</th>
                         <th>Correo Electrónico</th>
                         <th>Roles</th>
+                        <th>Estado</th>
                         <th class="text-end">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var user in FilteredUsers) // Use FilteredUsers
+                    @foreach (var user in FilteredUsers)
                     {
                         <tr>
                             <td>@user.PrimerNombre @user.SegundoNombre @user.PrimerApellido @user.SegundoApellido</td>
                             <td>@user.Email</td>
                             <td>@string.Join(", ", user.Roles)</td>
+                            <td>
+                                @if (user.EstaActivo)
+                                {
+                                    <span class="badge bg-success">Activo</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactivo</span>
+                                }
+                            </td>
                             <td class="text-end">
                                 <div class="btn-group" role="group">
-                                    <a href="@($"/users/edit/{user.Id}")" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-pencil-square"></i> Editar
-                                    </a>
-                                    <button class="btn btn-sm @(user.EstaActivo ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => HandleDeleteUser(user.Id)">
-                                        <i class="bi @(user.EstaActivo ? "bi-trash" : "bi-check-circle")"></i> @(user.EstaActivo ? "Desactivar" : "Activar")
-                                    </button>
+                                    @if (currentUserId == user.Id)
+                                    {
+                                        <a href="/profile" class="btn btn-sm btn-outline-success">
+                                            <i class="bi bi-person-badge"></i> Mi Perfil
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <a href="@($"/users/edit/{user.Id}")" class="btn btn-sm btn-outline-primary @(user.EstaActivo ? "" : "disabled")"
+                                           title="@(user.EstaActivo ? "Editar Usuario" : "No se puede editar un usuario inactivo")">
+                                            <i class="bi bi-pencil-square"></i> Editar
+                                        </a>
+                                    }
+                                    
+                                    @if (currentUserId != user.Id)
+                                    {
+                                        <button class="btn btn-sm @(user.EstaActivo ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => HandleToggleUserStatus(user.Id)">
+                                            <i class="bi @(user.EstaActivo ? "bi-trash" : "bi-check-circle")"></i> @(user.EstaActivo ? "Desactivar" : "Activar")
+                                        </button>
+                                    }
                                 </div>
                             </td>
                         </tr>
@@ -62,12 +89,6 @@
     </div>
 </div>
 
-
-
-
-
-
-
 <ConfirmationModal IsVisible="showConfirmationModal"
                   Title="@confirmationModalTitle"
                   Message="@confirmationModalMessage"
@@ -76,6 +97,7 @@
 
 @code {
     private List<UserDto> allUsers = new();
+    private Guid currentUserId;
 
     private bool showConfirmationModal = false;
     private string confirmationModalTitle = string.Empty;
@@ -86,13 +108,23 @@
 
     private List<UserDto> FilteredUsers => string.IsNullOrWhiteSpace(searchTerm)
         ? allUsers
-        : allUsers.Where(u => u.PrimerNombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                               u.PrimerApellido.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                               u.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+        : allUsers.Where(u => (u.PrimerNombre != null && u.PrimerNombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                               (u.PrimerApellido != null && u.PrimerApellido.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                               (u.Email != null && u.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
                       .ToList();
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var id))
+            {
+                currentUserId = id;
+            }
+        }
         await LoadData();
     }
 
@@ -101,7 +133,7 @@
         allUsers = await UserService.GetUsersAsync();
     }
 
-    private void HandleDeleteUser(Guid id)
+    private void HandleToggleUserStatus(Guid id)
     {
         var userToToggle = allUsers.FirstOrDefault(u => u.Id == id);
         if (userToToggle == null) return;
@@ -126,7 +158,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error al toggling user status: {ex.Message}");
+            Console.WriteLine($"Error al cambiar el estado del usuario: {ex.Message}");
         }
     }
 

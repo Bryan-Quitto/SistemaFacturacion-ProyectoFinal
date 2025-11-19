@@ -10,11 +10,15 @@
 
 <PageTitle>Editar Usuario</PageTitle>
 
-@if (user == null && !string.IsNullOrEmpty(errorMessage))
+@if (!string.IsNullOrEmpty(errorMessage))
 {
-    <div class="alert alert-danger">@errorMessage</div>
+    <div class="alert alert-danger mb-4">
+        @errorMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
+    </div>
 }
-else if (user == null)
+
+@if (user == null)
 {
     <p><em>Cargando usuario...</em></p>
 }
@@ -112,6 +116,7 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Error al cargar el usuario: {ex.Message}";
+            StateHasChanged();
         }
     }
 
@@ -120,13 +125,27 @@ else
         if (user != null)
         {
             user.RolesId = new List<Guid> { selectedRoleId };
-            await UserService.UpdateUserAsync(user);
-            Navigation.NavigateTo("/users");
+            try
+            {
+                await UserService.UpdateUserAsync(user);
+                Navigation.NavigateTo("/users");
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error al guardar los cambios: {ex.Message}";
+                StateHasChanged();
+            }
         }
     }
 
     private void GoBack()
     {
         Navigation.NavigateTo("/users");
+    }
+
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
+        StateHasChanged();
     }
 }

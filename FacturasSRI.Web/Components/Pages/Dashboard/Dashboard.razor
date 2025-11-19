@@ -1,9 +1,8 @@
 @page "/dashboard"
 @attribute [Authorize]
-@using System.Net.Http.Json
 @using FacturasSRI.Application.Dtos
-@inject IHttpClientFactory HttpClientFactory
-@inject NavigationManager Navigation
+@using FacturasSRI.Application.Interfaces
+@inject IDashboardService DashboardService
 
 <PageTitle>Panel Principal</PageTitle>
 
@@ -106,9 +105,7 @@ else if (stats != null)
     {
         try
         {
-            var httpClient = HttpClientFactory.CreateClient();
-            httpClient.BaseAddress = new Uri(Navigation.BaseUri);
-            stats = await httpClient.GetFromJsonAsync<DashboardStatsDto>("api/dashboard/stats");
+            stats = await DashboardService.GetDashboardStatsAsync();
         }
         catch (Exception ex)
         {

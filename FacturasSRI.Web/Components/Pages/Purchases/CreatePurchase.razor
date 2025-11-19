@@ -20,8 +20,9 @@
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
-    <div class="alert @(isSuccess ? "alert-success" : "alert-danger")" role="alert">
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
         @statusMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearStatusMessage" aria-label="Close"></button>
     </div>
 }
 
@@ -202,10 +203,19 @@
         catch (Exception ex)
         {
             statusMessage = $"Ocurrió un error al procesar la compra: {ex.Message}";
+            isSuccess = false; // Ensure isSuccess is false on error
+            StateHasChanged();
         }
         finally
         {
             isSubmitting = false;
         }
+    }
+
+    private void ClearStatusMessage()
+    {
+        statusMessage = null;
+        isSuccess = false;
+        StateHasChanged();
     }
 }

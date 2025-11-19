@@ -18,8 +18,9 @@
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
-    <div class="alert @(isSuccess ? "alert-success" : "alert-danger")" role="alert">
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
         @statusMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearStatusMessage" aria-label="Close"></button>
     </div>
 }
 
@@ -119,7 +120,16 @@
 
     protected override async Task OnInitializedAsync()
     {
-        allProducts = await ProductService.GetProductsAsync();
+        try
+        {
+            allProducts = await ProductService.GetProductsAsync();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error al cargar productos: {ex.Message}";
+            isSuccess = false;
+            StateHasChanged();
+        }
     }
 
     private void SearchProducts()
@@ -151,6 +161,7 @@
         selectedProduct = null;
         selectedProductStock = null;
         ajusteModel = new();
+        StateHasChanged();
     }
 
     private async Task HandleCreateAdjustment()
@@ -169,22 +180,33 @@
                 statusMessage = "Ajuste de inventario registrado con éxito.";
                 selectedProductStock = await ProductService.GetProductStockDetailsAsync(ajusteModel.ProductoId);
                 ajusteModel = new() { ProductoId = ajusteModel.ProductoId };
+                StateHasChanged();
             }
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 isSuccess = false;
                 statusMessage = $"Error al registrar el ajuste: {errorContent}";
+                StateHasChanged();
             }
         }
         catch (Exception ex)
         {
             isSuccess = false;
             statusMessage = $"Error de red o del sistema: {ex.Message}";
+            StateHasChanged();
         }
         finally
         {
             isSubmitting = false;
+            StateHasChanged();
         }
+    }
+
+    private void ClearStatusMessage()
+    {
+        statusMessage = null;
+        isSuccess = false;
+        StateHasChanged();
     }
 }

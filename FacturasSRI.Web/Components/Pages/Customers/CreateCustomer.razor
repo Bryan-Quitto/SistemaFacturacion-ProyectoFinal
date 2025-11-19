@@ -19,7 +19,10 @@
             
             @if (!string.IsNullOrEmpty(statusMessage))
             {
-                <div class="alert @(isSuccess ? "alert-success" : "alert-danger")">@statusMessage</div>
+                <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4">
+                    @statusMessage
+                    <button type="button" class="btn-close float-end" @onclick="ClearStatusMessage" aria-label="Close"></button>
+                </div>
             }
 
             <div class="row">
@@ -85,6 +88,7 @@
         {
             isSuccess = false;
             statusMessage = "No se pudo identificar al usuario. Por favor, inicie sesión de nuevo.";
+            StateHasChanged();
             return;
         }
 
@@ -99,16 +103,25 @@
         {
             isSuccess = false;
             statusMessage = ex.Message;
+            StateHasChanged();
         }
         catch (Exception)
         {
             isSuccess = false;
             statusMessage = "Error al guardar el cliente. Por favor, intente de nuevo.";
+            StateHasChanged();
         }
     }
 
     private void GoToList()
     {
         Navigation.NavigateTo("/customers");
+    }
+
+    private void ClearStatusMessage()
+    {
+        statusMessage = null;
+        isSuccess = false;
+        StateHasChanged();
     }
 }

@@ -11,6 +11,14 @@
 
 <h3>Crear Nuevo Usuario</h3>
 
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
+    </div>
+}
+
 <div class="card">
     <div class="card-body">
         <EditForm Model="@createUserModel" OnValidSubmit="@HandleAddUser">
@@ -71,18 +79,32 @@
     private List<RoleDto> allRoles = new();
     private CreateUserModel createUserModel = new();
     private Guid selectedRoleId;
+    private string? errorMessage;
+    private bool isSuccess;
     
     protected override async Task OnInitializedAsync()
     {
-        allRoles = await RoleService.GetRolesAsync();
-        if (allRoles.Any())
+        try
         {
-            selectedRoleId = allRoles.First().Id;
+            allRoles = await RoleService.GetRolesAsync();
+            if (allRoles.Any())
+            {
+                selectedRoleId = allRoles.First().Id;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar roles: {ex.Message}";
+            isSuccess = false;
+            StateHasChanged();
         }
     }
 
     private async Task HandleAddUser()
     {
+        errorMessage = null; // Clear previous errors
+        isSuccess = false;
+
         var newUser = new UserDto
         {
             PrimerNombre = createUserModel.PrimerNombre,
@@ -93,13 +115,34 @@
             RolesId = new List<Guid> { selectedRoleId }
         };
         
-        await UserService.CreateUserAsync(newUser);
-        Navigation.NavigateTo("/users");
+        try
+        {
+            await UserService.CreateUserAsync(newUser);
+            isSuccess = true;
+            errorMessage = "Usuario creado exitosamente!";
+            Navigation.NavigateTo("/users");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al crear el usuario: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            StateHasChanged(); // Ensure UI updates to show message
+        }
     }
 
     private void GoToList()
     {
         Navigation.NavigateTo("/users");
+    }
+
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
+        isSuccess = false;
+        StateHasChanged();
     }
 
     public class CreateUserModel

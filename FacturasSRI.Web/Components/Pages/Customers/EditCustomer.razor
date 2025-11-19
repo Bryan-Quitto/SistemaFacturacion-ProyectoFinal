@@ -12,11 +12,15 @@
 
 <PageTitle>Editar Cliente</PageTitle>
 
-@if (customer == null && !string.IsNullOrEmpty(errorMessage))
+@if (!string.IsNullOrEmpty(errorMessage))
 {
-    <div class="alert alert-danger">@errorMessage</div>
+    <div class="alert alert-danger mb-4">
+        @errorMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
+    </div>
 }
-else if (customer == null)
+
+@if (customer == null)
 {
     <p><em>Cargando cliente...</em></p>
 }
@@ -36,11 +40,6 @@ else
         <div class="card-body">
             <EditForm Model="@customer" OnValidSubmit="SaveChanges">
                 <DataAnnotationsValidator />
-
-                @if (!string.IsNullOrEmpty(statusMessage))
-                {
-                    <div class="alert @(isSuccess ? "alert-success" : "alert-danger")">@statusMessage</div>
-                }
 
                 <div class="row">
                     <div class="col-md-6">
@@ -99,8 +98,6 @@ else
 
     private CustomerDto? customer;
     private string? errorMessage;
-    private string? statusMessage;
-    private bool isSuccess;
 
     protected override async Task OnInitializedAsync()
     {
@@ -116,6 +113,7 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Error al cargar el cliente: {ex.Message}";
+            StateHasChanged();
         }
     }
 
@@ -147,13 +145,13 @@ else
             }
             catch (InvalidOperationException ex)
             {
-                isSuccess = false;
-                statusMessage = ex.Message;
+                errorMessage = ex.Message;
+                StateHasChanged();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                isSuccess = false;
-                statusMessage = "Error al guardar el cliente. Por favor, intente de nuevo.";
+                errorMessage = $"Error al guardar el cliente: {ex.Message}";
+                StateHasChanged();
             }
         }
     }
@@ -161,5 +159,11 @@ else
     private void GoBack()
     {
         Navigation.NavigateTo("/customers");
+    }
+
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
+        StateHasChanged();
     }
 }

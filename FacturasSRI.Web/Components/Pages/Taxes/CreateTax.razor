@@ -9,6 +9,14 @@
 
 <h3>Crear Nuevo Impuesto</h3>
 
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
+    </div>
+}
+
 <div class="card">
     <div class="card-body">
         <EditForm Model="@newTax" OnValidSubmit="@HandleAddTax">
@@ -44,15 +52,41 @@
 
 @code {
     private TaxDto newTax = new();
+    private string? errorMessage;
+    private bool isSuccess;
 
     private async Task HandleAddTax()
     {
-        await TaxService.CreateTaxAsync(newTax);
-        Navigation.NavigateTo("/taxes");
+        errorMessage = null; // Clear previous errors
+        isSuccess = false;
+
+        try
+        {
+            await TaxService.CreateTaxAsync(newTax);
+            isSuccess = true;
+            errorMessage = "Impuesto creado exitosamente!";
+            Navigation.NavigateTo("/taxes");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al crear el impuesto: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            StateHasChanged(); // Ensure UI updates to show message
+        }
     }
 
     private void GoToList()
     {
         Navigation.NavigateTo("/taxes");
+    }
+
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
+        isSuccess = false;
+        StateHasChanged();
     }
 }

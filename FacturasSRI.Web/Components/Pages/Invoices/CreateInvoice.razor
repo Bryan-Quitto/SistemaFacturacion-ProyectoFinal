@@ -25,9 +25,10 @@
 
     @if (errorMessage != null)
     {
-        <div class="alert alert-danger" role="alert">
+        <div class="alert alert-danger mb-4" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-2"></i>
             @errorMessage
+            <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
         </div>
     }
 
@@ -387,6 +388,7 @@
         {
             errorMessage = "Debe añadir al menos un producto.";
             isSubmitting = false;
+            StateHasChanged();
             return;
         }
 
@@ -398,6 +400,7 @@
         {
             errorMessage = "No se pudo identificar al usuario. Por favor, inicie sesión de nuevo.";
             isSubmitting = false;
+            StateHasChanged();
             return;
         }
 
@@ -417,6 +420,7 @@
             {
                 errorMessage = "Debe seleccionar un cliente existente.";
                 isSubmitting = false;
+                StateHasChanged();
                 return;
             }
             createDto.ClienteId = formModel.SelectedClienteId.Value;
@@ -429,6 +433,7 @@
         {
             errorMessage = "Debe seleccionar un tipo de cliente.";
             isSubmitting = false;
+            StateHasChanged();
             return;
         }
 
@@ -440,19 +445,28 @@
         catch (InvalidOperationException stockEx)
         {
             errorMessage = stockEx.Message;
+            StateHasChanged();
         }
         catch (ArgumentException argEx)
         {
             errorMessage = argEx.Message;
+            StateHasChanged();
         }
         catch (Exception ex)
         {
             errorMessage = $"Error inesperado al generar la factura: {ex.Message}";
+            StateHasChanged();
         }
         finally
         {
             isSubmitting = false;
+            StateHasChanged();
         }
+    }
+
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
     }
 
     public class InvoiceItemViewModel

@@ -11,11 +11,15 @@
 
 <PageTitle>Editar Impuesto</PageTitle>
 
-@if (tax == null && !string.IsNullOrEmpty(errorMessage))
+@if (!string.IsNullOrEmpty(errorMessage))
 {
-    <div class="alert alert-danger">@errorMessage</div>
+    <div class="alert alert-danger mb-4">
+        @errorMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
+    </div>
 }
-else if (tax == null)
+
+@if (tax == null)
 {
     <p><em>Cargando impuesto...</em></p>
 }
@@ -87,6 +91,7 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Error al cargar el impuesto: {ex.Message}";
+            StateHasChanged();
         }
     }
 
@@ -94,13 +99,27 @@ else
     {
         if (tax != null)
         {
-            await TaxService.UpdateTaxAsync(tax);
-            Navigation.NavigateTo("/taxes");
+            try
+            {
+                await TaxService.UpdateTaxAsync(tax);
+                Navigation.NavigateTo("/taxes");
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error al guardar los cambios: {ex.Message}";
+                StateHasChanged();
+            }
         }
     }
 
     private void GoBack()
     {
         Navigation.NavigateTo("/taxes");
+    }
+
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
+        StateHasChanged();
     }
 }
