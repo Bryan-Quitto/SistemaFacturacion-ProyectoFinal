@@ -62,6 +62,7 @@
                             <th>Categoría</th>
                             <th>Precio Unitario</th>
                             <th>Stock Actual</th>
+                            <th>Estado</th>
                             <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
@@ -75,6 +76,16 @@
                                 <td>@product.CategoriaNombre</td>
                                 <td>@product.PrecioVentaUnitario.ToString("C")</td>
                                 <td>@product.StockTotal</td>
+                                <td>
+                                    @if (product.IsActive)
+                                    {
+                                        <span class="badge bg-success">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Inactivo</span>
+                                    }
+                                </td>
                                 <td class="text-end">
                                     <div class="btn-group" role="group">
                                         <a href="@($"/products/details/{product.Id}")" class="btn btn-sm btn-outline-secondary">

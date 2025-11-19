@@ -25,7 +25,8 @@
             <th>Nombre</th>
             <th>Código SRI</th>
             <th>Porcentaje</th>
-            <th>Acciones</th>
+            <th>Estado</th>
+            <th class="text-end">Acciones</th>
         </tr>
     </thead>
     <tbody>
@@ -35,12 +36,22 @@
                 <td>@tax.Nombre</td>
                 <td>@tax.CodigoSRI</td>
                 <td>@tax.Porcentaje</td>
+                <td>
+                    @if (tax.EstaActivo)
+                    {
+                        <span class="badge bg-success">Activo</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">Inactivo</span>
+                    }
+                </td>
                 <td class="text-end">
                     <div class="btn-group" role="group">
-                        <a href="@($"/taxes/edit/{tax.Id}")" class="btn btn-sm btn-outline-primary">
+                        <a href="@($"/taxes/edit/{tax.Id}")" class="btn btn-sm action-button-fixed-width btn-outline-primary">
                             <i class="bi bi-pencil-square"></i> Editar
                         </a>
-                        <button class="btn btn-sm @(tax.EstaActivo ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => HandleDeleteTax(tax.Id)">
+                        <button class="btn btn-sm action-button-fixed-width @(tax.EstaActivo ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => HandleDeleteTax(tax.Id)">
                             <i class="bi @(tax.EstaActivo ? "bi-trash" : "bi-check-circle")"></i> @(tax.EstaActivo ? "Desactivar" : "Activar")
                         </button>
                     </div>
@@ -58,15 +69,14 @@
                   OnCancel="CancelToggleTaxStatus" />
 
 @code {
-    private List<TaxDto> allTaxes = new(); // Holds all taxes
+    private List<TaxDto> allTaxes = new();
 
-    // Confirmation Modal State
     private bool showConfirmationModal = false;
     private string confirmationModalTitle = string.Empty;
     private string confirmationModalMessage = string.Empty;
     private Guid taxToToggleId;
 
-    private string searchTerm = string.Empty; // New property for search
+    private string searchTerm = string.Empty;
 
     private List<TaxDto> FilteredTaxes => string.IsNullOrWhiteSpace(searchTerm)
         ? allTaxes
@@ -127,3 +137,9 @@
         Navigation.NavigateTo("/taxes/create");
     }
 }
+
+<style>
+    .action-button-fixed-width {
+        min-width: 110px; /* Adjust as needed to accommodate the longest text comfortably */
+    }
+</style>
