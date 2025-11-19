@@ -101,7 +101,7 @@
 </div>
 
 
-<ConfirmationPage IsVisible="showConfirmationModal" Title="@confirmationModalTitle" Message="@confirmationModalMessage"
+<ConfirmationModal IsVisible="showConfirmationModal" Title="@confirmationModalTitle" Message="@confirmationModalMessage"
     OnConfirm="ConfirmToggleProductStatus" OnCancel="CancelToggleProductStatus" />
 
 @if (isGlobalTaxModalVisible)
@@ -158,8 +158,7 @@
     private bool isGlobalTaxModalVisible = false;
 
     private List<ProductDto> FilteredProducts => (allProducts ?? new())
-    .Where(p => p.IsActive &&
-    (string.IsNullOrWhiteSpace(searchTerm) ||
+    .Where(p => (string.IsNullOrWhiteSpace(searchTerm) ||
     p.Nombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
     p.CodigoPrincipal.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
     .ToList();

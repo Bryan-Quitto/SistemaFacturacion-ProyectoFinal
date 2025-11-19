@@ -6,7 +6,7 @@
 @using FacturasSRI.Domain.Enums
 @using FacturasSRI.Web.Services
 @inject IProductService ProductService
-@inject ApiClient ApiClient
+@inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Navigation
 
 <PageTitle>Ajuste de Inventario</PageTitle>
@@ -160,7 +160,7 @@
         
         try
         {
-            var httpClient = await ApiClient.GetHttpClientAsync();
+            var httpClient = HttpClientFactory.CreateClient();
             var response = await httpClient.PostAsJsonAsync("api/AjustesInventario", ajusteModel);
 
             if (response.IsSuccessStatusCode)

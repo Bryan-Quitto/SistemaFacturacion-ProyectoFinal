@@ -73,5 +73,12 @@ namespace FacturasSRI.Web.Controllers
 
             return LocalRedirect(returnUrl);
         }
+         [HttpPost("logout")]
+        [Authorize]
+        public async Task<IActionResult> Logout()
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return Redirect("/");
+        }
     }
 }

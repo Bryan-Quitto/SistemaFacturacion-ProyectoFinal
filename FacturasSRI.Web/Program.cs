@@ -4,22 +4,13 @@ using FacturasSRI.Application.Interfaces;
 using FacturasSRI.Infrastructure.Services;
 using FacturasSRI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using FacturasSRI.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.Extensions.Logging;
 using System.Globalization;
 using Microsoft.AspNetCore.Localization;
-using FacturasSRI.Web;
 using SendGrid.Extensions.DependencyInjection;
 using Supabase;
-using System.Linq;
-using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
-using System.IO;
-using Microsoft.AspNetCore.Http;
 using FacturasSRI.Web.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,12 +21,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddControllers()
-    .AddDataAnnotationsLocalization(options =>
-    {
-        options.DataAnnotationLocalizerProvider = (type, factory) =>
-            factory.Create(typeof(ValidationMessages));
-    });
+builder.Services.AddControllers();
 
 builder.Services.AddDbContext<FacturasSRIDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -64,30 +50,19 @@ builder.Services.AddScoped<ITaxService, TaxService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IAjusteInventarioService, AjusteInventarioService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
-
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IValidationService, ValidationService>();
-
-builder.Services.AddScoped<AuthenticationStateProvider, ApiAuthenticationStateProvider>();
-builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<FacturasSRI.Core.Services.FirmaDigitalService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.XmlGeneratorService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.SriApiClientService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.SriResponseParserService>();
 
-builder.Services.AddHttpClient("ApiClient", (serviceProvider, client) =>
-{
-    var httpContextAccessor = serviceProvider.GetRequiredService<IHttpContextAccessor>();
-    if (httpContextAccessor.HttpContext != null)
-    {
-        var request = httpContextAccessor.HttpContext.Request;
-        client.BaseAddress = new Uri($"{request.Scheme}://{request.Host}");
-    }
-});
-builder.Services.AddScoped<ApiClient>();
+builder.Services.AddScoped<AuthenticationStateProvider, CookieAuthenticationStateProvider>();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddHttpContextAccessor();
 
+builder.Services.AddHttpClient();
 
 builder.Services.AddAuthentication("Cookies")
     .AddCookie("Cookies", options =>
@@ -95,31 +70,7 @@ builder.Services.AddAuthentication("Cookies")
         options.LoginPath = "/login";
         options.AccessDeniedPath = "/forbidden";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.Events.OnRedirectToLogin = context =>
-        {
-            if (context.Request.Path.StartsWithSegments("/api"))
-            {
-                context.Response.StatusCode = 401;
-                return Task.CompletedTask;
-            }
-            context.Response.Redirect(context.RedirectUri);
-            return Task.CompletedTask;
-        };
-    })
-    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
-        };
     });
-
 
 builder.Services.AddAuthorization(options =>
 {
@@ -138,11 +89,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var supportedCultures = new[]
-{
-    new CultureInfo("es-EC")
-};
-
+var supportedCultures = new[] { new CultureInfo("es-EC") };
 app.UseRequestLocalization(new RequestLocalizationOptions
 {
     DefaultRequestCulture = new RequestCulture("es-EC"),
@@ -151,9 +98,7 @@ app.UseRequestLocalization(new RequestLocalizationOptions
 });
 
 app.UseStaticFiles();
-
 app.UseCookiePolicy();
-
 app.UseStatusCodePagesWithReExecute("/NotFound");
 
 app.UseAuthentication();
@@ -162,26 +107,7 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapControllers();
-
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
-
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapDownloadEndpoints();
 
 app.Run();
-
-namespace FacturasSRI.Web.Extensions
-{
-    public static class AntiforgeryExtensions
-    {
-        public static RouteGroupBuilder IgnoreAntiforgeryToken(this RouteGroupBuilder group)
-        {
-            return group.WithMetadata(new Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryTokenAttribute());
-        }
-
-        public static RouteHandlerBuilder IgnoreAntiforgeryToken(this RouteHandlerBuilder builder)
-        {
-            return builder.WithMetadata(new Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryTokenAttribute());
-        }
-    }
-}

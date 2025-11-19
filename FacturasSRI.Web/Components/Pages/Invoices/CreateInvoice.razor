@@ -259,7 +259,7 @@
         try
         {
             allCustomers = await CustomerService.GetActiveCustomersAsync();
-            allProducts = await ProductService.GetActiveProductsAsync();
+            allProducts = await ProductService.GetProductsAsync();
         }
         catch (Exception ex)
         {

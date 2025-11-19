@@ -28,7 +28,11 @@
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="/profile">Mi Perfil</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><button class="dropdown-item" @onclick="HandleLogout">Cerrar Sesión</button></li>
+                            <li>
+                                <form action="/account/logout" method="post">
+                                    <button type="submit" class="dropdown-item">Cerrar Sesión</button>
+                                </form>
+                            </li>
                         </ul>
                     </div>
                 </Authorized>
@@ -85,12 +89,5 @@
     private void ToggleNavMenu()
     {
         isNavMenuCollapsed = !isNavMenuCollapsed;
-    }
-
-    private async Task HandleLogout()
-    {
-        var apiStateProvider = (ApiAuthenticationStateProvider)AuthenticationStateProvider;
-        await apiStateProvider.MarkUserAsLoggedOut();
-        Navigation.NavigateTo("/login", forceLoad: true);
     }
 }

@@ -3,7 +3,7 @@
 @using System.Net.Http.Json
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Web.Services
-@inject ApiClient ApiClient
+@inject IHttpClientFactory HttpClientFactory
 
 <PageTitle>Panel Principal</PageTitle>
 
@@ -99,7 +99,7 @@ else
     {
         try
         {
-            var httpClient = await ApiClient.GetHttpClientAsync();
+            var httpClient = HttpClientFactory.CreateClient();
             stats = await httpClient.GetFromJsonAsync<DashboardStatsDto>("api/dashboard/stats");
         }
         catch (Exception ex)
