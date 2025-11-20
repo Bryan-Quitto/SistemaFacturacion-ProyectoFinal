@@ -40,7 +40,7 @@ namespace FacturasSRI.Core.Services
             _firmaService = firmaService;
         }
 
-        public string GenerarYFirmarFactura(
+        public (string XmlGenerado, string XmlFirmado) GenerarYFirmarFactura(
             string claveAcceso,
             FacturaDominio facturaDominio, 
             ClienteDominio clienteDominio,
@@ -49,11 +49,12 @@ namespace FacturasSRI.Core.Services
             )
         {
             FacturaXml facturaXml = GenerarXmlFactura(claveAcceso, facturaDominio, clienteDominio);
+            
             string xmlSinFirmar = SerializarObjeto(facturaXml);
 
             string xmlFirmado = _firmaService.FirmarXml(xmlSinFirmar, rutaCertificado, passwordCertificado);
 
-            return xmlFirmado;
+            return (xmlSinFirmar, xmlFirmado);
         }
 
         private FacturaXml GenerarXmlFactura( 

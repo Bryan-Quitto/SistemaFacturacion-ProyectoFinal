@@ -228,10 +228,11 @@ namespace FacturasSRI.Infrastructure.Services
 
                     await _context.SaveChangesAsync();
                     
-                    var xmlFirmado = _xmlGeneratorService.GenerarYFirmarFactura(claveAcceso, invoice, cliente, certificatePath!, certificatePassword!);
-                    facturaSri.XmlFirmado = xmlFirmado;
-                    
-                    string respuestaRecepcionXml = await _sriApiClientService.EnviarRecepcionAsync(xmlFirmado);
+                    var resultadoXml = _xmlGeneratorService.GenerarYFirmarFactura(claveAcceso, invoice, cliente, certificatePath!, certificatePassword!);
+                    facturaSri.XmlGenerado = resultadoXml.XmlGenerado; 
+                    facturaSri.XmlFirmado = resultadoXml.XmlFirmado;
+
+                    string respuestaRecepcionXml = await _sriApiClientService.EnviarRecepcionAsync(resultadoXml.XmlFirmado);
                     RespuestaRecepcion respuestaRecepcion = _sriResponseParserService.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
                     if (respuestaRecepcion.Estado == "DEVUELTA")
