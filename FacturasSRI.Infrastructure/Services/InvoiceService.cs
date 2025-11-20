@@ -14,6 +14,7 @@ using FacturasSRI.Core.Services;
 using FacturasSRI.Core.Models;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 
 namespace FacturasSRI.Infrastructure.Services
 {
@@ -26,10 +27,11 @@ namespace FacturasSRI.Infrastructure.Services
         private readonly XmlGeneratorService _xmlGeneratorService;
         private readonly SriApiClientService _sriApiClientService;
         private readonly SriResponseParserService _sriResponseParserService;
+        private static readonly SemaphoreSlim _invoiceCreationSemaphore = new SemaphoreSlim(1, 1);
 
         public InvoiceService(
-            FacturasSRIDbContext context, 
-            ILogger<InvoiceService> logger, 
+            FacturasSRIDbContext context,
+            ILogger<InvoiceService> logger,
             IConfiguration configuration,
             FirmaDigitalService firmaDigitalService,
             XmlGeneratorService xmlGeneratorService,
@@ -45,7 +47,7 @@ namespace FacturasSRI.Infrastructure.Services
             _sriApiClientService = sriApiClientService;
             _sriResponseParserService = sriResponseParserService;
         }
-        
+
         private async Task<Cliente> GetOrCreateConsumidorFinalClientAsync()
         {
             var consumidorFinalId = "9999999999";
@@ -76,38 +78,62 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDto> CreateInvoiceAsync(CreateInvoiceDto invoiceDto)
         {
-            // 1. VALIDACIÓN DE CONFIGURACIÓN
-            var rucEmisor = _configuration["CompanyInfo:Ruc"];
-            var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"];
-            var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"];
-            var environmentType = _configuration["CompanyInfo:EnvironmentType"];
-            var certificatePath = _configuration["CompanyInfo:CertificatePath"];
-            var certificatePassword = _configuration["CompanyInfo:CertificatePassword"];
+            await _invoiceCreationSemaphore.WaitAsync();
+            try
+            {
+                // Step 1: Create the invoice in a "Pending" state in a local transaction.
+                var (factura, cliente) = await CrearFacturaPendienteAsync(invoiceDto);
 
-            if (string.IsNullOrEmpty(rucEmisor)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:Ruc' en appsettings.");
-            if (string.IsNullOrEmpty(establishmentCode)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:EstablishmentCode' en appsettings.");
-            if (string.IsNullOrEmpty(emissionPointCode)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:EmissionPointCode' en appsettings.");
-            if (string.IsNullOrEmpty(environmentType)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:EnvironmentType' en appsettings.");
-            if (string.IsNullOrEmpty(certificatePath)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:CertificatePath' en appsettings.");
-            if (string.IsNullOrEmpty(certificatePassword)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:CertificatePassword' en appsettings.");
+                // Step 2: Generate XML and sign it. This happens outside any DB transaction.
+                var (xmlGenerado, xmlFirmadoBytes, claveAcceso) = await GenerarYFirmarXmlAsync(factura, cliente);
 
+                // Update the FacturaSRI entity with the generated XMLs
+                var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == factura.Id);
+                facturaSri.XmlGenerado = xmlGenerado;
+                facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
+                await _context.SaveChangesAsync();
+
+                // Step 3: Send to SRI and process the response. This is the external call.
+                string respuestaRecepcionXml = await _sriApiClientService.EnviarRecepcionAsync(xmlFirmadoBytes);
+
+                // Step 4: Process and save the SRI response in a new, separate transaction.
+                await ProcesarRespuestaSriAsync(factura.Id, claveAcceso, respuestaRecepcionXml);
+
+                // Step 5: Return the final state of the invoice.
+                var resultDto = await GetInvoiceByIdAsync(factura.Id);
+                return resultDto!;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error en el proceso de creación de factura.");
+                // Note: We are not doing a transaction rollback here because the operations are now separated.
+                // A more robust implementation would include compensation logic to undo previous steps if a later one fails.
+                // For example, if sending to SRI fails, we might want to mark the invoice as "Failed" instead of "Pending".
+                throw;
+            }
+            finally
+            {
+                _invoiceCreationSemaphore.Release();
+            }
+        }
+
+        private async Task<(Factura, Cliente)> CrearFacturaPendienteAsync(CreateInvoiceDto invoiceDto)
+        {
             using (var transaction = await _context.Database.BeginTransactionAsync())
             {
                 try
                 {
+                    var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EstablishmentCode'.");
+                    var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EmissionPointCode'.");
+
                     Cliente cliente;
-                    
                     if (invoiceDto.EsConsumidorFinal)
                     {
                         cliente = await GetOrCreateConsumidorFinalClientAsync();
                     }
                     else if (invoiceDto.ClienteId.HasValue)
                     {
-                        cliente = await _context.Clientes.FindAsync(invoiceDto.ClienteId.Value);
-                        if (cliente == null)
-                        {
-                            throw new ArgumentException("Cliente no encontrado.");
-                        }
+                        cliente = await _context.Clientes.FindAsync(invoiceDto.ClienteId.Value) ?? throw new ArgumentException("Cliente no encontrado.");
                     }
                     else
                     {
@@ -119,38 +145,30 @@ namespace FacturasSRI.Infrastructure.Services
                             RazonSocial = invoiceDto.RazonSocialComprador ?? throw new ArgumentException("Razón social del comprador es requerida."),
                             Direccion = invoiceDto.DireccionComprador,
                             Email = invoiceDto.EmailComprador,
-                            Telefono = null,
                             FechaCreacion = DateTime.UtcNow,
                             EstaActivo = true
                         };
                         _context.Clientes.Add(cliente);
                     }
 
-                    var secuencial = await _context.Secuenciales
-                        .FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
-
+                    var secuencial = await _context.Secuenciales.FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
                     if (secuencial == null)
                     {
-                        secuencial = new Secuencial { 
-                            Id = Guid.NewGuid(),
-                            Establecimiento = establishmentCode, 
-                            PuntoEmision = emissionPointCode, 
-                            UltimoSecuencialFactura = 0 
-                        };
+                        secuencial = new Secuencial { Id = Guid.NewGuid(), Establecimiento = establishmentCode, PuntoEmision = emissionPointCode, UltimoSecuencialFactura = 0 };
                         _context.Secuenciales.Add(secuencial);
                     }
-                    
+
                     secuencial.UltimoSecuencialFactura++;
                     var numeroSecuencial = secuencial.UltimoSecuencialFactura.ToString("D9");
-                    
+
                     var invoice = new Factura
                     {
                         Id = Guid.NewGuid(),
                         ClienteId = cliente.Id,
                         FechaEmision = DateTime.UtcNow,
                         NumeroFactura = numeroSecuencial,
-                        Estado = EstadoFactura.Generada,
-                        UsuarioIdCreador = invoiceDto.UsuarioIdCreador, 
+                        Estado = EstadoFactura.Pendiente, // New state
+                        UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
                         FechaCreacion = DateTime.UtcNow
                     };
 
@@ -160,13 +178,11 @@ namespace FacturasSRI.Infrastructure.Services
                     foreach (var item in invoiceDto.Items)
                     {
                         var producto = await _context.Productos
-                            .Include(p => p.ProductoImpuestos)
-                            .ThenInclude(pi => pi.Impuesto)
+                            .Include(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
                             .SingleAsync(p => p.Id == item.ProductoId);
 
                         decimal valorIvaItem = 0;
                         var impuestoIva = producto.ProductoImpuestos.FirstOrDefault(pi => pi.Impuesto.Porcentaje > 0);
-                        
                         var subtotalItem = item.Cantidad * producto.PrecioVentaUnitario;
 
                         if (impuestoIva != null)
@@ -206,7 +222,7 @@ namespace FacturasSRI.Infrastructure.Services
                     invoice.SubtotalSinImpuestos = subtotalSinImpuestos;
                     invoice.TotalIVA = totalIva;
                     invoice.Total = subtotalSinImpuestos + totalIva;
-                    
+
                     var cuentaPorCobrar = new CuentaPorCobrar
                     {
                         Id = Guid.NewGuid(),
@@ -219,98 +235,103 @@ namespace FacturasSRI.Infrastructure.Services
                         UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
                         FechaCreacion = DateTime.UtcNow
                     };
-                    
+
                     _context.Facturas.Add(invoice);
                     _context.CuentasPorCobrar.Add(cuentaPorCobrar);
-                    
-                    // Generamos la clave con las variables validadas
+
+                    var rucEmisor = _configuration["CompanyInfo:Ruc"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:Ruc'.");
+                    var environmentType = _configuration["CompanyInfo:EnvironmentType"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EnvironmentType'.");
                     var claveAcceso = GenerarClaveAcceso(invoice.FechaEmision, "01", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencial, environmentType);
-                    
+
                     var facturaSri = new FacturaSRI
                     {
                         FacturaId = invoice.Id,
                         ClaveAcceso = claveAcceso
                     };
-                    
                     _context.FacturasSRI.Add(facturaSri);
 
                     await _context.SaveChangesAsync();
-                    
-                    // Tupla corregida
-                    var (xmlGenerado, xmlFirmadoBytes) = _xmlGeneratorService.GenerarYFirmarFactura(claveAcceso, invoice, cliente, certificatePath, certificatePassword);
-                    
-                    facturaSri.XmlGenerado = xmlGenerado; 
-                    facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
+                    await transaction.CommitAsync();
 
-                    string respuestaRecepcionXml = await _sriApiClientService.EnviarRecepcionAsync(xmlFirmadoBytes);
+                    return (invoice, cliente);
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+        }
+
+        private async Task<(string XmlGenerado, byte[] XmlFirmadoBytes, string ClaveAcceso)> GenerarYFirmarXmlAsync(Factura factura, Cliente cliente)
+        {
+            var certificatePath = _configuration["CompanyInfo:CertificatePath"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:CertificatePath'.");
+            var certificatePassword = _configuration["CompanyInfo:CertificatePassword"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:CertificatePassword'.");
+
+            var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == factura.Id);
+
+            var (xmlGenerado, xmlFirmadoBytes) = _xmlGeneratorService.GenerarYFirmarFactura(facturaSri.ClaveAcceso, factura, cliente, certificatePath, certificatePassword);
+
+            return (xmlGenerado, xmlFirmadoBytes, facturaSri.ClaveAcceso);
+        }
+
+        private async Task ProcesarRespuestaSriAsync(Guid facturaId, string claveAcceso, string respuestaRecepcionXml)
+        {
+            using (var transaction = await _context.Database.BeginTransactionAsync())
+            {
+                try
+                {
+                    var invoice = await _context.Facturas.FindAsync(facturaId);
+                    var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == facturaId);
+
                     RespuestaRecepcion respuestaRecepcion = _sriResponseParserService.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
                     if (respuestaRecepcion.Estado == "DEVUELTA")
                     {
                         invoice.Estado = EstadoFactura.RechazadaSRI;
                         facturaSri.RespuestaSRI = JsonSerializer.Serialize(respuestaRecepcion.Errores);
-                        await _context.SaveChangesAsync();
-                        await transaction.CommitAsync();
-                        
+
+                        // TODO: Implement compensation logic here. For example, roll back stock changes.
+                        // For now, we just log the error.
                         var errorMsg = string.Join(", ", respuestaRecepcion.Errores.Select(e => $"{e.Identificador}: {e.Mensaje}"));
                         _logger.LogWarning("Factura rechazada en Recepción: {Error}", errorMsg);
-                        throw new InvalidOperationException($"El SRI rechazó la factura (Recepción): {errorMsg}");
                     }
-
-                    invoice.Estado = EstadoFactura.EnviadaSRI;
-                    await _context.SaveChangesAsync();
-                    
-                    await Task.Delay(1000);
-
-                    string respuestaAutorizacionXml = await _sriApiClientService.ConsultarAutorizacionAsync(claveAcceso);
-                    RespuestaAutorizacion respuestaAutorizacion = _sriResponseParserService.ParsearRespuestaAutorizacion(respuestaAutorizacionXml);
-
-                    switch (respuestaAutorizacion.Estado)
+                    else
                     {
-                        case "AUTORIZADO":
-                            invoice.Estado = EstadoFactura.Autorizada;
-                            facturaSri.NumeroAutorizacion = respuestaAutorizacion.NumeroAutorizacion;
-                            facturaSri.FechaAutorizacion = respuestaAutorizacion.FechaAutorizacion;
-                            facturaSri.RespuestaSRI = "AUTORIZADO";
-                            break;
-                        
-                        case "NO AUTORIZADO":
-                            invoice.Estado = EstadoFactura.RechazadaSRI;
-                            facturaSri.RespuestaSRI = JsonSerializer.Serialize(respuestaAutorizacion.Errores);
-                            break;
-
-                        case "PROCESANDO":
-                            facturaSri.RespuestaSRI = "El SRI todavía está procesando la autorización.";
-                            _logger.LogInformation("Factura {NumeroFactura} sigue en procesamiento.", invoice.NumeroFactura);
-                            break;
-
-                        case "ERROR":
-                            invoice.Estado = EstadoFactura.RechazadaSRI;
-                            facturaSri.RespuestaSRI = JsonSerializer.Serialize(respuestaAutorizacion.Errores);
-                            break;
-
-                        default:
-                            invoice.Estado = EstadoFactura.RechazadaSRI;
-                            facturaSri.RespuestaSRI = "Respuesta desconocida del servicio de autorización.";
-                            _logger.LogWarning("Respuesta desconocida del SRI: {Estado}", respuestaAutorizacion.Estado);
-                            break;
+                        invoice.Estado = EstadoFactura.EnviadaSRI; // Or "Procesando"
                     }
-                    
+
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
 
-                    var resultDto = await GetInvoiceByIdAsync(invoice.Id);
-                    return resultDto!;
+                    // We could trigger a background job to check for authorization later.
+                    // For now, we'll try to check it right away for simplicity, but outside the reception transaction.
+                    if (invoice.Estado == EstadoFactura.EnviadaSRI)
+                    {
+                        await Task.Delay(2000); // Wait as per SRI recommendation
+                        await CheckSriStatusAsync(facturaId);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error al crear la factura.");
+                    _logger.LogError(ex, "Error procesando la respuesta del SRI.");
                     await transaction.RollbackAsync();
-                    throw;
+
+                    // It's important to mark the invoice as failed if processing the response fails
+                    var invoice = await _context.Facturas.FindAsync(facturaId);
+                    if (invoice != null)
+                    {
+                        invoice.Estado = EstadoFactura.RechazadaSRI; // Or a new "ProcessingError" state
+                        var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == facturaId);
+                        facturaSri.RespuestaSRI = $"Error local procesando respuesta del SRI: {ex.Message}";
+                        await _context.SaveChangesAsync();
+                    }
+
+                    throw; // Rethrow the exception so the caller knows something went wrong.
                 }
-            }    
+            }
         }
-        
+
         public async Task<InvoiceDetailViewDto?> CheckSriStatusAsync(Guid invoiceId)
         {
             var invoice = await _context.Facturas
@@ -342,7 +363,7 @@ namespace FacturasSRI.Infrastructure.Services
                         invoice.InformacionSRI.FechaAutorizacion = respuestaAutorizacion.FechaAutorizacion;
                         invoice.InformacionSRI.RespuestaSRI = "AUTORIZADO";
                         break;
-                    
+
                     case "NO AUTORIZADO":
                         invoice.Estado = EstadoFactura.RechazadaSRI;
                         invoice.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respuestaAutorizacion.Errores);
@@ -352,7 +373,7 @@ namespace FacturasSRI.Infrastructure.Services
                         invoice.InformacionSRI.RespuestaSRI = "El SRI todavía está procesando la autorización.";
                         _logger.LogInformation("Factura {NumeroFactura} sigue en procesamiento.", invoice.NumeroFactura);
                         break;
-                    
+
                     case "ERROR":
                         invoice.Estado = EstadoFactura.RechazadaSRI;
                         invoice.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respuestaAutorizacion.Errores);
@@ -373,7 +394,7 @@ namespace FacturasSRI.Infrastructure.Services
                 invoice.InformacionSRI.RespuestaSRI = $"Error de conexión: {ex.Message}";
                 await _context.SaveChangesAsync();
             }
-            
+
             return await GetInvoiceDetailByIdAsync(invoiceId);
         }
 

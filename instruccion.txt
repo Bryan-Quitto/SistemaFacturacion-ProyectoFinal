@@ -1,0 +1,183 @@
+Hola gemini, puedes ayudarme por favor con la creacion de una factura por favor, mira estos errores (el de soap me aparece la primera vez, el de la database, me aparece despues y ahi si ya se queda ese siempre):
+
+PS C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Web> dotnet run --environment Development
+info: FacturasSRI.Infrastructure.Services.VencimientoComprasService[0]
+      Servicio de Vencimiento de Compras iniciado.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5000
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Web
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (116ms) [Parameters=[@__ahoraUtc_0='?' (DbType = DateTime)], CommandType='Text', CommandTimeout='30']
+      SELECT c."Id", c."Cantidad", c."ComprobantePagoPath", c."Estado", c."FacturaCompraPath", c."FechaCreacion", c."FechaEmision", c."FechaPago", c."FechaVencimiento", c."LoteId", c."MontoTotal", c."NombreProveedor", c."ProductoId", c."UsuarioIdCreador"
+      FROM "CuentasPorPagar" AS c
+      WHERE c."Estado" = 0 AND c."FechaVencimiento" IS NOT NULL AND c."FechaVencimiento" < @__ahoraUtc_0
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+info: FacturasSRI.Web.Services.CookieAuthenticationStateProvider[0]
+      CookieAuthenticationStateProvider: Usuario AUTENTICADO encontrado en HttpContext. Usuario: Admin
+info: FacturasSRI.Web.Services.CookieAuthenticationStateProvider[0]
+      CookieAuthenticationStateProvider: Usuario AUTENTICADO encontrado en HttpContext. Usuario: Admin
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (91ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT c."Id", c."TipoIdentificacion", c."NumeroIdentificacion", c."RazonSocial", c."Email", c."Direccion", c."Telefono", c."EstaActivo", CASE
+          WHEN u."Id" IS NOT NULL THEN COALESCE(u."PrimerNombre", '') || ' ' || COALESCE(u."PrimerApellido", '')
+          ELSE 'Usuario no encontrado'
+      END AS "CreadoPor", c."FechaCreacion", c."FechaModificacion", CASE
+          WHEN u0."Id" IS NOT NULL THEN COALESCE(u0."PrimerNombre", '') || ' ' || COALESCE(u0."PrimerApellido", '')
+          ELSE 'N/A'
+      END AS "UltimaModificacionPor"
+      FROM "Clientes" AS c
+      LEFT JOIN "Usuarios" AS u ON c."UsuarioIdCreador" = u."Id"
+      LEFT JOIN "Usuarios" AS u0 ON c."UsuarioModificadorId" = u0."Id"
+      WHERE c."EstaActivo"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (89ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT p."Id", p."CodigoPrincipal", p."Nombre", p."Descripcion", p."PrecioVentaUnitario", p."ManejaInventario", p."ManejaLotes", CASE
+          WHEN p."ManejaLotes" THEN (
+              SELECT COALESCE(sum(l."CantidadDisponible"), 0)::int
+              FROM "Lotes" AS l
+              WHERE p."Id" = l."ProductoId")
+          ELSE p."StockTotal"
+      END AS "StockTotal", CASE
+          WHEN u."Id" IS NOT NULL THEN COALESCE(u."PrimerNombre", '') || ' ' || COALESCE(u."PrimerApellido", '')
+          ELSE 'Usuario no encontrado'
+      END AS "CreadoPor", p."EstaActivo" AS "IsActive", p."Marca", p."CategoriaId", c."Nombre" AS "CategoriaNombre"
+      FROM "Productos" AS p
+      LEFT JOIN "Usuarios" AS u ON p."UsuarioIdCreador" = u."Id"
+      INNER JOIN "Categorias" AS c ON p."CategoriaId" = c."Id"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (93ms) [Parameters=[@__id_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT t."Id", t."CodigoPrincipal", t."Nombre", t."Descripcion", t."PrecioVentaUnitario", t."ManejaInventario", t."ManejaLotes", t."EstaActivo", t.c, t0."Id", t0."Nombre", t0."CodigoSRI", t0."Porcentaje", t0."EstaActivo", t0."ProductoId", t0."ImpuestoId"
+      FROM (
+          SELECT p."Id", p."CodigoPrincipal", p."Nombre", p."Descripcion", p."PrecioVentaUnitario", p."ManejaInventario", p."ManejaLotes", p."EstaActivo", CASE
+              WHEN p."ManejaLotes" THEN (
+                  SELECT COALESCE(sum(l."CantidadDisponible"), 0)::int
+                  FROM "Lotes" AS l
+                  WHERE p."Id" = l."ProductoId")
+              ELSE p."StockTotal"
+          END AS c
+          FROM "Productos" AS p
+          WHERE p."Id" = @__id_0
+          LIMIT 1
+      ) AS t
+      LEFT JOIN (
+          SELECT i."Id", i."Nombre", i."CodigoSRI", i."Porcentaje", i."EstaActivo", p0."ProductoId", p0."ImpuestoId"
+          FROM "ProductoImpuestos" AS p0
+          INNER JOIN "Impuestos" AS i ON p0."ImpuestoId" = i."Id"
+      ) AS t0 ON t."Id" = t0."ProductoId"
+      ORDER BY t."Id", t0."ProductoId", t0."ImpuestoId"
+info: FacturasSRI.Web.Services.CookieAuthenticationStateProvider[0]
+      CookieAuthenticationStateProvider: Usuario AUTENTICADO encontrado en HttpContext. Usuario: Admin
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (90ms) [Parameters=[@__get_Item_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT c."Id", c."Direccion", c."Email", c."EstaActivo", c."FechaCreacion", c."FechaModificacion", c."NumeroIdentificacion", c."RazonSocial", c."Telefono", c."TipoIdentificacion", c."UltimaModificacionPor", c."UsuarioIdCreador", c."UsuarioModificadorId"
+      FROM "Clientes" AS c
+      WHERE c."Id" = @__get_Item_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (88ms) [Parameters=[@__establishmentCode_0='?', @__emissionPointCode_1='?'], CommandType='Text', CommandTimeout='30'] 
+      SELECT s."Id", s."Establecimiento", s."PuntoEmision", s."UltimoSecuencialFactura"
+      FROM "Secuenciales" AS s
+      WHERE s."Establecimiento" = @__establishmentCode_0 AND s."PuntoEmision" = @__emissionPointCode_1
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (88ms) [Parameters=[@__item_ProductoId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT t."Id", t."CategoriaId", t."CodigoPrincipal", t."Descripcion", t."EstaActivo", t."FechaCreacion", t."FechaModificacion", t."ManejaInventario", t."ManejaLotes", t."Marca", t."Nombre", t."PrecioVentaUnitario", t."StockTotal", t."TipoProducto", t."UsuarioIdCreador", t0."ProductoId", t0."ImpuestoId", t0."Id", t0."CodigoSRI", t0."EstaActivo", t0."FechaCreacion", t0."FechaModificacion", t0."Nombre", t0."Porcentaje"    
+      FROM (
+          SELECT p."Id", p."CategoriaId", p."CodigoPrincipal", p."Descripcion", p."EstaActivo", p."FechaCreacion", p."FechaModificacion", p."ManejaInventario", p."ManejaLotes", p."Marca", p."Nombre", p."PrecioVentaUnitario", p."StockTotal", p."TipoProducto", p."UsuarioIdCreador"       
+          FROM "Productos" AS p
+          WHERE p."Id" = @__item_ProductoId_0
+          LIMIT 2
+      ) AS t
+      LEFT JOIN (
+          SELECT p0."ProductoId", p0."ImpuestoId", i."Id", i."CodigoSRI", i."EstaActivo", i."FechaCreacion", i."FechaModificacion", i."Nombre", i."Porcentaje"
+          FROM "ProductoImpuestos" AS p0
+          INNER JOIN "Impuestos" AS i ON p0."ImpuestoId" = i."Id"
+      ) AS t0 ON t."Id" = t0."ProductoId"
+      ORDER BY t."Id", t0."ProductoId", t0."ImpuestoId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (93ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?' (DbType = Guid), @p2='?' (DbType = Int32), @p3='?' (DbType = DateTime), @p4='?' (DbType = DateTime), @p5='?', @p6='?' (DbType = Decimal), @p7='?' (DbType = Decimal), @p8='?' (DbType = Decimal), @p9='?' (DbType = Decimal), @p10='?' (DbType = Guid), @p12='?' (DbType = Guid), @p11='?' (DbType = Int32), @p14='?' (DbType = Guid), @p13='?' (DbType = Int32), @p15='?' (DbType = Guid), @p16='?' (DbType = Guid), @p17='?' (DbType = Guid), @p18='?' (DbType = DateTime), @p19='?' (DbType = DateTime), @p20='?' (DbType = DateTime), @p21='?' (DbType = Decimal), @p22='?' (DbType = Boolean), @p23='?' (DbType = Decimal), @p24='?' (DbType = Guid), @p25='?' (DbType = Guid), @p26='?' (DbType = Int32), @p27='?' (DbType = Decimal), @p28='?' (DbType = Decimal), @p29='?' (DbType = Guid), @p30='?' (DbType = Decimal), @p31='?' (DbType = Guid), @p32='?' (DbType = Decimal), @p33='?' (DbType = Decimal), @p34='?' (DbType = Guid), @p35='?', @p36='?' (DbType = DateTime), @p37='?', @p38='?', @p39='?', @p40='?', @p41='?'], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "Facturas" ("Id", "ClienteId", "Estado", "FechaCreacion", "FechaEmision", "NumeroFactura", "SubtotalSinImpuestos", "Total", "TotalDescuento", "TotalIVA", "UsuarioIdCreador")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10);
+      UPDATE "Productos" SET "StockTotal" = @p11
+      WHERE "Id" = @p12;
+      UPDATE "Secuenciales" SET "UltimoSecuencialFactura" = @p13
+      WHERE "Id" = @p14;
+      INSERT INTO "CuentasPorCobrar" ("Id", "ClienteId", "FacturaId", "FechaCreacion", "FechaEmision", "FechaVencimiento", "MontoTotal", "Pagada", "SaldoPendiente", "UsuarioIdCreador")
+      VALUES (@p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24);
+      INSERT INTO "FacturaDetalles" ("Id", "Cantidad", "CostoTotal", "Descuento", "FacturaId", "PrecioVentaUnitario", "ProductoId", "Subtotal", "ValorIVA")
+      VALUES (@p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, @p33);
+      INSERT INTO "FacturasSRI" ("FacturaId", "ClaveAcceso", "FechaAutorizacion", "NumeroAutorizacion", "RespuestaSRI", "RideUrl", "XmlFirmado", "XmlGenerado")
+      VALUES (@p34, @p35, @p36, @p37, @p38, @p39, @p40, @p41);
+==========================================
+RESPUESTA SRI (RECEPCIÓN):
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultcode>soap:Server</faultcode><faultstring>Error en la sintaxis del archivo XML</faultstring></soap:Fault></soap:Body></soap:Envelope>
+==========================================
+fail: FacturasSRI.Infrastructure.Services.InvoiceService[0]
+      Error al crear la factura.
+      System.Exception: No se encontró 'validarComprobanteResponse' en la respuesta SOAP.
+         at FacturasSRI.Core.Services.SriResponseParserService.ParsearRespuestaRecepcion(String soapResponse) in C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Core\Services\SriResponseParserService.cs:line 22
+         at FacturasSRI.Infrastructure.Services.InvoiceService.CreateInvoiceAsync(CreateInvoiceDto invoiceDto) in C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Infrastructure\Services\InvoiceService.cs:line 251
+info: FacturasSRI.Web.Services.CookieAuthenticationStateProvider[0]
+      CookieAuthenticationStateProvider: Usuario AUTENTICADO encontrado en HttpContext. Usuario: Admin
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (91ms) [Parameters=[@__establishmentCode_0='?', @__emissionPointCode_1='?'], CommandType='Text', CommandTimeout='30'] 
+      SELECT s."Id", s."Establecimiento", s."PuntoEmision", s."UltimoSecuencialFactura"
+      FROM "Secuenciales" AS s
+      WHERE s."Establecimiento" = @__establishmentCode_0 AND s."PuntoEmision" = @__emissionPointCode_1
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (90ms) [Parameters=[@__item_ProductoId_0='?' (DbType = Guid)], CommandType='Text', CommandTimeout='30']
+      SELECT t."Id", t."CategoriaId", t."CodigoPrincipal", t."Descripcion", t."EstaActivo", t."FechaCreacion", t."FechaModificacion", t."ManejaInventario", t."ManejaLotes", t."Marca", t."Nombre", t."PrecioVentaUnitario", t."StockTotal", t."TipoProducto", t."UsuarioIdCreador", t0."ProductoId", t0."ImpuestoId", t0."Id", t0."CodigoSRI", t0."EstaActivo", t0."FechaCreacion", t0."FechaModificacion", t0."Nombre", t0."Porcentaje"    
+      FROM (
+          SELECT p."Id", p."CategoriaId", p."CodigoPrincipal", p."Descripcion", p."EstaActivo", p."FechaCreacion", p."FechaModificacion", p."ManejaInventario", p."ManejaLotes", p."Marca", p."Nombre", p."PrecioVentaUnitario", p."StockTotal", p."TipoProducto", p."UsuarioIdCreador"       
+          FROM "Productos" AS p
+          WHERE p."Id" = @__item_ProductoId_0
+          LIMIT 2
+      ) AS t
+      LEFT JOIN (
+          SELECT p0."ProductoId", p0."ImpuestoId", i."Id", i."CodigoSRI", i."EstaActivo", i."FechaCreacion", i."FechaModificacion", i."Nombre", i."Porcentaje"
+          FROM "ProductoImpuestos" AS p0
+          INNER JOIN "Impuestos" AS i ON p0."ImpuestoId" = i."Id"
+      ) AS t0 ON t."Id" = t0."ProductoId"
+      ORDER BY t."Id", t0."ProductoId", t0."ImpuestoId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (96ms) [Parameters=[@p0='?' (DbType = Guid), @p1='?' (DbType = Guid), @p2='?' (DbType = Int32), @p3='?' (DbType = DateTime), @p4='?' (DbType = DateTime), @p5='?', @p6='?' (DbType = Decimal), @p7='?' (DbType = Decimal), @p8='?' (DbType = Decimal), @p9='?' (DbType = Decimal), @p10='?' (DbType = Guid), @p13='?' (DbType = Guid), @p11='?', @p12='?', @p15='?' (DbType = Guid), @p14='?' (DbType = Int32), @p17='?' (DbType = Guid), @p16='?' (DbType = Int32), @p18='?' (DbType = Guid), @p19='?' (DbType = Guid), @p20='?' (DbType = Guid), @p21='?' (DbType = DateTime), @p22='?' (DbType = DateTime), @p23='?' (DbType = DateTime), @p24='?' (DbType = Decimal), @p25='?' (DbType = Boolean), @p26='?' (DbType = Decimal), @p27='?' (DbType = Guid), @p28='?' (DbType = Guid), @p29='?' (DbType = Int32), @p30='?' (DbType = Decimal), @p31='?' (DbType = Decimal), @p32='?' (DbType = Guid), @p33='?' (DbType = Decimal), @p34='?' (DbType = Guid), @p35='?' (DbType = Decimal), @p36='?' (DbType = Decimal), @p37='?' (DbType = Guid), @p38='?', @p39='?' (DbType = DateTime), @p40='?', @p41='?', @p42='?', @p43='?', @p44='?'], CommandType='Text', CommandTimeout='30']
+      INSERT INTO "Facturas" ("Id", "ClienteId", "Estado", "FechaCreacion", "FechaEmision", "NumeroFactura", "SubtotalSinImpuestos", "Total", "TotalDescuento", "TotalIVA", "UsuarioIdCreador")
+      VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10);
+      UPDATE "FacturasSRI" SET "XmlFirmado" = @p11, "XmlGenerado" = @p12
+      WHERE "FacturaId" = @p13;
+      UPDATE "Productos" SET "StockTotal" = @p14
+      WHERE "Id" = @p15;
+      UPDATE "Secuenciales" SET "UltimoSecuencialFactura" = @p16
+      WHERE "Id" = @p17;
+      INSERT INTO "CuentasPorCobrar" ("Id", "ClienteId", "FacturaId", "FechaCreacion", "FechaEmision", "FechaVencimiento", "MontoTotal", "Pagada", "SaldoPendiente", "UsuarioIdCreador")
+      VALUES (@p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27);
+      INSERT INTO "FacturaDetalles" ("Id", "Cantidad", "CostoTotal", "Descuento", "FacturaId", "PrecioVentaUnitario", "ProductoId", "Subtotal", "ValorIVA")
+      VALUES (@p28, @p29, @p30, @p31, @p32, @p33, @p34, @p35, @p36);
+      INSERT INTO "FacturasSRI" ("FacturaId", "ClaveAcceso", "FechaAutorizacion", "NumeroAutorizacion", "RespuestaSRI", "RideUrl", "XmlFirmado", "XmlGenerado")
+      VALUES (@p37, @p38, @p39, @p40, @p41, @p42, @p43, @p44);
+fail: FacturasSRI.Infrastructure.Services.InvoiceService[0]
+      Error al crear la factura.
+      Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException: The database operation was expected to affect 1 row(s), but actually affected 0 row(s); data may have been modified or deleted since entities were loaded. See https://go.microsoft.com/fwlink/?LinkId=527962 for information on understanding and handling optimistic concurrency exceptions.
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Update.Internal.NpgsqlModificationCommandBatch.ThrowAggregateUpdateConcurrencyExceptionAsync(RelationalDataReader reader, Int32 commandIndex, Int32 expectedRowsAffected, Int32 rowsAffected, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Update.Internal.NpgsqlModificationCommandBatch.Consume(RelationalDataReader reader, Boolean async, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.ReaderModificationCommandBatch.ExecuteAsync(IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Update.Internal.BatchExecutor.ExecuteAsync(IEnumerable`1 commandBatches, IRelationalConnection connection, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(IList`1 entriesToSave, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.ChangeTracking.Internal.StateManager.SaveChangesAsync(StateManager stateManager, Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+         at Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal.NpgsqlExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.DbContext.SaveChangesAsync(Boolean acceptAllChangesOnSuccess, CancellationToken cancellationToken)   
+         at FacturasSRI.Infrastructure.Services.InvoiceService.CreateInvoiceAsync(CreateInvoiceDto invoiceDto) in C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Infrastructure\Services\InvoiceService.cs:line 242
+
+//FIN
+
+Asegurate de analizar bien todo el proyecto para ver por que pasa esto por favor

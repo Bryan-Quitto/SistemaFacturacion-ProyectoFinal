@@ -3,10 +3,11 @@ namespace FacturasSRI.Domain.Enums
     public enum EstadoFactura
     {
         Borrador = 0,
-        Generada = 1,
-        EnviadaSRI = 2,
-        Autorizada = 3,
-        RechazadaSRI = 4,
-        Cancelada = 5
+        Pendiente = 1,
+        Generada = 2,
+        EnviadaSRI = 3,
+        Autorizada = 4,
+        RechazadaSRI = 5,
+        Cancelada = 6
     }
 }

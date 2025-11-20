@@ -69,6 +69,7 @@ namespace FacturasSRI.Core.Services
             var facturaXml = new FacturaXml 
             {
                 Id = FacturaId.Comprobante,
+                IdSpecified = true,
                 Version = "1.1.0", 
             };
             
@@ -76,40 +77,49 @@ namespace FacturasSRI.Core.Services
             {
                 Ambiente = TIPO_AMBIENTE,
                 TipoEmision = "1", 
-                RazonSocial = RAZON_SOCIAL_EMISOR,
-                NombreComercial = NOMBRE_COMERCIAL_EMISOR,
+                RazonSocial = NormalizeString(RAZON_SOCIAL_EMISOR),
+                NombreComercial = NormalizeString(NOMBRE_COMERCIAL_EMISOR),
                 Ruc = RUC_EMISOR,
                 ClaveAcceso = claveAcceso,
                 CodDoc = "01", 
                 Estab = COD_ESTABLECIMIENTO,
                 PtoEmi = COD_PUNTO_EMISION,
                 Secuencial = secuencialFormateado,
-                DirMatriz = DIRECCION_MATRIZ_EMISOR
+                DirMatriz = NormalizeString(DIRECCION_MATRIZ_EMISOR)
             };
 
             facturaXml.InfoFactura = new InfoFacturaXml 
             {
                 FechaEmision = facturaDominio.FechaEmision.ToString("dd/MM/yyyy"),
-                DirEstablecimiento = DIRECCION_MATRIZ_EMISOR, 
+                DirEstablecimiento = NormalizeString(DIRECCION_MATRIZ_EMISOR), 
                 ObligadoContabilidad = OBLIGADO_CONTABILIDAD,
+                ObligadoContabilidadSpecified = true,
                 
                 TipoIdentificacionComprador = MapearTipoIdentificacion(clienteDominio.TipoIdentificacion, clienteDominio.NumeroIdentificacion),
-                RazonSocialComprador = clienteDominio.RazonSocial,
+                RazonSocialComprador = NormalizeString(clienteDominio.RazonSocial),
                 IdentificacionComprador = clienteDominio.NumeroIdentificacion,
                 
                 TotalSinImpuestos = facturaDominio.SubtotalSinImpuestos,
                 TotalDescuento = facturaDominio.TotalDescuento,
                 Propina = 0.00m,
+                PropinaSpecified = true,
                 ImporteTotal = facturaDominio.Total
             };
             
+            facturaXml.InfoFactura.Pagos.Add(new PagosPago {
+                FormaPago = "01",
+                Total = facturaDominio.Total,
+                Plazo = 0m,
+                PlazoSpecified = true
+            });
+            
             var gruposImpuestos = facturaDominio.Detalles
                 .SelectMany(d => d.Producto.ProductoImpuestos.Select(pi => new { Detalle = d, Impuesto = pi.Impuesto }))
-                .GroupBy(x => x.Impuesto)
+                .GroupBy(x => new { Codigo = "2", CodigoPorcentaje = x.Impuesto.CodigoSRI })
                 .Select(g => new TotalImpuestoXml 
                 {
-                    Codigo = "2", 
-                    CodigoPorcentaje = g.Key.CodigoSRI, 
+                    Codigo = g.Key.Codigo, 
+                    CodigoPorcentaje = g.Key.CodigoPorcentaje, 
                     BaseImponible = g.Sum(x => x.Detalle.Subtotal),
                     Valor = g.Sum(x => x.Detalle.ValorIVA)
                 });
@@ -124,7 +134,7 @@ namespace FacturasSRI.Core.Services
                 var detalleXml = new DetalleXml
                 {
                     CodigoPrincipal = detalle.Producto.CodigoPrincipal,
-                    Descripcion = detalle.Producto.Nombre,
+                    Descripcion = NormalizeString(detalle.Producto.Nombre),
                     Cantidad = detalle.Cantidad,
                     PrecioUnitario = detalle.PrecioVentaUnitario,
                     Descuento = detalle.Descuento,
@@ -138,7 +148,7 @@ namespace FacturasSRI.Core.Services
                         CodigoPorcentaje = pi.Impuesto.CodigoSRI, 
                         Tarifa = pi.Impuesto.Porcentaje,
                         BaseImponible = detalle.Subtotal,
-                        Valor = detalle.ValorIVA
+                        Valor = detalle.Subtotal * (pi.Impuesto.Porcentaje / 100)
                     });
 
                 foreach (var impuesto in impuestosDetalle)
@@ -151,27 +161,58 @@ namespace FacturasSRI.Core.Services
 
             return facturaXml;
         }
+        
+        private string NormalizeString(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            var normalizedString = input.Normalize(NormalizationForm.FormD);
+            var stringBuilder = new StringBuilder();
+
+            foreach (var c in normalizedString)
+            {
+                var unicodeCategory = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (unicodeCategory != UnicodeCategory.NonSpacingMark)
+                {
+                    stringBuilder.Append(c);
+                }
+            }
+
+            return stringBuilder.ToString().Normalize(NormalizationForm.FormC);
+        }
+
 
         private string SerializarObjeto(object objeto)
         {
-            using (var stringWriter = new Utf8StringWriter()) 
+            var currentCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
             {
-                var settings = new XmlWriterSettings
-                {
-                    Indent = true, 
-                    Encoding = new UTF8Encoding(false)
-                };
+                System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
 
-                using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
+                using (var stringWriter = new Utf8StringWriter())
                 {
-                    var serializer = new XmlSerializer(objeto.GetType());
-                    
-                    var namespaces = new XmlSerializerNamespaces();
-                    namespaces.Add(string.Empty, string.Empty);
+                    var settings = new XmlWriterSettings
+                    {
+                        Indent = true,
+                        Encoding = new UTF8Encoding(false)
+                    };
 
-                    serializer.Serialize(xmlWriter, objeto, namespaces);
+                    using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
+                    {
+                        var serializer = new XmlSerializer(objeto.GetType());
+
+                        var namespaces = new XmlSerializerNamespaces();
+                        namespaces.Add(string.Empty, string.Empty);
+
+                        serializer.Serialize(xmlWriter, objeto, namespaces);
+                    }
+                    return stringWriter.ToString();
                 }
-                return stringWriter.ToString();
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = currentCulture;
             }
         }
 
