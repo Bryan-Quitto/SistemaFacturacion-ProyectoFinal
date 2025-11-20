@@ -76,17 +76,30 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDto> CreateInvoiceAsync(CreateInvoiceDto invoiceDto)
         {
+            // 1. VALIDACIÓN DE CONFIGURACIÓN
+            var rucEmisor = _configuration["CompanyInfo:Ruc"];
+            var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"];
+            var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"];
+            var environmentType = _configuration["CompanyInfo:EnvironmentType"];
+            var certificatePath = _configuration["CompanyInfo:CertificatePath"];
+            var certificatePassword = _configuration["CompanyInfo:CertificatePassword"];
+
+            if (string.IsNullOrEmpty(rucEmisor)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:Ruc' en appsettings.");
+            if (string.IsNullOrEmpty(establishmentCode)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:EstablishmentCode' en appsettings.");
+            if (string.IsNullOrEmpty(emissionPointCode)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:EmissionPointCode' en appsettings.");
+            if (string.IsNullOrEmpty(environmentType)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:EnvironmentType' en appsettings.");
+            if (string.IsNullOrEmpty(certificatePath)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:CertificatePath' en appsettings.");
+            if (string.IsNullOrEmpty(certificatePassword)) throw new InvalidOperationException("Falta configurar 'CompanyInfo:CertificatePassword' en appsettings.");
+
             using (var transaction = await _context.Database.BeginTransactionAsync())
             {
                 try
                 {
                     Cliente cliente;
-                    Guid? clienteId = null;
                     
                     if (invoiceDto.EsConsumidorFinal)
                     {
                         cliente = await GetOrCreateConsumidorFinalClientAsync();
-                        clienteId = cliente.Id;
                     }
                     else if (invoiceDto.ClienteId.HasValue)
                     {
@@ -95,7 +108,6 @@ namespace FacturasSRI.Infrastructure.Services
                         {
                             throw new ArgumentException("Cliente no encontrado.");
                         }
-                        clienteId = cliente.Id;
                     }
                     else
                     {
@@ -112,11 +124,7 @@ namespace FacturasSRI.Infrastructure.Services
                             EstaActivo = true
                         };
                         _context.Clientes.Add(cliente);
-                        clienteId = cliente.Id;
                     }
-
-                    var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"];
-                    var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"];
 
                     var secuencial = await _context.Secuenciales
                         .FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
@@ -125,8 +133,8 @@ namespace FacturasSRI.Infrastructure.Services
                     {
                         secuencial = new Secuencial { 
                             Id = Guid.NewGuid(),
-                            Establecimiento = establishmentCode!, 
-                            PuntoEmision = emissionPointCode!, 
+                            Establecimiento = establishmentCode, 
+                            PuntoEmision = emissionPointCode, 
                             UltimoSecuencialFactura = 0 
                         };
                         _context.Secuenciales.Add(secuencial);
@@ -215,12 +223,8 @@ namespace FacturasSRI.Infrastructure.Services
                     _context.Facturas.Add(invoice);
                     _context.CuentasPorCobrar.Add(cuentaPorCobrar);
                     
-                    var rucEmisor = _configuration["CompanyInfo:Ruc"];
-                    var tipoAmbiente = _configuration["CompanyInfo:EnvironmentType"];
-                    var certificatePath = _configuration["CompanyInfo:CertificatePath"];
-                    var certificatePassword = _configuration["CompanyInfo:CertificatePassword"];
-
-                    var claveAcceso = GenerarClaveAcceso(invoice.FechaEmision, "01", rucEmisor!, establishmentCode!, emissionPointCode!, numeroSecuencial, tipoAmbiente!);
+                    // Generamos la clave con las variables validadas
+                    var claveAcceso = GenerarClaveAcceso(invoice.FechaEmision, "01", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencial, environmentType);
                     
                     var facturaSri = new FacturaSRI
                     {
@@ -232,13 +236,13 @@ namespace FacturasSRI.Infrastructure.Services
 
                     await _context.SaveChangesAsync();
                     
-                    var (xmlGenerado, xmlFirmadoBytes) = _xmlGeneratorService.GenerarYFirmarFactura(claveAcceso, invoice, cliente, certificatePath!, certificatePassword!);
+                    // Tupla corregida
+                    var (xmlGenerado, xmlFirmadoBytes) = _xmlGeneratorService.GenerarYFirmarFactura(claveAcceso, invoice, cliente, certificatePath, certificatePassword);
                     
                     facturaSri.XmlGenerado = xmlGenerado; 
                     facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
 
                     string respuestaRecepcionXml = await _sriApiClientService.EnviarRecepcionAsync(xmlFirmadoBytes);
-
                     RespuestaRecepcion respuestaRecepcion = _sriResponseParserService.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
                     if (respuestaRecepcion.Estado == "DEVUELTA")
@@ -425,6 +429,7 @@ namespace FacturasSRI.Infrastructure.Services
             var tipoEmision = "1";
             var codigoNumerico = "12345678";
 
+            // --- DIAGNÓSTICO DE CLAVE DE ACCESO ---
             var clave = new StringBuilder();
             clave.Append(fecha);
             clave.Append(tipoComprobante);
@@ -436,6 +441,13 @@ namespace FacturasSRI.Infrastructure.Services
             clave.Append(codigoNumerico);
             clave.Append(tipoEmision);
 
+            if (clave.Length != 48)
+            {
+                throw new InvalidOperationException($"Error al generar clave de acceso. Longitud: {clave.Length} (esperado: 48). " +
+                    $"Detalle: Fecha({fecha.Length}), TipoComp({tipoComprobante.Length}), RUC({ruc?.Length}), Ambiente({tipoAmbiente?.Length}), " +
+                    $"Estab({establecimiento?.Length}), PtoEmi({puntoEmision?.Length}), Secuencial({secuencial?.Length}), CodNum(8), TipoEmi(1)");
+            }
+
             var digitoVerificador = CalcularDigitoVerificador(clave.ToString());
             clave.Append(digitoVerificador);
 
@@ -444,12 +456,18 @@ namespace FacturasSRI.Infrastructure.Services
 
         private int CalcularDigitoVerificador(string clave)
         {
-            int[] factores = { 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2 };
-            int suma = 0;
+            var reverso = clave.Reverse().ToArray();
+            var suma = 0;
+            var factor = 2;
 
-            for (int i = 0; i < 48; i++)
+            for (int i = 0; i < reverso.Length; i++)
             {
-                suma += (int)char.GetNumericValue(clave[i]) * factores[i];
+                suma += (int)char.GetNumericValue(reverso[i]) * factor;
+                factor++;
+                if (factor > 7)
+                {
+                    factor = 2;
+                }
             }
 
             int modulo = suma % 11;
@@ -474,12 +492,12 @@ namespace FacturasSRI.Infrastructure.Services
                 Id = invoice.Id,
                 FechaEmision = invoice.FechaEmision,
                 NumeroFactura = invoice.NumeroFactura,
-                Estado = invoice.Estado,
                 ClienteId = invoice.ClienteId,
                 SubtotalSinImpuestos = invoice.SubtotalSinImpuestos,
                 TotalDescuento = invoice.TotalDescuento,
                 TotalIVA = invoice.TotalIVA,
                 Total = invoice.Total,
+                Estado = invoice.Estado,
                 Detalles = invoice.Detalles.Select(d => new InvoiceDetailDto
                 {
                     Id = d.Id,
