@@ -4,9 +4,13 @@
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Domain.Enums
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+
 @inject IPurchaseService PurchaseService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Detalle de Compra</PageTitle>
 
@@ -32,6 +36,13 @@ else
             </button>
         </div>
     </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isSuccess ? "alert-success" : "alert-danger")" role="alert">
+            @statusMessage
+        </div>
+    }
 
     <div class="row">
         <div class="col-lg-8">
@@ -93,6 +104,14 @@ else
                                 <i class="bi bi-file-earmark-arrow-down"></i> Ver Comprobante de Pago
                             </button>
                         }
+                        
+                        <!-- BOTÓN DE ANULAR AÑADIDO -->
+                        @if (userIsAdmin && purchase.Estado == EstadoCompra.Vencida)
+                        {
+                             <button class="btn btn-danger" @onclick="HandleAnularCompra">
+                                <i class="bi bi-x-circle"></i> Anular Compra
+                            </button>
+                        }
                     </div>
                 </div>
             </div>
@@ -106,18 +125,66 @@ else
 
     private PurchaseListItemDto? purchase;
     private bool isLoading = true;
+    private bool userIsAdmin;
+    private string? statusMessage;
+    private bool isSuccess;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             isLoading = true;
+            statusMessage = null; // Limpiar mensaje en recarga
+            
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            userIsAdmin = user.IsInRole("Administrador");
+
             purchase = await PurchaseService.GetPurchaseByIdAsync(PurchaseId);
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    private async Task HandleAnularCompra()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                statusMessage = "No se pudo identificar al usuario para la autorización.";
+                isSuccess = false;
+                return;
+            }
+
+            // Opcional: Añadir una confirmación de JavaScript antes de llamar al servicio
+            bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Se anulará la compra y se revertirá el inventario asociado. ¿Estás seguro?");
+            if (!confirmed) return;
+
+            await PurchaseService.AnularCompraAsync(PurchaseId, Guid.Parse(userId));
+            
+            statusMessage = "La compra ha sido anulada y el inventario ha sido ajustado correctamente.";
+            isSuccess = true;
+            await OnInitializedAsync(); // Recargar los datos para mostrar el nuevo estado
+        }
+        catch (InvalidOperationException ex)
+        {
+            statusMessage = ex.Message;
+            isSuccess = false;
+        }
+        catch (Exception)
+        {
+            statusMessage = "Ocurrió un error inesperado al intentar anular la compra.";
+            isSuccess = false;
+        }
+        
+        StateHasChanged();
     }
 
     private void GoBack()

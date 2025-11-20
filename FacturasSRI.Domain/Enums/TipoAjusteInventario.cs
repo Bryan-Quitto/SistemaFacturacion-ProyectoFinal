@@ -6,6 +6,7 @@ namespace FacturasSRI.Domain.Enums
         Perdida = 2,
         Conteo = 3,
         Inicial = 4,
+        AnulacionCompra = 5,
         Otro = 99
     }
 }

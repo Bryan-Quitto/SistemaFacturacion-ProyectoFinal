@@ -19,13 +19,35 @@ namespace FacturasSRI.Infrastructure.Services
         private readonly FacturasSRIDbContext _context;
         private readonly ILogger<PurchaseService> _logger;
         private readonly Client _supabase;
+        private readonly IAjusteInventarioService _ajusteInventarioService;
 
-        public PurchaseService(FacturasSRIDbContext context, ILogger<PurchaseService> logger, Client supabase)
+        public PurchaseService(FacturasSRIDbContext context, ILogger<PurchaseService> logger, Client supabase, IAjusteInventarioService ajusteInventarioService)
         {
             _context = context;
             _logger = logger;
             _supabase = supabase;
+            _ajusteInventarioService = ajusteInventarioService;
         }
+        
+        // --- MÉTODO IMPLEMENTADO ---
+        public async Task MarcarComprasVencidasAsync()
+        {
+            var ahoraUtc = DateTime.UtcNow;
+            var comprasPendientes = await _context.CuentasPorPagar
+                .Where(c => c.Estado == EstadoCompra.Pendiente && c.FechaVencimiento.HasValue && c.FechaVencimiento.Value < ahoraUtc)
+                .ToListAsync();
+
+            if (comprasPendientes.Any())
+            {
+                foreach (var compra in comprasPendientes)
+                {
+                    compra.Estado = EstadoCompra.Vencida;
+                }
+                await _context.SaveChangesAsync();
+                _logger.LogInformation($"Se marcaron {comprasPendientes.Count} compras como vencidas.");
+            }
+        }
+
 
         public async Task<bool> CreatePurchaseAsync(PurchaseDto purchaseDto)
         {
@@ -95,6 +117,43 @@ namespace FacturasSRI.Infrastructure.Services
                 return false;
             }
         }
+        
+        public async Task AnularCompraAsync(Guid compraId, Guid usuarioId)
+        {
+            var compra = await _context.CuentasPorPagar
+                .Include(c => c.Lote)
+                .Include(c => c.Producto)
+                .FirstOrDefaultAsync(c => c.Id == compraId);
+
+            if (compra == null) throw new InvalidOperationException("La compra no existe.");
+            if (compra.Estado != EstadoCompra.Vencida) throw new InvalidOperationException("Solo se pueden anular compras vencidas.");
+
+            // --- VALIDACIÓN CORREGIDA PARA ELIMINAR EL WARNING ---
+            if (compra.Producto == null) throw new InvalidOperationException("El producto asociado a la compra es inválido. No se puede anular.");
+            if (!compra.Producto.ManejaLotes) throw new InvalidOperationException("Solo se pueden anular automáticamente compras de productos que manejan lotes. Realice un ajuste de inventario manual.");
+            
+            if (compra.Lote != null && compra.Lote.CantidadDisponible < compra.Lote.CantidadComprada)
+            {
+                throw new InvalidOperationException("No se puede anular. El stock del lote ya ha sido vendido parcialmente. Realice un ajuste manual por las unidades restantes.");
+            }
+
+            if (compra.Lote != null && compra.Lote.CantidadDisponible > 0)
+            {
+                var ajusteDto = new AjusteInventarioDto
+                {
+                    ProductoId = compra.ProductoId,
+                    LoteId = compra.LoteId,
+                    CantidadAjustada = compra.Lote.CantidadDisponible,
+                    Tipo = TipoAjusteInventario.AnulacionCompra,
+                    Motivo = $"Anulación de compra vencida ID: {compra.Id}",
+                    UsuarioIdAutoriza = usuarioId
+                };
+                await _ajusteInventarioService.CreateAdjustmentAsync(ajusteDto);
+            }
+
+            compra.Estado = EstadoCompra.Cancelada;
+            await _context.SaveChangesAsync();
+        }
 
         public async Task<List<PurchaseListItemDto>> GetPurchasesAsync()
         {
@@ -160,9 +219,8 @@ namespace FacturasSRI.Infrastructure.Services
                 
                 await _supabase.Storage.From("comprobantes-compra").Upload(memoryStream.ToArray(), bucketPath);
 
-                // 2. Update purchase record in DB
                 purchase.Estado = EstadoCompra.Pagada;
-                purchase.FechaPago = DateTime.UtcNow; // Asignar fecha de pago automáticamente
+                purchase.FechaPago = DateTime.UtcNow;
                 purchase.ComprobantePagoPath = bucketPath;
 
                 await _context.SaveChangesAsync();

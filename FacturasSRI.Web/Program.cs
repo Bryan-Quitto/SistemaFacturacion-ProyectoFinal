@@ -79,6 +79,8 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("BodegueroPolicy", policy => policy.RequireRole("Bodeguero", "Administrador"));
 });
 
+builder.Services.AddHostedService<VencimientoComprasService>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())

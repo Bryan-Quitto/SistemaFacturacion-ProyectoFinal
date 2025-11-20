@@ -90,6 +90,7 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 case TipoAjusteInventario.Daño:
                 case TipoAjusteInventario.Perdida:
+                case TipoAjusteInventario.AnulacionCompra:
                     if (lote.CantidadDisponible < cantidad)
                     {
                         throw new InvalidOperationException($"No se puede reducir el stock en {cantidad}. Stock disponible en el lote: {lote.CantidadDisponible}.");
@@ -111,6 +112,7 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 case TipoAjusteInventario.Daño:
                 case TipoAjusteInventario.Perdida:
+                case TipoAjusteInventario.AnulacionCompra:
                     if (producto.StockTotal < cantidad)
                     {
                         throw new InvalidOperationException($"No se puede reducir el stock en {cantidad}. Stock total disponible: {producto.StockTotal}.");
