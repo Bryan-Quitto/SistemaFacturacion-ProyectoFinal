@@ -24,6 +24,14 @@
     <input type="text" class="form-control" placeholder="Buscar usuarios por nombre o correo..." @bind-value="searchTerm" @bind-value:event="oninput" />
 </div>
 
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
+        @statusMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearStatusMessage" aria-label="Close"></button>
+    </div>
+}
+
 <div class="card">
     <div class="card-header">
         <h3>Listado de Usuarios</h3>
@@ -103,6 +111,9 @@
     private string confirmationModalTitle = string.Empty;
     private string confirmationModalMessage = string.Empty;
     private Guid userToToggleId;
+    
+    private string? statusMessage; // New
+    private bool isSuccess;       // New
 
     private string searchTerm = string.Empty;
 
@@ -154,11 +165,14 @@
         try
         {
             await UserService.DeleteUserAsync(userToToggleId);
+            isSuccess = true;
+            statusMessage = $"El estado del usuario '{userToToggle.PrimerNombre} {userToToggle.PrimerApellido}' ha sido cambiado correctamente.";
             await LoadData();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error al cambiar el estado del usuario: {ex.Message}");
+            isSuccess = false;
+            statusMessage = $"Ocurrió un error al cambiar el estado del usuario '{userToToggle.PrimerNombre} {userToToggle.PrimerApellido}'. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -166,6 +180,12 @@
     {
         showConfirmationModal = false;
         userToToggleId = Guid.Empty;
+    }
+
+    private void ClearStatusMessage()
+    {
+        statusMessage = null;
+        StateHasChanged();
     }
 
     private void GoToCreateUser()

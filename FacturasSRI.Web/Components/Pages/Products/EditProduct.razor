@@ -124,7 +124,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar el producto: {ex.Message}";
+            errorMessage = $"No se pudo cargar la información del producto o sus categorías. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -147,7 +147,7 @@ else
             }
             catch (Exception ex)
             {
-                errorMessage = $"Error al guardar los cambios: {ex.Message}";
+                errorMessage = $"Ocurrió un error al guardar los cambios del producto. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
                 // Force a re-render to display the error message
                 StateHasChanged();
             }

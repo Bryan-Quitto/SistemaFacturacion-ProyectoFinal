@@ -69,7 +69,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al crear el impuesto: {ex.Message}";
+            errorMessage = $"Ocurrió un error al crear el impuesto. Por favor, revise los datos e inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             isSuccess = false;
         }
         finally

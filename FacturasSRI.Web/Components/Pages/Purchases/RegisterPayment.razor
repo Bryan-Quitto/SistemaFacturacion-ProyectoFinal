@@ -152,13 +152,13 @@ else
             }
             else
             {
-                statusMessage = "Ocurrió un error al registrar el pago.";
+                statusMessage = "No se pudo registrar el pago. Por favor, revise la información e inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico.";
                 isSuccess = false;
             }
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error: {ex.Message}";
+            statusMessage = $"Ocurrió un error al procesar el pago: {ex.Message}. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico.";
             isSuccess = false;
         }
         finally

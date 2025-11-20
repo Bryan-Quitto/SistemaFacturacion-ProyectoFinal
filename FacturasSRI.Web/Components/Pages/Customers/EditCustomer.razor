@@ -112,7 +112,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar el cliente: {ex.Message}";
+            errorMessage = $"No se pudo cargar la información del cliente. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             StateHasChanged();
         }
     }
@@ -150,7 +150,7 @@ else
             }
             catch (Exception ex)
             {
-                errorMessage = $"Error al guardar el cliente: {ex.Message}";
+                errorMessage = $"Ocurrió un error al guardar los cambios del cliente. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
                 StateHasChanged();
             }
         }

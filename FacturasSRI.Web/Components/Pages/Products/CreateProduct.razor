@@ -114,7 +114,7 @@
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error crítico al cargar las categorías: {ex.Message}";
+            statusMessage = $"No se pudieron cargar los datos iniciales (categorías o marcas). Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -150,7 +150,7 @@
         }
         catch (Exception ex)
         {
-            statusMessage = "Error al crear el producto: " + ex.Message;
+            statusMessage = $"Ocurrió un error inesperado al crear el producto. Por favor, revise los datos e inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             isSuccess = false;
             StateHasChanged();
         }

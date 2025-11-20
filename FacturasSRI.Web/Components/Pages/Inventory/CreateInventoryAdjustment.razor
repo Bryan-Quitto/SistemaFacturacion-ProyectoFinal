@@ -126,7 +126,7 @@
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error al cargar productos: {ex.Message}";
+            statusMessage = $"No se pudieron cargar los productos. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             isSuccess = false;
             StateHasChanged();
         }
@@ -193,7 +193,7 @@
         catch (Exception ex)
         {
             isSuccess = false;
-            statusMessage = $"Error de red o del sistema: {ex.Message}";
+            statusMessage = $"Ocurrió un error de red o del sistema al intentar registrar el ajuste. Por favor, verifique su conexión e inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             StateHasChanged();
         }
         finally

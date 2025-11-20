@@ -15,6 +15,14 @@
     <input type="text" class="form-control" placeholder="Buscar ajustes por producto o motivo..." @bind-value="searchTerm" @bind-value:event="oninput" />
 </div>
 
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mb-4" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
+    </div>
+}
+
 @if (isLoading)
 {
     <p><em>Cargando historial de ajustes...</em></p>
@@ -60,6 +68,7 @@ else
 @code {
     private List<AjusteListItemDto> allAdjustments = new(); // Holds all adjustments
     private bool isLoading = true;
+    private string? errorMessage; // New
 
     private string searchTerm = string.Empty; // New property for search
 
@@ -76,12 +85,19 @@ else
         {
             allAdjustments = await AjusteInventarioService.GetAdjustmentsAsync(); // Load all adjustments
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            errorMessage = $"No se pudieron cargar los ajustes de inventario. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
         finally
         {
             isLoading = false;
         }
+    }
+
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
+        StateHasChanged();
     }
 }

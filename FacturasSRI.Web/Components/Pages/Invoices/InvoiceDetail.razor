@@ -210,7 +210,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar los detalles de la factura: {ex.Message}";
+            errorMessage = $"No se pudieron cargar los detalles de la factura. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -235,7 +235,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al consultar al SRI: {ex.Message}";
+            errorMessage = $"Ocurrió un error al consultar el estado de la factura en el SRI. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
         finally
         {

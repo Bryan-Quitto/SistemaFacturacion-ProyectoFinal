@@ -264,7 +264,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar datos iniciales: {ex.Message}";
+            errorMessage = $"No se pudieron cargar los datos iniciales (clientes o productos). Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -455,7 +455,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error inesperado al generar la factura: {ex.Message}";
+            errorMessage = $"Ocurrió un error inesperado al generar la factura. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             StateHasChanged();
         }
         finally

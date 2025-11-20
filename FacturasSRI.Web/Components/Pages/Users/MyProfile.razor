@@ -11,6 +11,14 @@
 
 <h3>Mi Perfil</h3>
 
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mb-4" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
+    </div>
+}
+
 @if (userProfile == null)
 {
     <p><em>Cargando perfil...</em></p>
@@ -100,59 +108,108 @@ else
     private string? passwordMessage;
     private bool passwordChangeSuccess = false;
     private string? userId;
+    private string? errorMessage; // New property
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        if (!string.IsNullOrEmpty(userId))
+        try
         {
-            userProfile = await UserService.GetUserProfileAsync(userId);
-            if (userProfile != null)
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!string.IsNullOrEmpty(userId))
             {
-                updateProfileDto = new UpdateProfileDto
+                userProfile = await UserService.GetUserProfileAsync(userId);
+                if (userProfile != null)
                 {
-                    PrimerNombre = userProfile.PrimerNombre,
-                    SegundoNombre = userProfile.SegundoNombre,
-                    PrimerApellido = userProfile.PrimerApellido,
-                    SegundoApellido = userProfile.SegundoApellido
-                };
+                    updateProfileDto = new UpdateProfileDto
+                    {
+                        PrimerNombre = userProfile.PrimerNombre,
+                        SegundoNombre = userProfile.SegundoNombre,
+                        PrimerApellido = userProfile.PrimerApellido,
+                        SegundoApellido = userProfile.SegundoApellido
+                    };
+                }
+                else
+                {
+                    errorMessage = "No se pudo cargar la información del perfil del usuario. El usuario podría no existir o estar inactivo.";
+                }
             }
+            else
+            {
+                errorMessage = "No se pudo identificar al usuario actual.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ocurrió un error al cargar el perfil. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
     private async Task HandleUpdateProfile()
     {
-        if (string.IsNullOrEmpty(userId)) return;
+        errorMessage = null; // Clear any previous error messages
+        profileMessage = null; // Clear any previous success messages
+        if (string.IsNullOrEmpty(userId))
+        {
+            errorMessage = "No se pudo identificar al usuario para actualizar el perfil.";
+            return;
+        }
 
-        await UserService.UpdateUserProfileAsync(userId, updateProfileDto);
-        profileMessage = "Perfil actualizado correctamente.";
-        await InvokeAsync(() => StateHasChanged());
-        await Task.Delay(3000);
-        profileMessage = null;
-        await InvokeAsync(() => StateHasChanged());
+        try
+        {
+            await UserService.UpdateUserProfileAsync(userId, updateProfileDto);
+            profileMessage = "Perfil actualizado correctamente.";
+            await InvokeAsync(() => StateHasChanged());
+            await Task.Delay(3000);
+            profileMessage = null;
+            await InvokeAsync(() => StateHasChanged());
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ocurrió un error al actualizar el perfil. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+        }
     }
 
     private async Task HandleChangePassword()
     {
-        if (string.IsNullOrEmpty(userId)) return;
-
-        passwordChangeSuccess = await UserService.ChangePasswordAsync(userId, changePasswordDto);
-        if (passwordChangeSuccess)
+        errorMessage = null; // Clear any previous error messages
+        passwordMessage = null; // Clear any previous password messages
+        if (string.IsNullOrEmpty(userId))
         {
-            passwordMessage = "Contraseña cambiada correctamente.";
-            changePasswordDto = new(); // Reset form
+            errorMessage = "No se pudo identificar al usuario para cambiar la contraseña.";
+            return;
         }
-        else
+
+        try
         {
-            passwordMessage = "La contraseña actual es incorrecta.";
+            passwordChangeSuccess = await UserService.ChangePasswordAsync(userId, changePasswordDto);
+            if (passwordChangeSuccess)
+            {
+                passwordMessage = "Contraseña cambiada correctamente.";
+                changePasswordDto = new(); // Reset form
+            }
+            else
+            {
+                passwordMessage = "La contraseña actual es incorrecta o los datos no son válidos.";
+            }
+        }
+        catch (Exception ex)
+        {
+            passwordChangeSuccess = false; // Ensure it shows as an error
+            passwordMessage = $"Ocurrió un error al cambiar la contraseña. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
         
         await InvokeAsync(() => StateHasChanged());
         await Task.Delay(5000);
         passwordMessage = null;
         await InvokeAsync(() => StateHasChanged());
+    }
+
+    private void ClearErrorMessage()
+    {
+        errorMessage = null;
+        StateHasChanged();
     }
 }

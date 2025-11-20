@@ -19,6 +19,14 @@
     <input type="text" class="form-control" placeholder="Buscar impuestos por nombre o código SRI..." @bind-value="searchTerm" @bind-value:event="oninput" />
 </div>
 
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
+        @statusMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearStatusMessage" aria-label="Close"></button>
+    </div>
+}
+
 <table class="table">
     <thead>
         <tr>
@@ -75,6 +83,9 @@
     private string confirmationModalTitle = string.Empty;
     private string confirmationModalMessage = string.Empty;
     private Guid taxToToggleId;
+    
+    private string? statusMessage; // New
+    private bool isSuccess;       // New
 
     private string searchTerm = string.Empty;
 
@@ -115,12 +126,14 @@
         try
         {
             await TaxService.DeleteTaxAsync(taxToToggleId);
+            isSuccess = true;
+            statusMessage = $"El impuesto '{taxToToggle.Nombre}' ha sido {(taxToToggle.EstaActivo ? "desactivado" : "activado")} correctamente.";
             await LoadTaxes();
         }
         catch (Exception ex)
         {
-            // Handle error, e.g., display an error message
-            Console.WriteLine($"Error al toggling tax status: {ex.Message}");
+            isSuccess = false;
+            statusMessage = $"Ocurrió un error al intentar cambiar el estado del impuesto '{taxToToggle.Nombre}'. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -128,6 +141,12 @@
     {
         showConfirmationModal = false; // Hide the modal
         taxToToggleId = Guid.Empty;
+    }
+
+    private void ClearStatusMessage()
+    {
+        statusMessage = null;
+        StateHasChanged();
     }
 
 

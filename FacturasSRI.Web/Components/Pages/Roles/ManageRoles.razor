@@ -8,6 +8,14 @@
 
 <h1>Roles</h1>
 
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
+        @statusMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearStatusMessage" aria-label="Close"></button>
+    </div>
+}
+
 <div class="mb-3">
     <EditForm Model="@newRole" OnValidSubmit="@HandleAddRole">
         <DataAnnotationsValidator />
@@ -54,22 +62,58 @@
 @code {
     private List<RoleDto> roles = new();
     private RoleDto newRole = new();
+    private string? statusMessage; // New
+    private bool isSuccess;       // New
 
     protected override async Task OnInitializedAsync()
     {
-        roles = await RoleService.GetRolesAsync();
+        try
+        {
+            roles = await RoleService.GetRolesAsync();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error al cargar los roles: {ex.Message}";
+            isSuccess = false;
+        }
     }
 
     private async Task HandleAddRole()
     {
-        await RoleService.CreateRoleAsync(newRole);
-        newRole = new();
-        roles = await RoleService.GetRolesAsync();
+        try
+        {
+            await RoleService.CreateRoleAsync(newRole);
+            isSuccess = true;
+            statusMessage = "Rol añadido exitosamente!";
+            newRole = new();
+            roles = await RoleService.GetRolesAsync();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error al añadir el rol: {ex.Message}";
+            isSuccess = false;
+        }
     }
 
     private async Task HandleDeleteRole(Guid id)
     {
-        await RoleService.DeleteRoleAsync(id);
-        roles = await RoleService.GetRolesAsync();
+        try
+        {
+            await RoleService.DeleteRoleAsync(id);
+            isSuccess = true;
+            statusMessage = "Rol desactivado exitosamente!";
+            roles = await RoleService.GetRolesAsync();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error al desactivar el rol: {ex.Message}";
+            isSuccess = false;
+        }
+    }
+
+    private void ClearStatusMessage()
+    {
+        statusMessage = null;
+        isSuccess = false;
     }
 }

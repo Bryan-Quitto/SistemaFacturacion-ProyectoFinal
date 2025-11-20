@@ -115,7 +115,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar el usuario: {ex.Message}";
+            errorMessage = $"No se pudo cargar la información del usuario o sus roles. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             StateHasChanged();
         }
     }
@@ -132,7 +132,7 @@ else
             }
             catch (Exception ex)
             {
-                errorMessage = $"Error al guardar los cambios: {ex.Message}";
+                errorMessage = $"Ocurrió un error al guardar los cambios del usuario. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
                 StateHasChanged();
             }
         }

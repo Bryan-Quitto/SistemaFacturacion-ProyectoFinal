@@ -22,6 +22,14 @@
     <input type="text" class="form-control" placeholder="Buscar clientes por razón social o identificación..." @bind-value="searchTerm" @bind-value:event="oninput" />
 </div>
 
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
+        @statusMessage
+        <button type="button" class="btn-close float-end" @onclick="ClearStatusMessage" aria-label="Close"></button>
+    </div>
+}
+
 <table class="table">
     <thead>
         <tr>
@@ -91,6 +99,9 @@
     private string confirmationModalMessage = string.Empty;
     private Guid customerToToggleId;
 
+    private string? statusMessage; // New
+    private bool isSuccess;       // New
+
     private string searchTerm = string.Empty; // New property for search
 
     private List<CustomerDto> FilteredCustomers => string.IsNullOrWhiteSpace(searchTerm)
@@ -130,12 +141,14 @@
         try
         {
             await CustomerService.DeleteCustomerAsync(customerToToggleId);
+            isSuccess = true;
+            statusMessage = $"El cliente '{customerToToggle.RazonSocial}' ha sido {(customerToToggle.EstaActivo ? "desactivado" : "activado")} correctamente.";
             await LoadCustomers();
         }
         catch (Exception ex)
         {
-            // Handle error, e.g., display an error message
-            Console.WriteLine($"Error al toggling customer status: {ex.Message}");
+            isSuccess = false;
+            statusMessage = $"Ocurrió un error al intentar cambiar el estado del cliente '{customerToToggle.RazonSocial}'. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -143,6 +156,12 @@
     {
         showConfirmationModal = false; // Hide the modal
         customerToToggleId = Guid.Empty;
+    }
+
+    private void ClearStatusMessage()
+    {
+        statusMessage = null;
+        StateHasChanged();
     }
 
 

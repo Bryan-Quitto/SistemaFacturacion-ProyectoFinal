@@ -94,7 +94,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar roles: {ex.Message}";
+            errorMessage = $"No se pudieron cargar los roles. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             isSuccess = false;
             StateHasChanged();
         }
@@ -124,7 +124,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al crear el usuario: {ex.Message}";
+            errorMessage = $"Ocurrió un error al crear el usuario. Por favor, revise los datos e inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             isSuccess = false;
         }
         finally

@@ -129,7 +129,7 @@
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error al cargar datos iniciales: {ex.Message}";
+            statusMessage = $"No se pudieron cargar los productos. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             isSuccess = false;
         }
     }
@@ -214,12 +214,12 @@
             }
             else
             {
-                statusMessage = "Ocurrió un error desconocido al registrar la compra en la base de datos.";
+                statusMessage = "No se pudo registrar la compra en la base de datos. Por favor, revise la información e inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico.";
             }
         }
         catch (Exception ex)
         {
-            statusMessage = $"Ocurrió un error al procesar la compra: {ex.Message}";
+            statusMessage = $"Ocurrió un error al procesar la compra. Por favor, revise los datos ingresados e inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             isSuccess = false; // Ensure isSuccess is false on error
             StateHasChanged();
         }

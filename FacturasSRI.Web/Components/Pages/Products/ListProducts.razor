@@ -189,7 +189,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar impuestos: {ex.Message}";
+            errorMessage = $"No se pudieron cargar los impuestos. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -201,7 +201,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar el impuesto global actual: {ex.Message}";
+            errorMessage = $"No se pudo cargar la información del impuesto global. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -233,7 +233,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al aplicar el impuesto global: {ex.Message}";
+            errorMessage = $"Ocurrió un error al aplicar el impuesto global. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -246,7 +246,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar productos: {ex.Message}";
+            errorMessage = $"No se pudieron cargar los productos. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 
@@ -278,7 +278,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al {action} producto: {ex.Message}";
+            errorMessage = $"Ocurrió un error al {action} el producto. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
     }
 

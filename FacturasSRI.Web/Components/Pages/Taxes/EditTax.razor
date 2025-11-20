@@ -90,7 +90,7 @@ else
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar el impuesto: {ex.Message}";
+            errorMessage = $"No se pudo cargar la información del impuesto. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             StateHasChanged();
         }
     }
@@ -106,7 +106,7 @@ else
             }
             catch (Exception ex)
             {
-                errorMessage = $"Error al guardar los cambios: {ex.Message}";
+                errorMessage = $"Ocurrió un error al guardar los cambios del impuesto. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
                 StateHasChanged();
             }
         }
