@@ -58,6 +58,8 @@ builder.Services.AddScoped<FacturasSRI.Core.Services.XmlGeneratorService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.SriApiClientService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.SriResponseParserService>();
 
+builder.Services.AddScoped<FacturasSRI.Infrastructure.Services.PdfGeneratorService>();
+
 builder.Services.AddScoped<AuthenticationStateProvider, CookieAuthenticationStateProvider>();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();

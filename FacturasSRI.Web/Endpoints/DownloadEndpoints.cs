@@ -11,6 +11,8 @@ using System.IO;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using FacturasSRI.Web.Extensions;
+using FacturasSRI.Application.Interfaces;
+using FacturasSRI.Infrastructure.Services;
 
 namespace FacturasSRI.Web.Endpoints
 {
@@ -80,6 +82,39 @@ namespace FacturasSRI.Web.Endpoints
                 {
                     logger.LogError(ex, "Ocurrió un error al intentar descargar el archivo desde Supabase. Path: {Path}", filePath);
                     return Results.StatusCode(500);
+                }
+            });
+
+             downloadsGroup.MapGet("/invoice-ride/{id}", async (
+                Guid id,
+                IInvoiceService invoiceService,
+                PdfGeneratorService pdfGenerator,
+                ILoggerFactory loggerFactory) =>
+            {
+                var logger = loggerFactory.CreateLogger("DownloadEndpoints");
+                logger.LogInformation("Generación de RIDE solicitada. InvoiceID: {Id}", id);
+
+                // 1. Obtener los datos de la factura (incluye info del SRI)
+                var factura = await invoiceService.GetInvoiceDetailByIdAsync(id);
+
+                if (factura == null)
+                {
+                    return Results.NotFound("La factura solicitada no existe.");
+                }
+
+                try
+                {
+                    // 2. Generar el PDF en memoria
+                    var pdfBytes = pdfGenerator.GenerarFacturaPdf(factura);
+
+                    // 3. Devolver el archivo directamente
+                    var fileName = $"RIDE_{factura.NumeroFactura}.pdf";
+                    return Results.File(pdfBytes, "application/pdf", fileDownloadName: fileName);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error generando el RIDE para la factura {Id}", id);
+                    return Results.Problem("Ocurrió un error al generar el PDF.");
                 }
             });
         }
