@@ -1,30 +1,30 @@
 using System;
 using System.IO;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Xml;
 using FirmaXadesNetCore;
-using FirmaXadesNetCore.Crypto;
 using FirmaXadesNetCore.Signature.Parameters;
 
 namespace FacturasSRI.Core.Services
 {
     public class FirmaDigitalService
     {
-        public byte[] FirmarXml(string xmlSinFirmar, string rutaCertificado, string passwordCertificado)        {
+        public byte[] FirmarXml(string xmlSinFirmar, string rutaCertificado, string passwordCertificado)
+        {
             var certificado = new X509Certificate2(rutaCertificado, passwordCertificado, X509KeyStorageFlags.Exportable);
 
             var xadesService = new XadesService();
-            
+
             var parametros = new SignatureParameters
             {
                 Signer = new FirmaXadesNetCore.Crypto.Signer(certificado),
-                SignaturePolicyInfo = new SignaturePolicyInfo
-                {
-                    PolicyIdentifier = "http://www.w3.org/2000/09/xmldsig#",
-                    PolicyHash = "Ohixl6upD6av8N7pEvDABhEL6kM="
-                },
-                SignaturePackaging = SignaturePackaging.ENVELOPED
+                
+                SignaturePackaging = SignaturePackaging.ENVELOPED,
+                
+                DataFormat = new DataFormat 
+                { 
+                    MimeType = "text/xml" 
+                }
             };
 
             var documentoXml = new XmlDocument();

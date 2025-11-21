@@ -93,9 +93,11 @@ namespace FacturasSRI.Core.Services
                 DirMatriz = NormalizeString(DIRECCION_MATRIZ_EMISOR)
             };
 
+            var fechaEmisionEcuador = GetEcuadorTime(facturaDominio.FechaEmision);
+
             facturaXml.InfoFactura = new InfoFacturaXml 
             {
-                FechaEmision = facturaDominio.FechaEmision.ToString("dd/MM/yyyy"),
+                FechaEmision = fechaEmisionEcuador.ToString("dd/MM/yyyy"),
                 DirEstablecimiento = NormalizeString(DIRECCION_MATRIZ_EMISOR), 
                 ObligadoContabilidad = OBLIGADO_CONTABILIDAD,
                 ObligadoContabilidadSpecified = true,
@@ -196,10 +198,11 @@ namespace FacturasSRI.Core.Services
                 using (var stringWriter = new Utf8StringWriter())
                 {
                     var settings = new XmlWriterSettings
-                    {
-                        Indent = true,
-                        Encoding = new UTF8Encoding(false)
-                    };
+            {
+                Indent = false,
+                Encoding = new UTF8Encoding(false),
+                OmitXmlDeclaration = true
+            };
 
                     using (var xmlWriter = XmlWriter.Create(stringWriter, settings))
                     {
@@ -238,6 +241,28 @@ namespace FacturasSRI.Core.Services
                     return "07";
             }
         }
+
+        private DateTime GetEcuadorTime(DateTime utcTime)
+{
+    try
+    {
+        var tz = TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+        return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
+    }
+    catch
+    {
+        try 
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById("America/Guayaquil");
+            return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
+        }
+        catch
+        {
+            return utcTime.AddHours(-5);
+        }
+    }
+}
+
     }
 
     public class Utf8StringWriter : StringWriter

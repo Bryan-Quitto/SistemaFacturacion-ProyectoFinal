@@ -158,21 +158,41 @@ namespace FacturasSRI.Infrastructure.Services
                         _context.Secuenciales.Add(secuencial);
                     }
 
-                    secuencial.UltimoSecuencialFactura++;
-                    var numeroSecuencial = secuencial.UltimoSecuencialFactura.ToString("D9");
+                                        secuencial.UltimoSecuencialFactura++;
 
-                                var invoice = new Factura
-                                {
-                                    Id = Guid.NewGuid(),
-                                    ClienteId = cliente.Id,
-                                    FechaEmision = DateTime.UtcNow.AddYears(-2), // Use a past date to avoid "fecha extemporanea" error
-                                    NumeroFactura = numeroSecuencial,
-                                    Estado = EstadoFactura.Pendiente, // New state
-                                    UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
-                                    FechaCreacion = DateTime.UtcNow
-                                };
-                    decimal subtotalSinImpuestos = 0;
-                    decimal totalIva = 0;
+                                        var numeroSecuencial = secuencial.UltimoSecuencialFactura.ToString("D9");
+
+                    
+
+                                        var invoice = new Factura
+
+                                        {
+
+                                            Id = Guid.NewGuid(),
+
+                                            ClienteId = cliente.Id,
+
+                                            FechaEmision = DateTime.UtcNow,
+
+                                            NumeroFactura = numeroSecuencial,
+
+                                            Estado = EstadoFactura.Pendiente, // New state
+
+                                            UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
+
+                                            FechaCreacion = DateTime.UtcNow
+
+                                        };
+
+                                        
+
+                                        _logger.LogWarning("Fecha de Emisión generada (UTC): {Fecha}", invoice.FechaEmision.ToString("o"));
+
+                    
+
+                                        decimal subtotalSinImpuestos = 0;
+
+                                        decimal totalIva = 0;
 
                     foreach (var item in invoiceDto.Items)
                     {
@@ -240,7 +260,8 @@ namespace FacturasSRI.Infrastructure.Services
 
                     var rucEmisor = _configuration["CompanyInfo:Ruc"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:Ruc'.");
                     var environmentType = _configuration["CompanyInfo:EnvironmentType"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EnvironmentType'.");
-                    var claveAcceso = GenerarClaveAcceso(invoice.FechaEmision, "01", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencial, environmentType);
+                    var fechaEcuador = GetEcuadorTime(invoice.FechaEmision);
+                    var claveAcceso = GenerarClaveAcceso(fechaEcuador, "01", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencial, environmentType);
 
                     var facturaSri = new FacturaSRI
                     {
@@ -623,5 +644,28 @@ namespace FacturasSRI.Infrastructure.Services
                 RespuestaSRI = invoice.InformacionSRI?.RespuestaSRI
             };
         }
+    private DateTime GetEcuadorTime(DateTime utcTime)
+{
+    try
+    {
+        // Intento para Windows
+        var tz = TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+        return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
+    }
+    catch
+    {
+        // Intento para Linux/Docker (Supabase suele correr aquí)
+        try 
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById("America/Guayaquil");
+            return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
+        }
+        catch
+        {
+            // Fallback manual si todo falla
+            return utcTime.AddHours(-5);
+        }
+    }
+}
     }
 }
