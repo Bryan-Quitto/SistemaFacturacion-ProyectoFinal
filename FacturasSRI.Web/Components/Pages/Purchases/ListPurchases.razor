@@ -114,8 +114,8 @@ else
     private bool isLoading = true;
     
     private string searchTerm = string.Empty;
-    private EstadoCompra? selectedStatus; // Changed default to null
-    private FormaDePago? selectedFormaDePago; // Use FormaDePago directly
+    private EstadoCompra? selectedStatus; 
+    private FormaDePago? selectedFormaDePago;
 
     private List<PurchaseListItemDto> FilteredPurchases
     {
@@ -149,7 +149,7 @@ else
         {
             isLoading = true;
             allPurchases = await PurchaseService.GetPurchasesAsync();
-            selectedFormaDePago = null; // Initialize to null for "Todas las Formas de Pago"
+            selectedFormaDePago = null;
         }
         finally
         {
@@ -178,5 +178,4 @@ else
     {
         Navigation.NavigateTo($"/purchases/pay/{purchaseId}");
     }
-}
 }

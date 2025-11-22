@@ -3,105 +3,122 @@
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using FacturasSRI.Domain.Enums
 @inject IInvoiceService InvoiceService
 @inject ICustomerService CustomerService
 @inject IProductService ProductService
 @inject NavigationManager Navigation
-@using System.Security.Claims
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@using FacturasSRI.Domain.Enums
 
-<PageTitle>Crear Nueva Factura</PageTitle>
+<PageTitle>Nueva Factura</PageTitle>
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="page-header mb-4">
-                <h1 class="page-title">Crear Nueva Factura</h1>
-                <p class="text-muted">Emite una nueva factura electrónica de forma rápida y sencilla.</p>
-            </div>
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h2 fw-bold mb-0 text-dark">Nueva Factura</h1>
         </div>
+        <button type="button" class="btn btn-sm btn-light border" @onclick='() => Navigation.NavigateTo("/invoices")'>
+            <i class="bi bi-x-lg me-1"></i>Cancelar
+        </button>
     </div>
 
     @if (errorMessage != null)
     {
-        <div class="alert alert-danger mb-4" role="alert">
+        <div class="alert alert-danger py-2 px-3 d-flex align-items-center shadow-sm mb-3 border-0 small" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-2"></i>
-            @errorMessage
-            <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
+            <div class="flex-grow-1">@errorMessage</div>
+            <button type="button" class="btn-close btn-close-white small" @onclick="ClearErrorMessage"></button>
         </div>
     }
 
     <EditForm Model="@formModel" OnValidSubmit="@HandleCreateInvoice">
         <DataAnnotationsValidator />
 
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0"><i class="bi bi-box-seam me-2"></i>Productos de la Factura</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">Buscar Producto</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                <input type="text" class="form-control" placeholder="Escriba para buscar producto por nombre o código..." 
-                                       @bind="productSearchTerm" @bind:event="oninput" @onkeyup="SearchProducts" disabled="@(customerSelectionType == "existing" && !formModel.SelectedClienteId.HasValue)"/>
+        <div class="row g-3"> <div class="col-lg-8">
+                <div class="card shadow-sm border-0 rounded-3 h-100">
+                    <div class="card-body p-0 d-flex flex-column">
+                        
+                        <div class="p-3 border-bottom bg-light bg-opacity-25">
+                            <div class="position-relative">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white border-end-0 text-muted ps-3">
+                                        <i class="bi bi-search"></i>
+                                    </span>
+                                    <input type="text" class="form-control border-start-0 shadow-none" placeholder="Buscar producto (nombre o código)..."
+                                           @bind="productSearchTerm" @bind:event="oninput" @onkeyup="SearchProducts"
+                                           disabled="@(customerSelectionType == "existing" && !formModel.SelectedClienteId.HasValue)" />
+                                </div>
+                                @if (productSearchResults.Any())
+                                {
+                                    <div class="search-floating-results bg-white">
+                                        <div class="list-group list-group-flush">
+                                            @foreach (var product in productSearchResults)
+                                            {
+                                                <button type="button" class="list-group-item list-group-item-action px-3 py-2 border-bottom" @onclick="() => AddItem(product)">
+                                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                                        <div class="text-truncate me-2">
+                                                            <span class="fw-bold text-dark small">@product.Nombre</span>
+                                                            <span class="text-muted ms-1" style="font-size: 0.75rem;">| @product.CodigoPrincipal</span>
+                                                        </div>
+                                                        <span class="badge bg-light text-dark border fw-normal text-end" style="min-width: 60px;">@product.PrecioVentaUnitario.ToString("C")</span>
+                                                    </div>
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                }
                             </div>
-                             @if (productSearchResults.Any())
-                            {
-                                <ul class="list-group position-absolute w-100" style="z-index: 1000;">
-                                    @foreach (var product in productSearchResults)
-                                    {
-                                        <li class="list-group-item list-group-item-action" @onclick="() => AddItem(product)">
-                                            @product.Nombre (@product.CodigoPrincipal) - <strong>@product.PrecioVentaUnitario.ToString("C")</strong>
-                                        </li>
-                                    }
-                                </ul>
-                            }
                         </div>
 
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-light">
+                        <div class="table-responsive flex-grow-1">
+                            <table class="table table-hover table-sm table-compact align-middle mb-0">
+                                <thead class="bg-white text-uppercase text-secondary border-bottom">
                                     <tr>
-                                        <th>Producto</th>
-                                        <th style="width: 120px;">Cantidad</th>
-                                        <th class="text-end">Precio Unit.</th>
-                                        <th class="text-end">Subtotal</th>
-                                        <th class="text-center">Acciones</th>
+                                        <th class="ps-3" style="width: 45%;">Producto</th>
+                                        <th class="text-center" style="width: 15%;">Cant.</th>
+                                        <th class="text-end" style="width: 15%;">Precio</th>
+                                        <th class="text-end" style="width: 15%;">Total</th>
+                                        <th style="width: 10%;"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @if (!invoiceItems.Any())
                                     {
                                         <tr>
-                                            <td colspan="5" class="text-center text-muted py-4">
-                                                <i class="bi bi-cart-x" style="font-size: 2rem;"></i>
-                                                <p class="mb-0">Aún no has añadido productos.</p>
+                                            <td colspan="5" class="text-center py-5">
+                                                <div class="text-muted opacity-50 small">
+                                                    <i class="bi bi-basket2 display-6 mb-2 d-block"></i>
+                                                    <span>Lista vacía</span>
+                                                </div>
                                             </td>
                                         </tr>
                                     }
                                     @foreach (var item in invoiceItems)
                                     {
                                         <tr>
-                                            <td>
-                                                <strong>@item.ProductName</strong><br/>
-                                                <small class="text-muted">@string.Join(", ", item.Taxes.Select(t => t.Nombre))</small>
+                                            <td class="ps-3">
+                                                <div class="fw-medium text-dark text-truncate" style="max-width: 280px;" title="@item.ProductName">@item.ProductName</div>
+                                                @if (item.Taxes.Any())
+                                                {
+                                                    <span class="text-muted d-block" style="font-size: 0.7rem;">
+                                                        @string.Join(", ", item.Taxes.Select(t => t.Nombre))
+                                                    </span>
+                                                }
                                             </td>
-                                            <td>
-                                                <InputNumber class="form-control form-control-sm" 
-                                                             @bind-Value="item.Cantidad"
-                                                             @bind-Value:after="UpdateTotals" 
-                                                             min="1" />
-                                                <ValidationMessage For="@(() => item.Cantidad)" />
-                                            </td>
-                                            <td class="text-end">@item.PrecioVentaUnitario.ToString("C")</td>
-                                            <td class="text-end">@((item.Cantidad * item.PrecioVentaUnitario).ToString("C"))</td>
                                             <td class="text-center">
-                                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoveItem(item.ProductoId)">
-                                                    <i class="bi bi-trash"></i>
+                                                <InputNumber class="form-control form-control-sm text-center fw-bold bg-light border-0 p-0"
+                                                             @bind-Value="item.SafeCantidad"
+                                                             @bind-Value:after="UpdateTotals"
+                                                             min="1" 
+                                                             style="width: 50px; margin: 0 auto; height: 24px;" />
+                                            </td>
+                                            <td class="text-end text-muted">@item.PrecioVentaUnitario.ToString("F2")</td>
+                                            <td class="text-end fw-bold text-dark">@((item.SafeCantidad * item.PrecioVentaUnitario).ToString("F2"))</td>
+                                            <td class="text-end pe-3">
+                                                <button type="button" class="btn btn-trash-compact text-danger opacity-50 hover-opacity-100 border-0"
+                                                        @onclick="() => RemoveItem(item.ProductoId)">
+                                                    <i class="bi bi-trash3"></i>
                                                 </button>
                                             </td>
                                         </tr>
@@ -109,769 +126,459 @@
                                 </tbody>
                             </table>
                         </div>
+
+                        <div class="bg-light bg-opacity-10 p-3 mt-auto border-top">
+                            <div class="row justify-content-end">
+                                <div class="col-md-7 col-lg-5">
+                                    <table class="table table-borderless table-sm mb-0 small">
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-secondary text-end py-0">Subtotal 15%:</td>
+                                                <td class="text-end fw-medium py-0" style="width: 90px;">@subtotal15.ToString("C")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-secondary text-end py-0">Subtotal 0%:</td>
+                                                <td class="text-end fw-medium py-0">@subtotal0.ToString("C")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-secondary text-end py-0">IVA 15%:</td>
+                                                <td class="text-end fw-medium py-0">@totalIva.ToString("C")</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    
+                                    <div class="invoice-total-row d-flex justify-content-between align-items-center border border-primary border-opacity-10 bg-white">
+                                        <span class="fw-bold text-brand small text-uppercase">Total a Pagar</span>
+                                        <span class="fs-5 fw-bold text-brand">@total.ToString("C")</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-lg-4">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0"><i class="bi bi-person-circle me-2"></i>Información del Cliente</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">Tipo de Cliente</label>
-                            <InputRadioGroup @bind-Value="customerSelectionType" @bind-Value:after="OnCustomerSelectionTypeChanged">
-                                <div class="form-check form-check-inline">
-                                    <InputRadio Value="@("existing")" id="radioExistingCustomer" class="form-check-input" />
-                                    <label class="form-check-label" for="radioExistingCustomer">Cliente Existente</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <InputRadio Value="@("finalConsumer")" id="radioFinalConsumer" class="form-check-input" />
-                                    <label class="form-check-label" for="radioFinalConsumer">Consumidor Final</label>
-                                </div>
-                            </InputRadioGroup>
+            <div class="col-lg-4 d-flex flex-column gap-3">
+                
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-body p-3"> <h6 class="fw-bold mb-2 small text-uppercase text-muted d-flex align-items-center">
+                            <i class="bi bi-person-badge me-2"></i> Cliente
+                        </h6>
+                        
+                        <div class="btn-group w-100 mb-2 btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="customerType" id="typeExisting"
+                                checked="@(customerSelectionType == "existing")"
+                                @onchange="@(() => ChangeCustomerType("existing"))">
+                            <label class="btn btn-outline-brand" for="typeExisting">Registrado</label>
+
+                            <input type="radio" class="btn-check" name="customerType" id="typeFinal"
+                                checked="@(customerSelectionType == "finalConsumer")"
+                                @onchange="@(() => ChangeCustomerType("finalConsumer"))">
+                            <label class="btn btn-outline-brand" for="typeFinal">Consumidor Final</label>
                         </div>
 
                         @if (customerSelectionType == "existing")
                         {
-                            <div class="mb-3">
-                                <label class="form-label">Buscar Cliente</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                    <input type="text" class="form-control" placeholder="Nombre o RUC..." 
+                            <div class="position-relative mb-2">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                                    <input type="text" class="form-control border-start-0 shadow-none" placeholder="Buscar cliente..."
                                            @bind="customerSearchTerm" @bind:event="oninput" @onkeyup="SearchCustomers" />
                                 </div>
+
                                 @if (customerSearchResults.Any())
                                 {
-                                    <ul class="list-group position-absolute w-100" style="z-index: 1000;">
+                                    <div class="list-group position-absolute w-100 shadow mt-1 bg-white rounded-3 overflow-hidden border" style="z-index: 1050; max-height: 180px; overflow-y: auto;">
                                         @foreach (var customer in customerSearchResults)
                                         {
-                                            <li class="list-group-item list-group-item-action" @onclick="() => SelectCustomer(customer)">
-                                                @customer.RazonSocial (@customer.NumeroIdentificacion)
-                                            </li>
+                                            <button type="button" class="list-group-item list-group-item-action px-3 py-2 border-0 border-bottom small" @onclick="() => SelectCustomer(customer)">
+                                                <div class="fw-bold text-dark text-truncate">@customer.RazonSocial</div>
+                                                <div class="text-muted" style="font-size: 0.7rem;">@customer.NumeroIdentificacion</div>
+                                            </button>
                                         }
-                                    </ul>
+                                    </div>
                                 }
                             </div>
 
                             @if (formModel.SelectedClienteId.HasValue)
                             {
-                                <div class="alert alert-info">
-                                    <strong>@selectedCustomer?.RazonSocial</strong><br/>
-                                    <i class="bi bi-card-text"></i> @selectedCustomer?.NumeroIdentificacion<br/>
-                                    <i class="bi bi-envelope"></i> @selectedCustomer?.Email
-                                    <button type="button" class="btn btn-sm btn-outline-danger float-end" @onclick="ClearCustomer">
-                                        <i class="bi bi-x"></i>
-                                    </button>
+                                <div class="bg-primary bg-opacity-10 rounded p-2 border border-primary border-opacity-10 position-relative fade-in mt-2">
+                                    <button type="button" class="btn-close position-absolute top-0 end-0 m-1" style="font-size: 0.6rem;" aria-label="Close" @onclick="ClearCustomer"></button>
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-white p-1 rounded text-primary me-2 shadow-sm d-flex justify-content-center align-items-center" style="width: 28px; height: 28px;">
+                                            <i class="bi bi-building small"></i>
+                                        </div>
+                                        <div class="overflow-hidden" style="line-height: 1.2;">
+                                            <div class="fw-bold text-dark text-truncate small">@selectedCustomer?.RazonSocial</div>
+                                            <div class="text-muted" style="font-size: 0.7rem;">@selectedCustomer?.NumeroIdentificacion</div>
+                                        </div>
+                                    </div>
                                 </div>
                             }
                             else
                             {
-                                <div class="alert alert-warning">
-                                    <i class="bi bi-exclamation-circle me-2"></i>
-                                    Por favor, selecciona un cliente.
+                                <div class="text-center py-2 bg-light rounded border border-dashed mt-2">
+                                    <small class="text-muted" style="font-size: 0.75rem;">Seleccione un cliente</small>
                                 </div>
                             }
                         }
-                        else if (customerSelectionType == "finalConsumer")
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-body p-3">
+                        <h6 class="fw-bold mb-2 small text-uppercase text-muted d-flex align-items-center">
+                            <i class="bi bi-wallet2 me-2"></i> Pago
+                        </h6>
+                        
+                        <div class="mb-2">
+                            <InputSelect @bind-Value="formModel.FormaDePago" class="form-select form-select-sm shadow-none">
+                                @foreach (var forma in Enum.GetValues(typeof(FormaDePago)))
+                                {
+                                    <option value="@forma">@forma.ToString()</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        @if (formModel.FormaDePago == FormaDePago.Credito)
                         {
-                            <div class="alert alert-info">
-                                <i class="bi bi-person-fill me-2"></i>
-                                Facturando a Consumidor Final.
+                            <div class="credit-options-container p-2 rounded-end fade-in mt-2">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="compact-form-label">Días</label>
+                                        <InputNumber @bind-Value="formModel.DiasCredito" class="form-control form-control-sm shadow-none" min="1" />
+                                        @if (formModel.DiasCredito.HasValue && formModel.DiasCredito.Value < 1)
+                                        {
+                                            <div class="text-danger mt-1 lh-1" style="font-size: 0.65rem;">
+                                                <i class="bi bi-x-circle-fill"></i> Mín. 1
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="compact-form-label">Abono</label>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white border-end-0 text-muted px-1">$</span>
+                                            <InputNumber @bind-Value="formModel.MontoAbonoInicial" class="form-control border-start-0 ps-1 shadow-none" />
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        @if (formModel.MontoAbonoInicial > total)
+                                        {
+                                            <div class="text-danger small bg-white border border-danger rounded p-1 text-center" style="font-size: 0.75rem;">
+                                                <i class="bi bi-exclamation-circle-fill"></i> Abono no puede ser mayor al total
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex justify-content-between align-items-center pt-1 border-top border-secondary border-opacity-10 mt-1">
+                                                <span class="small text-muted fw-semibold" style="font-size: 0.7rem;">Pendiente:</span>
+                                                <span class="fw-bold text-dark small">@((total - formModel.MontoAbonoInicial).ToString("C"))</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
                             </div>
                         }
                     </div>
                 </div>
 
-                                <div class="card">
-
-                                    <div class="card-header">
-
-                                        <h5 class="card-title mb-0"><i class="bi bi-credit-card me-2"></i>Condiciones de Pago</h5>
-
-                                    </div>
-
-                                    <div class="card-body">
-
-                                        <div class="mb-3">
-
-                                            <label class="form-label">Forma de Pago</label>
-
-                                            <InputSelect @bind-Value="formModel.FormaDePago" class="form-select">
-
-                                                @foreach (var formaDePago in Enum.GetValues(typeof(FormaDePago)))
-
-                                                {
-
-                                                    <option value="@formaDePago">@formaDePago.ToString()</option>
-
-                                                }
-
-                                            </InputSelect>
-
-                                        </div>
-
-                
-
-                                        @if (formModel.FormaDePago == FormaDePago.Credito)
-
-                                        {
-
-                                            <div class="mb-3">
-
-                                                <label class="form-label">Días de Crédito</label>
-
-                                                <InputNumber @bind-Value="formModel.DiasCredito" class="form-control" />
-
-                                            </div>
-
-                                            <div class="mb-3">
-
-                                                <label class="form-label">Monto Abono Inicial</label>
-
-                                                <InputNumber @bind-Value="formModel.MontoAbonoInicial" class="form-control" />
-
-                                            </div>
-
-                                        }
-
-                                    </div>
-
-                                </div>
-
-                                
-
-                                <div class="card mt-4">
-
-                                    <div class="card-header">
-
-                                        <h5 class="card-title mb-0"><i class="bi bi-receipt-cutoff me-2"></i>Resumen de la Factura</h5>
-
-                                    </div>
-
-                                    <div class="card-body">
-
-                                        <ul class="list-group list-group-flush">
-
-                                            <li class="list-group-item d-flex justify-content-between align-items-center">
-
-                                                Subtotal
-
-                                                <span>@subtotal.ToString("C")</span>
-
-                                            </li>
-
-                                            @foreach (var taxSummary in taxSummaries)
-
-                                            {
-
-                                                <li class="list-group-item d-flex justify-content-between align-items-center">
-
-                                                    @taxSummary.TaxName (@taxSummary.TaxRate.ToString("0.##")%)
-
-                                                    <span>@taxSummary.Amount.ToString("C")</span>
-
-                                                </li>
-
-                                            }
-
-                                            <li class="list-group-item d-flex justify-content-between align-items-center fs-5 fw-bold bg-light">
-
-                                                Total
-
-                                                <span>@total.ToString("C")</span>
-
-                                            </li>
-
-                                        </ul>
-
-                                    </div>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                
-
-                        <div class="row mt-4">
-
-                            <div class="col-12 d-flex justify-content-end">
-
-                                <button type="button" class="btn btn-secondary me-2" @onclick='() => Navigation.NavigateTo("/invoices")'>
-
-                                    <i class="bi bi-x-circle me-2"></i>Cancelar
-
-                                </button>
-
-                                <button type="submit" class="btn btn-primary" disabled="@(!invoiceItems.Any() || isSubmitting || (customerSelectionType == "existing" && !formModel.SelectedClienteId.HasValue))">
-
-                                     @if (isSubmitting)
-
-                                    {
-
-                                        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-
-                                        <span>Generando...</span>
-
-                                    }
-
-                                    else
-
-                                    {
-
-                                        <i class="bi bi-check-circle-fill me-2"></i>
-
-                                        <span>Generar Factura</span>
-
-                                    }
-
-                                </button>
-
-                            </div>
-
-                        </div>
-
-                    </EditForm>
-
+                <div class="mt-auto">
+                    <button type="submit" class="btn btn-primary w-100 py-2 shadow-sm fw-bold text-uppercase" 
+                            style="letter-spacing: 0.5px; font-size: 0.9rem;"
+                            disabled="@(!IsValidForm() || isSubmitting)">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span> <span>Procesando...</span>
+                        }
+                        else
+                        {
+                            <span><i class="bi bi-send-check-fill me-2"></i>Emitir Factura</span>
+                        }
+                    </button>
                 </div>
-
-                
-
-                @code {
-
-                    private string? errorMessage;
-
-                    private bool isSubmitting = false;
-
-                
-
-                    private List<CustomerDto> allCustomers = new();
-
-                    private List<ProductDto> allProducts = new();
-
-                
-
-                    private string customerSearchTerm = string.Empty;
-
-                    private List<CustomerDto> customerSearchResults = new();
-
-                    private CustomerDto? selectedCustomer;
-
-                
-
-                    private string productSearchTerm = string.Empty;
-
-                    private List<ProductDto> productSearchResults = new();
-
-                
-
-                    private List<InvoiceItemViewModel> invoiceItems = new();
-
-                    private CreateInvoiceFormModel formModel = new();
-
-                    private string customerSelectionType = "existing";
-
-                    
-
-                    private decimal subtotal = 0;
-
-                    private decimal total = 0;
-
-                    private List<TaxSummary> taxSummaries = new();
-
-                
-
-                    protected override async Task OnInitializedAsync()
-
-                    {
-
-                        try
-
-                        {
-
-                            allCustomers = await CustomerService.GetActiveCustomersAsync();
-
-                            allProducts = await ProductService.GetProductsAsync();
-
-                        }
-
-                        catch (Exception ex)
-
-                        {
-
-                            errorMessage = $"No se pudieron cargar los datos iniciales (clientes o productos). Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
-
-                        }
-
-                    }
-
-                
-
-                    private void SearchCustomers()
-
-                    {
-
-                        if (customerSelectionType != "existing" || string.IsNullOrWhiteSpace(customerSearchTerm))
-
-                        {
-
-                            customerSearchResults.Clear();
-
-                            return;
-
-                        }
-
-                        customerSearchResults = allCustomers
-
-                            .Where(c => c.RazonSocial.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) || 
-
-                                        c.NumeroIdentificacion.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase))
-
-                            .Take(5)
-
-                            .ToList();
-
-                    }
-
-                
-
-                    private void SelectCustomer(CustomerDto customer)
-
-                    {
-
-                        selectedCustomer = customer;
-
-                        formModel.SelectedClienteId = customer.Id;
-
-                        customerSearchTerm = string.Empty;
-
-                        customerSearchResults.Clear();
-
-                    }
-
-                    
-
-                    private void ClearCustomer()
-
-                    {
-
-                        selectedCustomer = null;
-
-                        formModel.SelectedClienteId = null;
-
-                    }
-
-                
-
-                    private void OnCustomerSelectionTypeChanged()
-
-                    {
-
-                        selectedCustomer = null;
-
-                        formModel.SelectedClienteId = null;
-
-                        customerSearchTerm = string.Empty;
-
-                        customerSearchResults.Clear();
-
-                    }
-
-                
-
-                    private void SearchProducts()
-
-                    {
-
-                        if (string.IsNullOrWhiteSpace(productSearchTerm))
-
-                        {
-
-                            productSearchResults.Clear();
-
-                            return;
-
-                        }
-
-                        productSearchResults = allProducts
-
-                            .Where(p => p.IsActive && // Add this condition to filter by active products
-
-                                        (p.Nombre.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase) || 
-
-                                        p.CodigoPrincipal.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase)))
-
-                            .Take(5)
-
-                            .ToList();
-
-                    }
-
-                
-
-                    private async Task AddItem(ProductDto product)
-
-                    {
-
-                        var existingItem = invoiceItems.FirstOrDefault(i => i.ProductoId == product.Id);
-
-                        if (existingItem != null)
-
-                        {
-
-                            existingItem.Cantidad++;
-
-                        }
-
-                        else
-
-                        {
-
-                            var productDetails = await ProductService.GetProductDetailsByIdAsync(product.Id);
-
-                            if (productDetails != null)
-
-                            {
-
-                                invoiceItems.Add(new InvoiceItemViewModel
-
-                                {
-
-                                    ProductoId = productDetails.Id,
-
-                                    ProductName = productDetails.Nombre,
-
-                                    Cantidad = 1,
-
-                                    PrecioVentaUnitario = productDetails.PrecioVentaUnitario,
-
-                                    Taxes = productDetails.Taxes
-
-                                });
-
-                            }
-
-                        }
-
-                        
-
-                        productSearchTerm = string.Empty;
-
-                        productSearchResults.Clear();
-
-                        UpdateTotals();
-
-                    }
-
-                    
-
-                    private void RemoveItem(Guid productId)
-
-                    {
-
-                        var item = invoiceItems.FirstOrDefault(i => i.ProductoId == productId);
-
-                        if (item != null)
-
-                        {
-
-                            invoiceItems.Remove(item);
-
-                            UpdateTotals();
-
-                        }
-
-                    }
-
-                
-
-                    private void UpdateTotals()
-
-                    {
-
-                        subtotal = invoiceItems.Sum(i => i.Cantidad * i.PrecioVentaUnitario);
-
-                        
-
-                        taxSummaries = invoiceItems
-
-                            .SelectMany(item => item.Taxes.Select(tax => new {
-
-                                item.Cantidad,
-
-                                item.PrecioVentaUnitario,
-
-                                TaxName = tax.Nombre,
-
-                                TaxRate = tax.Porcentaje
-
-                            }))
-
-                            .GroupBy(t => new { t.TaxName, t.TaxRate })
-
-                            .Select(g => new TaxSummary {
-
-                                TaxName = g.Key.TaxName,
-
-                                TaxRate = g.Key.TaxRate,
-
-                                Amount = g.Sum(x => x.Cantidad * x.PrecioVentaUnitario * (x.TaxRate / 100))
-
-                            })
-
-                            .ToList();
-
-                
-
-                        total = subtotal + taxSummaries.Sum(ts => ts.Amount);
-
-                        StateHasChanged();
-
-                    }
-
-                
-
-                    private async Task HandleCreateInvoice()
-
-                    {
-
-                        isSubmitting = true;
-
-                        errorMessage = null;
-
-                
-
-                        if (!invoiceItems.Any())
-
-                        {
-
-                            errorMessage = "Debe añadir al menos un producto.";
-
-                            isSubmitting = false;
-
-                            StateHasChanged();
-
-                            return;
-
-                        }
-
-                
-
-                        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-
-                        var user = authState.User;
-
-                        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
-
-                
-
-                        if (string.IsNullOrEmpty(userId))
-
-                        {
-
-                            errorMessage = "No se pudo identificar al usuario. Por favor, inicie sesión de nuevo.";
-
-                            isSubmitting = false;
-
-                            StateHasChanged();
-
-                            return;
-
-                        }
-
-                
-
-                        CreateInvoiceDto createDto = new CreateInvoiceDto
-
-                        {
-
-                            UsuarioIdCreador = Guid.Parse(userId),
-
-                            Items = invoiceItems.Select(i => new InvoiceItemDto
-
-                            {
-
-                                ProductoId = i.ProductoId,
-
-                                Cantidad = i.Cantidad
-
-                            }).ToList(),
-
-                            FormaDePago = formModel.FormaDePago,
-
-                            DiasCredito = formModel.FormaDePago == FormaDePago.Credito ? formModel.DiasCredito : null,
-
-                            MontoAbonoInicial = formModel.FormaDePago == FormaDePago.Credito ? formModel.MontoAbonoInicial : 0
-
-                        };
-
-                
-
-                        if (customerSelectionType == "existing")
-
-                        {
-
-                            if (!formModel.SelectedClienteId.HasValue)
-
-                            {
-
-                                errorMessage = "Debe seleccionar un cliente existente.";
-
-                                isSubmitting = false;
-
-                                StateHasChanged();
-
-                                return;
-
-                            }
-
-                            createDto.ClienteId = formModel.SelectedClienteId.Value;
-
-                        }
-
-                        else if (customerSelectionType == "finalConsumer")
-
-                        {
-
-                            createDto.EsConsumidorFinal = true;
-
-                        }
-
-                        else
-
-                        {
-
-                            errorMessage = "Debe seleccionar un tipo de cliente.";
-
-                            isSubmitting = false;
-
-                            StateHasChanged();
-
-                            return;
-
-                        }
-
-                
-
-                        try
-
-                        {
-
-                            await InvoiceService.CreateInvoiceAsync(createDto);
-
-                            Navigation.NavigateTo("/invoices");
-
-                        }
-
-                        catch (InvalidOperationException stockEx)
-
-                        {
-
-                            errorMessage = stockEx.Message;
-
-                            StateHasChanged();
-
-                        }
-
-                        catch (ArgumentException argEx)
-
-                        {
-
-                            errorMessage = argEx.Message;
-
-                            StateHasChanged();
-
-                        }
-
-                        catch (Exception ex)
-
-                        {
-
-                            errorMessage = $"Ocurrió un error inesperado al generar la factura. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
-
-                            StateHasChanged();
-
-                        }
-
-                        finally
-
-                        {
-
-                            isSubmitting = false;
-
-                            StateHasChanged();
-
-                        }
-
-                    }
-
-                
-
-                    private void ClearErrorMessage()
-
-                    {
-
-                        errorMessage = null;
-
-                    }
-
-                
-
-                    public class InvoiceItemViewModel
-
-                    {
-
-                        public Guid ProductoId { get; set; }
-
-                        public string ProductName { get; set; } = string.Empty;
-
-                        
-
-                        [Range(1, int.MaxValue, ErrorMessage = "La cantidad debe ser al menos 1.")]
-
-                        public int Cantidad { get; set; }
-
-                        
-
-                        public decimal PrecioVentaUnitario { get; set; }
-
-                        public List<TaxDto> Taxes { get; set; } = new();
-
-                    }
-
-                
-
-                    public class TaxSummary
-
-                    {
-
-                        public string TaxName { get; set; } = string.Empty;
-
-                        public decimal TaxRate { get; set; }
-
-                        public decimal Amount { get; set; }
-
-                    }
-
-                
-
-                    public class CreateInvoiceFormModel
-
-                    {
-
-                        public Guid? SelectedClienteId { get; set; }
-
-                        public FormaDePago FormaDePago { get; set; } = FormaDePago.Contado;
-
-                        public int? DiasCredito { get; set; }
-
-                        public decimal MontoAbonoInicial { get; set; }
-
-                    }
-
-                }
-
-                
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+<style>
+    .hover-opacity-100:hover { opacity: 1 !important; }
+    .fade-in { animation: fadeIn 0.2s ease-in-out; }
+    @@keyframes fadeIn { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
+@code {
+    private string? errorMessage;
+    private bool isSubmitting = false;
+
+    private List<CustomerDto> allCustomers = new();
+    private List<ProductDto> allProducts = new();
+
+    private string customerSearchTerm = string.Empty;
+    private List<CustomerDto> customerSearchResults = new();
+    private CustomerDto? selectedCustomer;
+
+    private string productSearchTerm = string.Empty;
+    private List<ProductDto> productSearchResults = new();
+
+    private List<InvoiceItemViewModel> invoiceItems = new();
+    private CreateInvoiceFormModel formModel = new();
+    private string customerSelectionType = "existing";
+
+    private decimal subtotal15 = 0;
+    private decimal subtotal0 = 0;
+    private decimal subtotalSinImpuestos = 0;
+    private decimal totalIva = 0;
+    private decimal total = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allCustomers = await CustomerService.GetActiveCustomersAsync();
+            allProducts = await ProductService.GetProductsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error cargando datos: {ex.Message}";
+        }
+    }
+
+    private void ChangeCustomerType(string type)
+    {
+        customerSelectionType = type;
+        OnCustomerSelectionTypeChanged();
+    }
+
+    private void SearchCustomers()
+    {
+        if (customerSelectionType != "existing" || string.IsNullOrWhiteSpace(customerSearchTerm))
+        {
+            customerSearchResults.Clear();
+            return;
+        }
+        customerSearchResults = allCustomers
+            .Where(c => c.RazonSocial.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        c.NumeroIdentificacion.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase))
+            .Take(5)
+            .ToList();
+    }
+
+    private void SelectCustomer(CustomerDto customer)
+    {
+        selectedCustomer = customer;
+        formModel.SelectedClienteId = customer.Id;
+        customerSearchTerm = string.Empty;
+        customerSearchResults.Clear();
+    }
+
+    private void ClearCustomer()
+    {
+        selectedCustomer = null;
+        formModel.SelectedClienteId = null;
+    }
+
+    private void OnCustomerSelectionTypeChanged()
+    {
+        selectedCustomer = null;
+        formModel.SelectedClienteId = null;
+        customerSearchTerm = string.Empty;
+        customerSearchResults.Clear();
+    }
+
+    private void SearchProducts()
+    {
+        if (string.IsNullOrWhiteSpace(productSearchTerm))
+        {
+            productSearchResults.Clear();
+            return;
+        }
+        productSearchResults = allProducts
+            .Where(p => p.IsActive && (p.Nombre.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        p.CodigoPrincipal.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase)))
+            .Take(5)
+            .ToList();
+    }
+
+    private async Task AddItem(ProductDto product)
+    {
+        var existingItem = invoiceItems.FirstOrDefault(i => i.ProductoId == product.Id);
+        if (existingItem != null)
+        {
+            existingItem.SafeCantidad++;
+        }
+        else
+        {
+            var productDetails = await ProductService.GetProductDetailsByIdAsync(product.Id);
+            if (productDetails != null)
+            {
+                invoiceItems.Add(new InvoiceItemViewModel
+                {
+                    ProductoId = productDetails.Id,
+                    ProductName = productDetails.Nombre,
+                    SafeCantidad = 1,
+                    PrecioVentaUnitario = productDetails.PrecioVentaUnitario,
+                    Taxes = productDetails.Taxes
+                });
+            }
+        }
+
+        productSearchTerm = string.Empty;
+        productSearchResults.Clear();
+        UpdateTotals();
+    }
+
+    private void RemoveItem(Guid productId)
+    {
+        var item = invoiceItems.FirstOrDefault(i => i.ProductoId == productId);
+        if (item != null)
+        {
+            invoiceItems.Remove(item);
+            UpdateTotals();
+        }
+    }
+
+    private void UpdateTotals()
+    {
+        subtotalSinImpuestos = 0;
+        subtotal15 = 0;
+        subtotal0 = 0;
+        totalIva = 0;
+
+        foreach (var item in invoiceItems)
+        {
+            // Validacion extra: Si por alguna razon es 0 o menor, no suma
+            if(item.SafeCantidad < 1) continue;
+
+            var itemSubtotal = item.SafeCantidad * item.PrecioVentaUnitario;
+            subtotalSinImpuestos += itemSubtotal;
+
+            var hasIva = item.Taxes.Any(t => t.Porcentaje > 0);
+            if (hasIva)
+            {
+                var ivaRate = item.Taxes.First(t => t.Porcentaje > 0).Porcentaje;
+                subtotal15 += itemSubtotal;
+                totalIva += itemSubtotal * (ivaRate / 100m);
+            }
+            else
+            {
+                subtotal0 += itemSubtotal;
+            }
+        }
+
+        total = subtotalSinImpuestos + totalIva;
+        
+        // Safety check para abono
+        if(formModel.FormaDePago == FormaDePago.Credito && formModel.MontoAbonoInicial > total) {
+             // Podrías resetearlo, o dejar que la validación del form maneje el error
+        }
+        
+        StateHasChanged();
+    }
+
+    private bool IsValidForm()
+    {
+        if (!invoiceItems.Any()) return false;
+        
+        // Validar que no haya items con cantidad 0 o negativa
+        if (invoiceItems.Any(i => i.SafeCantidad < 1)) return false;
+
+        if (customerSelectionType == "existing" && !formModel.SelectedClienteId.HasValue) return false;
+
+        if (formModel.FormaDePago == FormaDePago.Credito)
+        {
+            if (!formModel.DiasCredito.HasValue || formModel.DiasCredito < 1) return false;
+            if (formModel.MontoAbonoInicial < 0) return false;
+            if (formModel.MontoAbonoInicial > total) return false;
+        }
+        return true;
+    }
+
+    private async Task HandleCreateInvoice()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+
+        if (!IsValidForm())
+        {
+            errorMessage = "Revise el formulario: cantidades inválidas o datos faltantes.";
+            isSubmitting = false;
+            return;
+        }
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            errorMessage = "Sesión inválida.";
+            isSubmitting = false;
+            return;
+        }
+
+        CreateInvoiceDto createDto = new CreateInvoiceDto
+        {
+            UsuarioIdCreador = Guid.Parse(userId),
+            // Usamos SafeCantidad
+            Items = invoiceItems.Select(i => new InvoiceItemDto { ProductoId = i.ProductoId, Cantidad = i.SafeCantidad }).ToList(),
+            FormaDePago = formModel.FormaDePago,
+            DiasCredito = formModel.FormaDePago == FormaDePago.Credito ? formModel.DiasCredito : null,
+            MontoAbonoInicial = formModel.FormaDePago == FormaDePago.Credito ? formModel.MontoAbonoInicial : 0
+        };
+
+        if (customerSelectionType == "existing")
+        {
+            createDto.ClienteId = formModel.SelectedClienteId!.Value;
+        }
+        else
+        {
+            createDto.EsConsumidorFinal = true;
+        }
+
+        try
+        {
+            await InvoiceService.CreateInvoiceAsync(createDto);
+            Navigation.NavigateTo("/invoices");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void ClearErrorMessage() => errorMessage = null;
+
+    public class InvoiceItemViewModel
+    {
+        public Guid ProductoId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        
+        // VALIDACION FUERTE: Propiedad privada + Getter/Setter con lógica
+        private int _cantidad;
+        public int SafeCantidad 
+        { 
+            get => _cantidad; 
+            set 
+            {
+                // Si intentan poner menos de 1, se queda en 1
+                if (value < 1) _cantidad = 1; 
+                else _cantidad = value;
+            }
+        }
+
+        public decimal PrecioVentaUnitario { get; set; }
+        public List<TaxDto> Taxes { get; set; } = new();
+    }
+
+    public class CreateInvoiceFormModel
+    {
+        public Guid? SelectedClienteId { get; set; }
+        public FormaDePago FormaDePago { get; set; } = FormaDePago.Contado;
+        public int? DiasCredito { get; set; } = 30;
+        public decimal MontoAbonoInicial { get; set; }
+    }
+}
