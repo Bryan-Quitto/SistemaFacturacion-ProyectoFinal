@@ -1,13 +1,15 @@
 @page "/inventory/adjustments/create"
 @attribute [Authorize(Roles = "Administrador,Bodeguero")]
-@using System.Net.Http.Json
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Domain.Enums
 @using FacturasSRI.Web.Services
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IProductService ProductService
-@inject IHttpClientFactory HttpClientFactory
+@inject IAjusteInventarioService AjusteService 
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Ajuste de Inventario</PageTitle>
 
@@ -126,9 +128,8 @@
         }
         catch (Exception ex)
         {
-            statusMessage = $"No se pudieron cargar los productos. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            statusMessage = $"No se pudieron cargar los productos: {ex.Message}";
             isSuccess = false;
-            StateHasChanged();
         }
     }
 
@@ -140,7 +141,7 @@
             return;
         }
         productSearchResults = allProducts
-            .Where(p => p.ManejaInventario && p.IsActive && // Add this condition to filter by active products
+            .Where(p => p.ManejaInventario && p.IsActive && 
                         (p.Nombre.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase) ||
                          p.CodigoPrincipal.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase)))
             .Take(5)
@@ -171,30 +172,39 @@
         
         try
         {
-            var httpClient = HttpClientFactory.CreateClient();
-            var response = await httpClient.PostAsJsonAsync("api/AjustesInventario", ajusteModel);
+            // 1. Obtener el Usuario Actual
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier) ?? user.FindFirst("sub");
 
-            if (response.IsSuccessStatusCode)
+            if (userIdClaim == null)
             {
-                isSuccess = true;
-                statusMessage = "Ajuste de inventario registrado con éxito.";
-                selectedProductStock = await ProductService.GetProductStockDetailsAsync(ajusteModel.ProductoId);
-                ajusteModel = new() { ProductoId = ajusteModel.ProductoId };
-                StateHasChanged();
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
                 isSuccess = false;
-                statusMessage = $"Error al registrar el ajuste: {errorContent}";
-                StateHasChanged();
+                statusMessage = "No se pudo identificar al usuario actual. Por favor inicie sesión nuevamente.";
+                isSubmitting = false;
+                return;
             }
+
+            // 2. Asignar ID de usuario al modelo
+            ajusteModel.UsuarioIdAutoriza = Guid.Parse(userIdClaim.Value);
+
+            // 3. Llamar al Servicio DIRECTAMENTE (Sin HTTPClient)
+            await AjusteService.CreateAdjustmentAsync(ajusteModel);
+
+            isSuccess = true;
+            statusMessage = "Ajuste de inventario registrado con éxito.";
+            
+            // Recargar stock para reflejar cambios
+            selectedProductStock = await ProductService.GetProductStockDetailsAsync(ajusteModel.ProductoId);
+            
+            // Limpiar formulario pero mantener producto seleccionado
+            var prodId = ajusteModel.ProductoId;
+            ajusteModel = new() { ProductoId = prodId };
         }
         catch (Exception ex)
         {
             isSuccess = false;
-            statusMessage = $"Ocurrió un error de red o del sistema al intentar registrar el ajuste. Por favor, verifique su conexión e inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
-            StateHasChanged();
+            statusMessage = $"Error al registrar el ajuste: {ex.Message}";
         }
         finally
         {

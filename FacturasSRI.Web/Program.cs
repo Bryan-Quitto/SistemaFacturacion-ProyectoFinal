@@ -67,7 +67,11 @@ builder.Services.AddScoped<AuthenticationStateProvider, CookieAuthenticationStat
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("", client => 
+{
+    var baseUrl = builder.Configuration["App:BaseUrl"] ?? "http://localhost:5000";
+    client.BaseAddress = new Uri(baseUrl);
+});
 
 builder.Services.AddAuthentication("Cookies")
     .AddCookie("Cookies", options =>
