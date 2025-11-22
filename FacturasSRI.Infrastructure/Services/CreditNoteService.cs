@@ -16,6 +16,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using FacturasSRI.Application.Dtos;
 
 namespace FacturasSRI.Infrastructure.Services
 {
@@ -134,6 +135,7 @@ namespace FacturasSRI.Infrastructure.Services
                 Estado = nc.Estado,
                 ClaveAcceso = nc.InformacionSRI?.ClaveAcceso,
                 NumeroAutorizacion = nc.InformacionSRI?.NumeroAutorizacion,
+                RespuestaSRI = nc.InformacionSRI?.RespuestaSRI, 
                 Items = itemsDto,
                 TaxSummaries = taxSummaries
             };

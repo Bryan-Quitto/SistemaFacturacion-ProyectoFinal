@@ -32,6 +32,7 @@ namespace FacturasSRI.Application.Dtos
         // SRI Info
         public string? ClaveAcceso { get; set; }
         public string? NumeroAutorizacion { get; set; }
+        public string? RespuestaSRI { get; set; }
         public EstadoNotaDeCredito Estado { get; set; }
     }
 
