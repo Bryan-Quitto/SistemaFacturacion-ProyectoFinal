@@ -13,10 +13,10 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
         <h1>Gestión de Usuarios</h1>
-        <p class="text-muted">Edita y administra los usuarios del sistema.</p>
+        <p class="text-muted mb-0">Edita y administra los usuarios del sistema.</p>
     </div>
     <button class="btn btn-primary" @onclick="GoToCreateUser">
-        <i class="bi bi-plus-circle-fill me-2"></i>Crear Nuevo Usuario
+        <i class="bi bi-plus-circle-fill me-2"></i>Nuevo Usuario
     </button>
 </div>
 
@@ -26,95 +26,99 @@
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
-    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
-        @statusMessage
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4 shadow-sm border-0" role="alert">
+        <i class="bi @(isSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2"></i> @statusMessage
         <button type="button" class="btn-close float-end" @onclick="ClearStatusMessage" aria-label="Close"></button>
     </div>
 }
 
-<div class="card">
-    <div class="card-header">
-        <h3>Listado de Usuarios</h3>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Nombre Completo</th>
-                        <th>Correo Electrónico</th>
-                        <th>Roles</th>
-                        <th>Estado</th>
-                        <th class="text-end">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var user in FilteredUsers)
-                    {
-                        <tr>
-                            <td>@user.PrimerNombre @user.SegundoNombre @user.PrimerApellido @user.SegundoApellido</td>
-                            <td>@user.Email</td>
-                            <td>@string.Join(", ", user.Roles)</td>
-                            <td>
-                                @if (user.EstaActivo)
-                                {
-                                    <span class="badge bg-success">Activo</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-secondary">Inactivo</span>
-                                }
-                            </td>
-                            <td class="text-end">
-                                <div class="btn-group" role="group">
-                                    @if (currentUserId == user.Id)
-                                    {
-                                        <a href="/profile" class="btn btn-sm btn-outline-success">
-                                            <i class="bi bi-person-badge"></i> Mi Perfil
-                                        </a>
-                                    }
-                                    else
-                                    {
-                                        <a href="@($"/users/edit/{user.Id}")" class="btn btn-sm btn-outline-primary @(user.EstaActivo ? "" : "disabled")"
-                                           title="@(user.EstaActivo ? "Editar Usuario" : "No se puede editar un usuario inactivo")">
-                                            <i class="bi bi-pencil-square"></i> Editar
-                                        </a>
-                                    }
-                                    
-                                    @if (currentUserId != user.Id)
-                                    {
-                                        <button class="btn btn-sm @(user.EstaActivo ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => HandleToggleUserStatus(user.Id)">
-                                            <i class="bi @(user.EstaActivo ? "bi-trash" : "bi-check-circle")"></i> @(user.EstaActivo ? "Desactivar" : "Activar")
-                                        </button>
-                                    }
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Nombre Completo</th>
+                <th>Correo Electrónico</th>
+                <th>Roles</th>
+                <th>Estado</th>
+                <th class="text-end">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in FilteredUsers)
+            {
+                <tr>
+                    <td class="fw-medium">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-light rounded-circle p-2 me-2 text-primary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <i class="bi bi-person-fill"></i>
+                            </div>
+                            @user.PrimerNombre @user.SegundoNombre @user.PrimerApellido @user.SegundoApellido
+                        </div>
+                    </td>
+                    <td>@user.Email</td>
+                    <td>
+                        @foreach(var role in user.Roles)
+                        {
+                            <span class="badge bg-light text-dark border me-1">@role</span>
+                        }
+                    </td>
+                    <td>
+                        @if (user.EstaActivo)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactivo</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group shadow-sm" role="group">
+                            @if (currentUserId == user.Id)
+                            {
+                                <a href="/profile" class="btn btn-sm btn-outline-secondary" title="Mi Perfil">
+                                    <i class="bi bi-person-badge-fill"></i>
+                                </a>
+                            }
+                            else
+                            {
+                                <a href="@($"/users/edit/{user.Id}")" class="btn btn-sm btn-outline-primary @(user.EstaActivo ? "" : "disabled")"
+                                   title="@(user.EstaActivo ? "Editar" : "No se puede editar inactivo")">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </a>
+                            }
+                            
+                            @if (currentUserId != user.Id)
+                            {
+                                <button class="btn btn-sm @(user.EstaActivo ? "btn-outline-danger" : "btn-outline-success")" 
+                                        @onclick="() => HandleToggleUserStatus(user.Id)"
+                                        title="@(user.EstaActivo ? "Desactivar" : "Activar")">
+                                    <i class="bi @(user.EstaActivo ? "bi-trash-fill" : "bi-check-circle-fill")"></i>
+                                </button>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
 </div>
 
 <ConfirmationModal IsVisible="showConfirmationModal"
-                  Title="@confirmationModalTitle"
-                  Message="@confirmationModalMessage"
-                  OnConfirm="ConfirmToggleUserStatus"
-                  OnCancel="CancelToggleUserStatus" />
+                   Title="@confirmationModalTitle"
+                   Message="@confirmationModalMessage"
+                   OnConfirm="ConfirmToggleUserStatus"
+                   OnCancel="CancelToggleUserStatus" />
 
 @code {
     private List<UserDto> allUsers = new();
     private Guid currentUserId;
-
     private bool showConfirmationModal = false;
     private string confirmationModalTitle = string.Empty;
     private string confirmationModalMessage = string.Empty;
     private Guid userToToggleId;
-    
-    private string? statusMessage; // New
-    private bool isSuccess;       // New
-
+    private string? statusMessage;
+    private bool isSuccess;
     private string searchTerm = string.Empty;
 
     private List<UserDto> FilteredUsers => string.IsNullOrWhiteSpace(searchTerm)
@@ -158,7 +162,6 @@
     private async Task ConfirmToggleUserStatus()
     {
         showConfirmationModal = false;
-
         var userToToggle = allUsers.FirstOrDefault(u => u.Id == userToToggleId);
         if (userToToggle == null) return;
 
@@ -172,7 +175,7 @@
         catch (Exception ex)
         {
             isSuccess = false;
-            statusMessage = $"Ocurrió un error al cambiar el estado del usuario '{userToToggle.PrimerNombre} {userToToggle.PrimerApellido}'. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            statusMessage = $"Error: {ex.Message}";
         }
     }
 

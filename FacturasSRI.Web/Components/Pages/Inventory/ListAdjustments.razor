@@ -2,75 +2,100 @@
 @attribute [Authorize(Roles = "Administrador, Bodeguero")]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Domain.Enums
 @inject IAjusteInventarioService AjusteInventarioService
 
 <PageTitle>Historial de Ajustes</PageTitle>
 
-<div class="page-header">
-    <h1>Historial de Ajustes de Inventario</h1>
-    <p>Consulta todos los movimientos de ajuste registrados en el sistema.</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1>Ajustes de Inventario</h1>
+        <p class="text-muted mb-0">Historial de movimientos manuales (Daños, Pérdidas, Conteo, etc).</p>
+    </div>
 </div>
 
 <div class="mb-3">
-    <input type="text" class="form-control" placeholder="Buscar ajustes por producto o motivo..." @bind-value="searchTerm" @bind-value:event="oninput" />
+    <input type="text" class="form-control" placeholder="Buscar por producto, motivo o usuario..." @bind-value="searchTerm" @bind-value:event="oninput" />
 </div>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
-    <div class="alert alert-danger mb-4" role="alert">
-        @errorMessage
+    <div class="alert alert-danger mb-4 shadow-sm border-0" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> @errorMessage
         <button type="button" class="btn-close float-end" @onclick="ClearErrorMessage" aria-label="Close"></button>
     </div>
 }
 
 @if (isLoading)
 {
-    <p><em>Cargando historial de ajustes...</em></p>
+    <p><em>Cargando historial...</em></p>
 }
-else if (FilteredAdjustments.Any()) // Use FilteredAdjustments
+else if (FilteredAdjustments.Any())
 {
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Producto</th>
-                            <th>Tipo</th>
-                            <th class="text-end">Cantidad</th>
-                            <th>Motivo</th>
-                            <th>Autorizado Por</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var ajuste in FilteredAdjustments) // Use FilteredAdjustments
-                        {
-                            <tr>
-                                <td>@ajuste.Fecha.ToLocalTime().ToString("g")</td>
-                                <td>@ajuste.ProductoNombre</td>
-                                <td>@ajuste.Tipo</td>
-                                <td class="text-end">@ajuste.CantidadAjustada</td>
-                                <td>@ajuste.Motivo</td>
-                                <td>@ajuste.UsuarioAutoriza</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Producto</th>
+                    <th>Tipo (Razón)</th>
+                    <th class="text-end">Cantidad</th>
+                    <th>Detalle / Motivo</th>
+                    <th>Autorizado Por</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ajuste in FilteredAdjustments)
+                {
+                    <tr>
+                        <td class="text-muted small">@ajuste.Fecha.ToLocalTime().ToString("g")</td>
+                        <td class="fw-medium">@ajuste.ProductoNombre</td>
+                        <td>
+                            @* LOGICA CORREGIDA: El color depende de si la cantidad es positiva o negativa *@
+                            @if (ajuste.CantidadAjustada > 0)
+                            {
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-10">
+                                    <i class="bi bi-arrow-up-circle me-1"></i>@ajuste.Tipo
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-10">
+                                    <i class="bi bi-arrow-down-circle me-1"></i>@ajuste.Tipo
+                                </span>
+                            }
+                        </td>
+                        <td class="text-end fw-bold @(ajuste.CantidadAjustada > 0 ? "text-success" : "text-danger")">
+                            @ajuste.CantidadAjustada
+                        </td>
+                        <td class="text-muted small">@ajuste.Motivo</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="bg-light rounded-circle p-1 me-2 text-secondary d-flex align-items-center justify-content-center" style="width: 24px; height: 24px;">
+                                    <i class="bi bi-person-fill small"></i>
+                                </div>
+                                <span class="text-muted small">@ajuste.UsuarioAutoriza</span>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 }
 else
 {
-    <p>No se han registrado ajustes de inventario todavía.</p>
+    <div class="alert alert-light border text-center py-4">
+        <i class="bi bi-inbox display-6 text-muted mb-3 d-block"></i>
+        No se han registrado ajustes de inventario todavía.
+    </div>
 }
-@code {
-    private List<AjusteListItemDto> allAdjustments = new(); // Holds all adjustments
-    private bool isLoading = true;
-    private string? errorMessage; // New
 
-    private string searchTerm = string.Empty; // New property for search
+@code {
+    private List<AjusteListItemDto> allAdjustments = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string searchTerm = string.Empty;
 
     private List<AjusteListItemDto> FilteredAdjustments => string.IsNullOrWhiteSpace(searchTerm)
         ? allAdjustments
@@ -83,11 +108,11 @@ else
     {
         try
         {
-            allAdjustments = await AjusteInventarioService.GetAdjustmentsAsync(); // Load all adjustments
+            allAdjustments = await AjusteInventarioService.GetAdjustmentsAsync();
         }
         catch (Exception ex)
         {
-            errorMessage = $"No se pudieron cargar los ajustes de inventario. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            errorMessage = $"Error cargando ajustes: {ex.Message}";
         }
         finally
         {

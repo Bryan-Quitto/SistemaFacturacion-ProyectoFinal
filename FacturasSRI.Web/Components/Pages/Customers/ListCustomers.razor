@@ -12,9 +12,12 @@
 <PageTitle>Lista de Clientes</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>Clientes</h1>
+    <div>
+        <h1>Clientes</h1>
+        <p class="text-muted mb-0">Administra tu cartera de clientes.</p>
+    </div>
     <button class="btn btn-primary" @onclick="GoToCreateCustomer">
-        <i class="bi bi-plus-circle-fill me-2"></i>Crear Nuevo Cliente
+        <i class="bi bi-plus-circle-fill me-2"></i>Nuevo Cliente
     </button>
 </div>
 
@@ -24,85 +27,91 @@
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
-    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4" role="alert">
-        @statusMessage
+    <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-4 shadow-sm border-0" role="alert">
+        <i class="bi @(isSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2"></i> @statusMessage
         <button type="button" class="btn-close float-end" @onclick="ClearStatusMessage" aria-label="Close"></button>
     </div>
 }
 
-<table class="table">
-    <thead>
-        <tr>
-            <th>Razón Social</th>
-            <th>Tipo de Identificación</th>
-            <th>Número de Identificación</th>
-            <th>Correo Electrónico</th>
-            <th>Teléfono</th>
-            <th>Creado por</th>
-            <th>Última edición por</th>
-            <th>Fecha de edición</th>
-            <th>Estado</th>
-            <th class="text-end">Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var customer in FilteredCustomers) // Use FilteredCustomers
-        {
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
             <tr>
-                <td>@customer.RazonSocial</td>
-                <td>@customer.TipoIdentificacion</td>
-                <td>@customer.NumeroIdentificacion</td>
-                <td>@customer.Email</td>
-                <td>@customer.Telefono</td>
-                <td>@customer.CreadoPor</td>
-                <td>@customer.UltimaModificacionPor</td>
-                <td>@(customer.FechaModificacion.HasValue ? customer.FechaModificacion.Value.ToShortDateString() : "N/A")</td>
-                <td>
-                    @if (customer.EstaActivo)
-                    {
-                        <span class="badge bg-success">Activo</span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-secondary">Inactivo</span>
-                    }
-                </td>
-                <td class="text-end">
-                    <div class="btn-group" role="group">
-                        <a href="@($"/customers/edit/{customer.Id}")" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-pencil-square"></i> Editar
-                        </a>
-                        <button class="btn btn-sm @(customer.EstaActivo ? "btn-outline-danger" : "btn-outline-success")" @onclick="() => HandleDeleteCustomer(customer.Id)">
-                            <i class="bi @(customer.EstaActivo ? "bi-trash" : "bi-check-circle")"></i> @(customer.EstaActivo ? "Desactivar" : "Activar")
-                        </button>
-                    </div>
-                </td>
+                <th>Razón Social</th>
+                <th>Identificación</th>
+                <th>Contacto</th>
+                <th>Creado por</th>
+                <th>Estado</th>
+                <th class="text-end">Acciones</th>
             </tr>
-        }
-    </tbody>
-</table>
-
-
+        </thead>
+        <tbody>
+            @foreach (var customer in FilteredCustomers)
+            {
+                <tr>
+                    <td class="fw-medium">@customer.RazonSocial</td>
+                    <td>
+                        <div class="d-flex flex-column">
+                            <span class="text-muted small">@customer.TipoIdentificacion</span>
+                            <span>@customer.NumeroIdentificacion</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="d-flex flex-column small">
+                            @if (!string.IsNullOrEmpty(customer.Email))
+                            {
+                                <div><i class="bi bi-envelope me-1 text-muted"></i>@customer.Email</div>
+                            }
+                            @if (!string.IsNullOrEmpty(customer.Telefono))
+                            {
+                                <div><i class="bi bi-telephone me-1 text-muted"></i>@customer.Telefono</div>
+                            }
+                        </div>
+                    </td>
+                    <td class="small text-muted">@customer.CreadoPor</td>
+                    <td>
+                        @if (customer.EstaActivo)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactivo</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group shadow-sm" role="group">
+                            <a href="@($"/customers/edit/{customer.Id}")" class="btn btn-sm btn-outline-primary" title="Editar">
+                                <i class="bi bi-pencil-fill"></i>
+                            </a>
+                            <button class="btn btn-sm @(customer.EstaActivo ? "btn-outline-danger" : "btn-outline-success")" 
+                                    @onclick="() => HandleDeleteCustomer(customer.Id)"
+                                    title="@(customer.EstaActivo ? "Desactivar" : "Activar")">
+                                <i class="bi @(customer.EstaActivo ? "bi-trash-fill" : "bi-check-circle-fill")"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
 
 <ConfirmationModal IsVisible="showConfirmationModal"
-                  Title="@confirmationModalTitle"
-                  Message="@confirmationModalMessage"
-                  OnConfirm="ConfirmToggleCustomerStatus"
-                  OnCancel="CancelToggleCustomerStatus" />
+                   Title="@confirmationModalTitle"
+                   Message="@confirmationModalMessage"
+                   OnConfirm="ConfirmToggleCustomerStatus"
+                   OnCancel="CancelToggleCustomerStatus" />
 
 @code {
-    private List<CustomerDto> allCustomers = new(); // Holds all customers
-
-    // Confirmation Modal State
+    private List<CustomerDto> allCustomers = new();
     private bool showConfirmationModal = false;
     private string confirmationModalTitle = string.Empty;
     private string confirmationModalMessage = string.Empty;
     private Guid customerToToggleId;
-
-    private string? statusMessage; // New
-    private bool isSuccess;       // New
-
-    private string searchTerm = string.Empty; // New property for search
+    private string? statusMessage;
+    private bool isSuccess;
+    private string searchTerm = string.Empty;
 
     private List<CustomerDto> FilteredCustomers => string.IsNullOrWhiteSpace(searchTerm)
         ? allCustomers
@@ -117,7 +126,7 @@
     
     private async Task LoadCustomers()
     {
-        allCustomers = await CustomerService.GetCustomersAsync(); // Load all customers
+        allCustomers = await CustomerService.GetCustomersAsync();
     }
 
     private void HandleDeleteCustomer(Guid id)
@@ -133,8 +142,7 @@
 
     private async Task ConfirmToggleCustomerStatus()
     {
-        showConfirmationModal = false; // Hide the modal
-
+        showConfirmationModal = false;
         var customerToToggle = allCustomers.FirstOrDefault(c => c.Id == customerToToggleId);
         if (customerToToggle == null) return;
 
@@ -148,13 +156,13 @@
         catch (Exception ex)
         {
             isSuccess = false;
-            statusMessage = $"Ocurrió un error al intentar cambiar el estado del cliente '{customerToToggle.RazonSocial}'. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            statusMessage = $"Error: {ex.Message}";
         }
     }
 
     private void CancelToggleCustomerStatus()
     {
-        showConfirmationModal = false; // Hide the modal
+        showConfirmationModal = false;
         customerToToggleId = Guid.Empty;
     }
 
@@ -163,8 +171,6 @@
         statusMessage = null;
         StateHasChanged();
     }
-
-
 
     private void GoToCreateCustomer()
     {

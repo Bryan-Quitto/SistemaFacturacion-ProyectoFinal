@@ -12,105 +12,105 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
         <h1>Gestión de Productos</h1>
-        <p class="text-muted">Edita y administra tus productos existentes.</p>
+        <p class="text-muted mb-0">Edita y administra tus productos existentes.</p>
     </div>
-    <div class="d-flex align-items-center">
-        <div class="me-3">
-            <span class="text-muted">Impuesto Global:</span>
-            <strong>@(currentGlobalTax?.Nombre ?? "No asignado")</strong>
+    <div class="d-flex align-items-center gap-3">
+        <div class="text-end d-none d-md-block">
+            <span class="text-muted small d-block">Impuesto Global</span>
+            <span class="badge bg-light text-dark border">@(currentGlobalTax?.Nombre ?? "No asignado")</span>
         </div>
         <AuthorizeView Roles="Administrador">
-            <button class="btn btn-outline-primary" @onclick="OpenGlobalTaxModal">
-                <i class="bi bi-pencil-square"></i> Cambiar
-            </button>
-            <button class="btn btn-primary ms-2" @onclick="GoToCreateProduct">
-                <i class="bi bi-plus-circle-fill me-2"></i>Crear Nuevo Producto
-            </button>
+            <div class="btn-group shadow-sm">
+                <button class="btn btn-outline-secondary" @onclick="OpenGlobalTaxModal" title="Cambiar Impuesto Global">
+                    <i class="bi bi-gear-fill"></i>
+                </button>
+                <button class="btn btn-primary" @onclick="GoToCreateProduct">
+                    <i class="bi bi-plus-circle-fill me-2"></i>Nuevo Producto
+                </button>
+            </div>
         </AuthorizeView>
     </div>
 </div>
 
-<div class="mb-3">
-    <input type="text" class="form-control" placeholder="Buscar productos por nombre o código..."
-        @bind-value="searchTerm" @bind-value:event="oninput" />
+<div class="row mb-3">
+    <div class="col-12">
+        <input type="text" class="form-control" placeholder="Buscar productos por nombre o código..."
+            @bind-value="searchTerm" @bind-value:event="oninput" />
+    </div>
 </div>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
-    <div class="alert alert-danger">@errorMessage</div>
+    <div class="alert alert-danger mb-4 shadow-sm border-0" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> @errorMessage
+    </div>
 }
 
-
-<div class="card">
-    <div class="card-header">
-        <h3>Listado de Productos</h3>
+@if (allProducts == null)
+{
+    <p><em>Cargando productos...</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Código</th>
+                    <th>Marca</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th>Stock</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var product in FilteredProducts)
+                {
+                    <tr>
+                        <td class="fw-medium">@product.Nombre</td>
+                        <td><span class="text-muted small">@product.CodigoPrincipal</span></td>
+                        <td>@product.Marca</td>
+                        <td>@product.CategoriaNombre</td>
+                        <td class="fw-bold">@product.PrecioVentaUnitario.ToString("C")</td>
+                        <td>
+                            <span class="@(product.StockTotal <= 5 ? "text-danger fw-bold" : "")">
+                                @product.StockTotal
+                            </span>
+                        </td>
+                        <td>
+                            @if (product.IsActive)
+                            {
+                                <span class="badge bg-success">Activo</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactivo</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group shadow-sm" role="group">
+                                <a href="@($"/products/details/{product.Id}")" class="btn btn-sm btn-outline-secondary" title="Ver Detalles">
+                                    <i class="bi bi-eye-fill"></i>
+                                </a>
+                                <a href="@($"/products/edit/{product.Id}")" class="btn btn-sm btn-outline-primary" title="Editar">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </a>
+                                <button class="btn btn-sm @(product.IsActive ? "btn-outline-danger" : "btn-outline-success")"
+                                        @onclick="() => HandleDeleteProduct(product.Id)"
+                                        title="@(product.IsActive ? "Desactivar" : "Activar")">
+                                    <i class="bi @(product.IsActive ? "bi-trash-fill" : "bi-check-circle-fill")"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
-    <div class="card-body">
-        @if (allProducts == null) // Check allProducts for loading state
-        {
-            <p><em>Cargando...</em></p>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Nombre</th>
-                            <th>Código Principal</th>
-                            <th>Marca</th>
-                            <th>Categoría</th>
-                            <th>Precio Unitario</th>
-                            <th>Stock Actual</th>
-                            <th>Estado</th>
-                            <th class="text-end">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var product in FilteredProducts) // Use FilteredProducts
-                        {
-                            <tr>
-                                <td>@product.Nombre</td>
-                                <td>@product.CodigoPrincipal</td>
-                                <td>@product.Marca</td>
-                                <td>@product.CategoriaNombre</td>
-                                <td>@product.PrecioVentaUnitario.ToString("C")</td>
-                                <td>@product.StockTotal</td>
-                                <td>
-                                    @if (product.IsActive)
-                                    {
-                                        <span class="badge bg-success">Activo</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-secondary">Inactivo</span>
-                                    }
-                                </td>
-                                <td class="text-end">
-                                    <div class="btn-group" role="group">
-                                        <a href="@($"/products/details/{product.Id}")" class="btn btn-sm btn-outline-secondary">
-                                            <i class="bi bi-eye-fill"></i> Ver detalles
-                                        </a>
-                                        <a href="@($"/products/edit/{product.Id}")" class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-pencil-square"></i> Editar
-                                        </a>
-                                        <button
-                                            class="btn btn-sm @(product.IsActive ? "btn-outline-danger" : "btn-outline-success")"
-                                            @onclick="() => HandleDeleteProduct(product.Id)">
-                                            <i class="bi @(product.IsActive ? "bi-trash" : "bi-check-circle")"></i>
-                                            @(product.IsActive ? "Desactivar" : "Activar")
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
-</div>
-
+}
 
 <ConfirmationModal IsVisible="showConfirmationModal" Title="@confirmationModalTitle" Message="@confirmationModalMessage"
     OnConfirm="ConfirmToggleProductStatus" OnCancel="CancelToggleProductStatus" />
@@ -125,10 +125,9 @@
                     <button type="button" class="btn-close" @onclick="CloseGlobalTaxModal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Seleccione un impuesto para aplicarlo a todos los productos. Esto reemplazará cualquier impuesto
-                        asignado previamente.</p>
+                    <p class="text-muted small">Seleccione un impuesto para aplicarlo a todos los productos. Esto reemplazará cualquier impuesto asignado previamente.</p>
                     <div class="mb-3">
-                        <label for="globalTax" class="form-label">Impuesto</label>
+                        <label for="globalTax" class="form-label fw-bold">Impuesto</label>
                         <InputSelect id="globalTax" class="form-select" @bind-Value="selectedTaxId">
                             <option value="@Guid.Empty">-- Seleccione un impuesto --</option>
                             @foreach (var tax in allTaxes)
@@ -142,7 +141,7 @@
                     <button type="button" class="btn btn-secondary" @onclick="CloseGlobalTaxModal">Cancelar</button>
                     <button type="button" class="btn btn-primary" @onclick="ApplyGlobalTax"
                         disabled="@(selectedTaxId == Guid.Empty)">
-                        <i class="bi bi-arrow-repeat"></i> Aplicar a Todos
+                        <i class="bi bi-arrow-repeat me-2"></i>Aplicar a Todos
                     </button>
                 </div>
             </div>
@@ -152,16 +151,15 @@
 }
 
 @code {
-    private List<ProductDto>? allProducts; // Holds all products
+    private List<ProductDto>? allProducts;
     private string? errorMessage;
 
-    // Confirmation Modal State
     private bool showConfirmationModal = false;
     private string confirmationModalTitle = string.Empty;
     private string confirmationModalMessage = string.Empty;
     private Guid productToToggleId;
 
-    private string searchTerm = string.Empty; // New property for search
+    private string searchTerm = string.Empty;
 
     private Guid selectedTaxId;
     private List<TaxDto> allTaxes = new();
@@ -189,7 +187,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"No se pudieron cargar los impuestos. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            errorMessage = $"Error cargando impuestos: {ex.Message}";
         }
     }
 
@@ -201,7 +199,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"No se pudo cargar la información del impuesto global. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            errorMessage = $"Error cargando impuesto global: {ex.Message}";
         }
     }
 
@@ -229,11 +227,10 @@
             await ProductService.ApplyTaxToAllProductsAsync(selectedTaxId);
             CloseGlobalTaxModal();
             await LoadCurrentGlobalTax();
-            // Optionally, show a success message
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ocurrió un error al aplicar el impuesto global. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            errorMessage = $"Error al aplicar impuesto global: {ex.Message}";
         }
     }
 
@@ -242,11 +239,11 @@
         errorMessage = null;
         try
         {
-            allProducts = await ProductService.GetProductsAsync(); // Load all products
+            allProducts = await ProductService.GetProductsAsync();
         }
         catch (Exception ex)
         {
-            errorMessage = $"No se pudieron cargar los productos. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            errorMessage = $"Error cargando productos: {ex.Message}";
         }
     }
 
@@ -264,7 +261,7 @@
     private async Task ConfirmToggleProductStatus()
     {
         errorMessage = null;
-        showConfirmationModal = false; // Hide the modal
+        showConfirmationModal = false;
 
         var productToToggle = allProducts?.FirstOrDefault(p => p.Id == productToToggleId);
         if (productToToggle == null) return;
@@ -278,17 +275,15 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ocurrió un error al {action} el producto. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            errorMessage = $"Error al {action} el producto: {ex.Message}";
         }
     }
 
     private void CancelToggleProductStatus()
     {
-        showConfirmationModal = false; // Hide the modal
+        showConfirmationModal = false;
         productToToggleId = Guid.Empty;
     }
-
-
 
     private void GoToCreateProduct()
     {
