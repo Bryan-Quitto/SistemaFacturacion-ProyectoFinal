@@ -11,6 +11,7 @@ namespace FacturasSRI.Infrastructure.Persistence
         {
         }
 
+        // DbSets
         public DbSet<AjusteInventario> AjustesInventario { get; set; }
         public DbSet<Categoria> Categorias { get; set; }
         public DbSet<Cliente> Clientes { get; set; }
@@ -33,11 +34,11 @@ namespace FacturasSRI.Infrastructure.Persistence
         public DbSet<UsuarioRol> UsuarioRoles { get; set; }
         public DbSet<Cobro> Cobros { get; set; }
 
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
             
+            // Configuración de tablas
             modelBuilder.Entity<AjusteInventario>().ToTable("AjustesInventario");
             modelBuilder.Entity<Cliente>().ToTable("Clientes");
             modelBuilder.Entity<CuentaPorCobrar>().ToTable("CuentasPorCobrar");
@@ -57,24 +58,27 @@ namespace FacturasSRI.Infrastructure.Persistence
 
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(FacturasSRIDbContext).Assembly);
 
-            // Configure the relationship between Factura and Cobro
+            // Relación Factura - Cobro
             modelBuilder.Entity<Factura>()
                 .HasMany(f => f.Cobros)
                 .WithOne(c => c.Factura)
                 .HasForeignKey(c => c.FacturaId);
 
-            // Configure the relationship between Cobro and Usuario
+            // Relación Cobro - Usuario
             modelBuilder.Entity<Cobro>()
                 .HasOne(c => c.UsuarioCreador)
-                .WithMany() // Assuming a user can create many payments, but we don't need a navigation property back on Usuario
+                .WithMany()
                 .HasForeignKey(c => c.UsuarioIdCreador)
-                .OnDelete(DeleteBehavior.Restrict); // Prevent deleting a user if they have created payments
+                .OnDelete(DeleteBehavior.Restrict);
             
+            // IDs fijos
             var adminRoleId = new Guid("d3b1b4a9-2f7b-4e6a-9f6b-1c2c3d4e5f6a");
             var vendedorRoleId = new Guid("e2a87c46-e5b3-4f9e-8c6e-1f2a3b4c5d6e");
             var bodegueroRoleId = new Guid("f5b8c9d0-1a2b-3c4d-5e6f-7a8b9c0d1e2f");
             var adminUserId = new Guid("a9b1b4d3-3f7b-4e6a-9f6b-1c2c3d4e5f6b");
-            var defaultProveedorId = new Guid("c1d2e3f4-5a6b-7c8d-9e0f-1a2b3c4d5e6f"); // New GUID for default supplier
+            var defaultProveedorId = new Guid("c1d2e3f4-5a6b-7c8d-9e0f-1a2b3c4d5e6f");
+
+            // --- SEEDING COMENTADO (Para que no choque con Supabase) ---
 
             // modelBuilder.Entity<Rol>().HasData(
             //     new Rol {
