@@ -233,7 +233,7 @@
                         </h6>
                         
                         <div class="mb-2">
-                            <InputSelect @bind-Value="formModel.FormaDePago" class="form-select form-select-sm shadow-none">
+                            <InputSelect @bind-Value="formModel.FormaDePago" class="form-select form-select-sm shadow-none" disabled="@(customerSelectionType == "finalConsumer")">
                                 @foreach (var forma in Enum.GetValues(typeof(FormaDePago)))
                                 {
                                     <option value="@forma">@forma.ToString()</option>
@@ -417,6 +417,10 @@
     private void ChangeCustomerType(string type)
     {
         customerSelectionType = type;
+        if (type == "finalConsumer")
+        {
+            formModel.FormaDePago = FormaDePago.Contado;
+        }
         OnCustomerSelectionTypeChanged();
     }
 

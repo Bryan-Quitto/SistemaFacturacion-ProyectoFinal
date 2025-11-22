@@ -89,6 +89,11 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDto> CreateInvoiceAsync(CreateInvoiceDto invoiceDto)
         {
+            if (invoiceDto.EsConsumidorFinal && invoiceDto.FormaDePago != FormaDePago.Contado)
+            {
+                throw new InvalidOperationException("Las facturas para Consumidor Final solo pueden ser de Contado.");
+            }
+
             await _invoiceCreationSemaphore.WaitAsync();
             try
             {
@@ -974,6 +979,11 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDto?> UpdateInvoiceAsync(UpdateInvoiceDto invoiceDto)
         {
+            if (invoiceDto.EsConsumidorFinal && invoiceDto.FormaDePago != FormaDePago.Contado)
+            {
+                throw new InvalidOperationException("Las facturas para Consumidor Final solo pueden ser de Contado.");
+            }
+
             var invoice = await _context.Facturas
                 .Include(f => f.Detalles)
                 .FirstOrDefaultAsync(f => f.Id == invoiceDto.Id);
