@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 
@@ -39,9 +40,17 @@
                             <label class="form-label">Referencia (Opcional)</label>
                             <InputText @bind-Value="nuevoCobro.Referencia" class="form-control" />
                         </div>
+                        <div class="mb-3">
+                            <label for="comprobante" class="form-label">Comprobante de Pago (PDF, PNG, JPG)</label>
+                            <InputFile id="comprobante" class="form-control" OnChange="@OnInputFileChange" disabled="@isSubmitting" accept=".pdf,.png,.jpg,.jpeg" />
+                             @if (!string.IsNullOrEmpty(fileValidationMessage))
+                            {
+                                <div class="text-danger small mt-1">@fileValidationMessage</div>
+                            }
+                        </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" @onclick="() => CloseModal()">Cancelar</button>
-                            <button type="submit" class="btn btn-primary" disabled="isSubmitting">
+                            <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
                                 @if (isSubmitting)
                                 {
                                     <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -80,7 +89,9 @@
     private RegistrarCobroDto nuevoCobro = new();
     private string? errorMessage;
     private bool isSubmitting = false;
-
+    private IBrowserFile? comprobanteFile;
+    private string? fileValidationMessage;
+    
     protected override void OnParametersSet()
     {
         if (FacturaId != Guid.Empty)
@@ -91,6 +102,24 @@
                 UsuarioIdCreador = this.UsuarioIdCreador,
                 FechaCobro = DateTime.UtcNow
             };
+            comprobanteFile = null;
+            errorMessage = null;
+            fileValidationMessage = null;
+        }
+    }
+
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        fileValidationMessage = null;
+        comprobanteFile = e.GetMultipleFiles(1).FirstOrDefault();
+
+        if (comprobanteFile != null)
+        {
+            if (comprobanteFile.Size > 5 * 1024 * 1024) // 5MB limit
+            {
+                fileValidationMessage = "Error: El archivo es demasiado grande (máximo 5MB).";
+                comprobanteFile = null;
+            }
         }
     }
 
@@ -98,9 +127,18 @@
     {
         isSubmitting = true;
         errorMessage = null;
+
+        if (comprobanteFile == null)
+        {
+            errorMessage = "Error: Debe adjuntar el comprobante de pago.";
+            isSubmitting = false;
+            return;
+        }
+
         try
         {
-            await CobroService.RegistrarCobroAsync(nuevoCobro);
+            await using var fileStream = comprobanteFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            await CobroService.RegistrarCobroAsync(nuevoCobro, fileStream, comprobanteFile.Name);
             await CloseModal(true);
         }
         catch (Exception ex)

@@ -85,6 +85,58 @@ namespace FacturasSRI.Web.Endpoints
                 }
             });
 
+            downloadsGroup.MapGet("/invoice-receipt/{id}", async (
+                Guid id,
+                HttpContext httpContext,
+                FacturasSRIDbContext dbContext,
+                Client supabase,
+                ILoggerFactory loggerFactory) =>
+            {
+                var logger = loggerFactory.CreateLogger("DownloadEndpoints");
+                
+                var cobro = await dbContext.Cobros.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
+
+                if (cobro == null)
+                {
+                    return Results.NotFound("El registro de cobro no fue encontrado.");
+                }
+
+                if (string.IsNullOrEmpty(cobro.ComprobantePagoPath))
+                {
+                    return Results.NotFound("El archivo solicitado no fue encontrado.");
+                }
+
+                var user = httpContext.User;
+                var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+                var isAdmin = user.IsInRole("Administrador");
+
+                if (cobro.UsuarioIdCreador.ToString() != userId && !isAdmin)
+                {
+                    return Results.Forbid();
+                }
+
+                try
+                {
+                    var fileBytes = await supabase.Storage
+                        .From("comprobantes-facturas-emitidas")
+                        .Download(cobro.ComprobantePagoPath, null);
+                    
+                    var fileName = Path.GetFileName(cobro.ComprobantePagoPath);
+                    var contentType = "application/octet-stream";
+                    
+                    if(fileName.EndsWith(".pdf")) contentType = "application/pdf";
+                    if(fileName.EndsWith(".png")) contentType = "image/png";
+                    if(fileName.EndsWith(".jpg") || fileName.EndsWith(".jpeg")) contentType = "image/jpeg";
+
+                    return Results.File(fileBytes, contentType, fileDownloadName: fileName);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Ocurrió un error al intentar descargar el comprobante de cobro desde Supabase. Path: {Path}", cobro.ComprobantePagoPath);
+                    return Results.StatusCode(500);
+                }
+            });
+
             downloadsGroup.MapGet("/invoice-ride/{id}", async (
                 Guid id,
                 IInvoiceService invoiceService,

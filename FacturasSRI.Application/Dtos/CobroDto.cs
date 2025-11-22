@@ -13,5 +13,6 @@ namespace FacturasSRI.Application.Dtos
         public string MetodoDePago { get; set; } = string.Empty;
         public string? Referencia { get; set; }
         public string CreadoPor { get; set; } = string.Empty;
+        public string? ComprobantePagoPath { get; set; }
     }
 }

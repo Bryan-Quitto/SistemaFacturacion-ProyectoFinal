@@ -230,146 +230,159 @@ else
                     }
                     else
                     {
-                        <ul class="list-group list-group-flush">
-                            @foreach(var cobro in cobros)
-                            {
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <p class="mb-0"><strong>@cobro.Monto.ToString("C")</strong> - @cobro.MetodoDePago</p>
-                                        <small class="text-muted">@cobro.FechaCobro.ToString("g") por @cobro.CreadoPor</small>
+                                                <ul class="list-group list-group-flush">
+                                                    @foreach(var cobro in cobros)
+                                                    {
+                                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <p class="mb-0"><strong>@cobro.Monto.ToString("C")</strong> - @cobro.MetodoDePago</p>
+                                                                <small class="text-muted">@cobro.FechaCobro.ToString("g") por @cobro.CreadoPor</small>
+                                                            </div>
+                                                            @if (!string.IsNullOrEmpty(cobro.ComprobantePagoPath))
+                                                            {
+                                                                <button class="btn btn-sm btn-outline-success" @onclick="() => DownloadCobroReceipt(cobro.Id)">
+                                                                    <i class="bi bi-download"></i>
+                                                                </button>
+                                                            }
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            }
+                                        </div>
+                                        @if(invoice.FormaDePago == FormaDePago.Credito && invoice.SaldoPendiente > 0)
+                                        {
+                                            <div class="card-footer text-center">
+                                                <button class="btn btn-primary" @onclick="() => showRegistrarPagoModal = true">
+                                                    <i class="bi bi-plus-circle me-2"></i>Registrar Pago
+                                                </button>
+                                            </div>
+                                        }
                                     </div>
-                                </li>
+                                </div>
+                            </div>
+                        
+                            <RegisterPaymentModal @bind-IsVisible="showRegistrarPagoModal" 
+                                                  FacturaId="@InvoiceId" 
+                                                  UsuarioIdCreador="@currentUserId" 
+                                                  OnPaymentRegistered="LoadInvoiceData" />
+                        }
+                        
+                        
+                        @code {
+                            [Parameter]
+                            public Guid InvoiceId { get; set; }
+                        
+                            [CascadingParameter]
+                            private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
+                        
+                            private InvoiceDetailViewDto? invoice;
+                            private List<CobroDto> cobros = new();
+                            
+                            private string? errorMessage;
+                            private string? sriCheckMessage;
+                            private string? emailMessage;
+                        
+                            private bool isCheckingStatus = false;
+                            private bool sendingEmail = false;
+                            private bool emailSuccess = false;
+                            private bool showRegistrarPagoModal = false;
+                            private Guid currentUserId;
+                        
+                            protected override async Task OnInitializedAsync()
+                            {
+                                var authState = await AuthenticationStateTask;
+                                var user = authState.User;
+                                if (user.Identity.IsAuthenticated)
+                                {
+                                    var userId = user.FindFirst(c => c.Type == "sub")?.Value;
+                                    if(!string.IsNullOrEmpty(userId))
+                                    {
+                                        currentUserId = Guid.Parse(userId);
+                                    }
+                                }
+                                await LoadInvoiceData();
                             }
-                        </ul>
-                    }
-                </div>
-                @if(invoice.FormaDePago == FormaDePago.Credito && invoice.SaldoPendiente > 0)
-                {
-                    <div class="card-footer text-center">
-                        <button class="btn btn-primary" @onclick="() => showRegistrarPagoModal = true">
-                            <i class="bi bi-plus-circle me-2"></i>Registrar Pago
-                        </button>
-                    </div>
-                }
-            </div>
-        </div>
-    </div>
-
-    <RegisterPaymentModal @bind-IsVisible="showRegistrarPagoModal" 
-                          FacturaId="@InvoiceId" 
-                          UsuarioIdCreador="@currentUserId" 
-                          OnPaymentRegistered="LoadInvoiceData" />
-}
-
-
-@code {
-    [Parameter]
-    public Guid InvoiceId { get; set; }
-
-    [CascadingParameter]
-    private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
-
-    private InvoiceDetailViewDto? invoice;
-    private List<CobroDto> cobros = new();
-    
-    private string? errorMessage;
-    private string? sriCheckMessage;
-    private string? emailMessage;
-
-    private bool isCheckingStatus = false;
-    private bool sendingEmail = false;
-    private bool emailSuccess = false;
-    private bool showRegistrarPagoModal = false;
-    private Guid currentUserId;
-
-    protected override async Task OnInitializedAsync()
-    {
-        var authState = await AuthenticationStateTask;
-        var user = authState.User;
-        if (user.Identity.IsAuthenticated)
-        {
-            var userId = user.FindFirst(c => c.Type == "sub")?.Value;
-            if(!string.IsNullOrEmpty(userId))
-            {
-                currentUserId = Guid.Parse(userId);
-            }
-        }
-        await LoadInvoiceData();
-    }
-
-    private async Task LoadInvoiceData()
-    {
-        try
-        {
-            invoice = await InvoiceService.GetInvoiceDetailByIdAsync(InvoiceId);
-            if (invoice != null)
-            {
-                cobros = await CobroService.GetCobrosByFacturaIdAsync(InvoiceId);
-            }
-            else
-            {
-                errorMessage = "No se encontró la factura solicitada o no se pudo cargar su detalle.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"No se pudieron cargar los detalles de la factura. {ex.Message}";
-        }
-    }
-
-    private async Task HandleCheckSriStatus()
-    {
-        isCheckingStatus = true;
-        sriCheckMessage = null;
-        errorMessage = null;
-
-        try
-        {
-            var updatedInvoice = await InvoiceService.CheckSriStatusAsync(InvoiceId);
-            if (updatedInvoice != null)
-            {
-                invoice = updatedInvoice;
-                sriCheckMessage = $"Estado actualizado a las {DateTime.Now:T}: {invoice.Estado}";
-            }
-            else
-            {
-                errorMessage = "No se pudo actualizar el estado de la factura.";
-            }
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error al consultar SRI: {ex.Message}";
-        }
-        finally
-        {
-            isCheckingStatus = false;
-        }
-    }
-
-    private async Task ResendEmail()
-    {
-        sendingEmail = true;
-        emailMessage = null;
-
-        try
-        {
-            await InvoiceService.ResendInvoiceEmailAsync(InvoiceId);
-            emailSuccess = true;
-            emailMessage = "Correo enviado exitosamente al cliente.";
-        }
-        catch (Exception ex)
-        {
-            emailSuccess = false;
-            emailMessage = $"Error al enviar correo: {ex.Message}";
-        }
-        finally
-        {
-            sendingEmail = false;
-        }
-    }
-
-    private void GoBack()
-    {
-        Navigation.NavigateTo("/invoices");
-    }
-}
+                        
+                            private async Task LoadInvoiceData()
+                            {
+                                try
+                                {
+                                    invoice = await InvoiceService.GetInvoiceDetailByIdAsync(InvoiceId);
+                                    if (invoice != null)
+                                    {
+                                        cobros = await CobroService.GetCobrosByFacturaIdAsync(InvoiceId);
+                                    }
+                                    else
+                                    {
+                                        errorMessage = "No se encontró la factura solicitada o no se pudo cargar su detalle.";
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    errorMessage = $"No se pudieron cargar los detalles de la factura. {ex.Message}";
+                                }
+                            }
+                        
+                            private async Task DownloadCobroReceipt(Guid cobroId)
+                            {
+                                var url = $"/api/downloads/invoice-receipt/{cobroId}";
+                                await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+                            }
+                        
+                            private async Task HandleCheckSriStatus()
+                            {
+                                isCheckingStatus = true;
+                                sriCheckMessage = null;
+                                errorMessage = null;
+                        
+                                try
+                                {
+                                    var updatedInvoice = await InvoiceService.CheckSriStatusAsync(InvoiceId);
+                                    if (updatedInvoice != null)
+                                    {
+                                        invoice = updatedInvoice;
+                                        sriCheckMessage = $"Estado actualizado a las {DateTime.Now:T}: {invoice.Estado}";
+                                    }
+                                    else
+                                    {
+                                        errorMessage = "No se pudo actualizar el estado de la factura.";
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    errorMessage = $"Error al consultar SRI: {ex.Message}";
+                                }
+                                finally
+                                {
+                                    isCheckingStatus = false;
+                                }
+                            }
+                        
+                            private async Task ResendEmail()
+                            {
+                                sendingEmail = true;
+                                emailMessage = null;
+                        
+                                try
+                                {
+                                    await InvoiceService.ResendInvoiceEmailAsync(InvoiceId);
+                                    emailSuccess = true;
+                                    emailMessage = "Correo enviado exitosamente al cliente.";
+                                }
+                                catch (Exception ex)
+                                {
+                                    emailSuccess = false;
+                                    emailMessage = $"Error al enviar correo: {ex.Message}";
+                                }
+                                finally
+                                {
+                                    sendingEmail = false;
+                                }
+                            }
+                        
+                            private void GoBack()
+                            {
+                                Navigation.NavigateTo("/invoices");
+                            }
+                        }
+                        

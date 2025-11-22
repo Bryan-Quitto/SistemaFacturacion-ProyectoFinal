@@ -11,6 +11,7 @@ namespace FacturasSRI.Domain.Entities
         public decimal Monto { get; set; }
         public string MetodoDePago { get; set; } = string.Empty;
         public string? Referencia { get; set; }
+        public string? ComprobantePagoPath { get; set; }
         public Guid UsuarioIdCreador { get; set; }
         public virtual Usuario UsuarioCreador { get; set; } = null!;
         public DateTime FechaCreacion { get; set; }
