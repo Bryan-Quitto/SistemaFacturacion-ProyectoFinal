@@ -89,17 +89,7 @@ else
                             </span>
                         </td>
                         <td>
-                            @* LOGICA ESTADO SRI: Solo 'Autorizada' es verde. El resto es error/invalido *@
-                            @if (invoice.Estado == EstadoFactura.Autorizada)
-                            {
-                                <span class="badge bg-success">Autorizada</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-danger">
-                                    <i class="bi bi-x-circle me-1"></i>@invoice.Estado
-                                </span>
-                            }
+                            @GetStatusBadge(invoice.Estado)
                         </td>
                         <td class="text-end">
                             @* LOGICA SALDO: Si no está autorizada, no importa el saldo *@
@@ -129,20 +119,32 @@ else
                                 <a href="@($"invoices/{invoice.Id}")" class="btn btn-sm btn-outline-secondary" title="Ver Detalles">
                                     <i class="bi bi-eye-fill"></i>
                                 </a>
-
-                                @* BOTON PAGO: Solo aparece si es Credito, Debe dinero Y está Autorizada *@
-                                @if (invoice.FormaDePago == FormaDePago.Credito 
-                                    && invoice.SaldoPendiente > 0 
-                                    && invoice.Estado == EstadoFactura.Autorizada)
+                                
+                                @if (invoice.Estado == EstadoFactura.Borrador)
                                 {
-                                    <a href="@($"invoices/register-payment/{invoice.Id}")" class="btn btn-sm btn-outline-success" title="Registrar Pago">
-                                        <i class="bi bi-cash-coin"></i>
+                                    <a href="@($"invoices/edit/{invoice.Id}")" class="btn btn-sm btn-outline-primary" title="Editar Borrador">
+                                        <i class="bi bi-pencil-fill"></i>
                                     </a>
+                                    <button class="btn btn-sm btn-outline-danger" title="Cancelar Borrador" @onclick="() => CancelInvoice(invoice.Id)">
+                                        <i class="bi bi-x-circle-fill"></i>
+                                    </button>
                                 }
 
-                                <a href="/api/downloads/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
+                                @if (invoice.Estado != EstadoFactura.Borrador && invoice.Estado != EstadoFactura.Cancelada)
+                                {
+                                    @if (invoice.FormaDePago == FormaDePago.Credito 
+                                        && invoice.SaldoPendiente > 0 
+                                        && invoice.Estado == EstadoFactura.Autorizada)
+                                    {
+                                        <a href="@($"invoices/register-payment/{invoice.Id}")" class="btn btn-sm btn-outline-success" title="Registrar Pago">
+                                            <i class="bi bi-cash-coin"></i>
+                                        </a>
+                                    }
+
+                                    <a href="/api/downloads/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                    </a>
+                                }
                             </div>
                         </td>
                     </tr>
@@ -223,5 +225,42 @@ else
     private void GoToCreateInvoice()
     {
         Navigation.NavigateTo("/invoices/create");
+    }
+
+    private async Task CancelInvoice(Guid invoiceId)
+    {
+        try
+        {
+            await InvoiceService.CancelInvoiceAsync(invoiceId);
+            await LoadInvoices();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cancelar la factura: {ex.Message}";
+        }
+    }
+
+    private RenderFragment GetStatusBadge(EstadoFactura estado)
+    {
+        return builder =>
+        {
+            var (badgeClass, iconClass, text) = estado switch
+            {
+                EstadoFactura.Autorizada => ("bg-success", "bi-check-circle-fill", "Autorizada"),
+                EstadoFactura.Borrador => ("bg-warning text-dark", "bi-pencil-square", "Borrador"),
+                EstadoFactura.Cancelada => ("bg-secondary", "bi-x-octagon-fill", "Cancelada"),
+                _ => ("bg-danger", "bi-x-circle-fill", estado.ToString())
+            };
+
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", $"badge {badgeClass}");
+            
+            builder.OpenElement(2, "i");
+            builder.AddAttribute(3, "class", $"bi {iconClass} me-1");
+            builder.CloseElement();
+            
+            builder.AddContent(4, text);
+            builder.CloseElement();
+        };
     }
 }

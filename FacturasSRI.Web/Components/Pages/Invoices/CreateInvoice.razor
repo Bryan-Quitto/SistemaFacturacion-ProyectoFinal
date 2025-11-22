@@ -283,6 +283,10 @@
                 </div>
 
                 <div class="mt-auto">
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="borradorSwitch" @bind="formModel.EsBorrador">
+                        <label class="form-check-label" for="borradorSwitch">Guardar como Borrador</label>
+                    </div>
                     <button type="submit" class="btn btn-primary w-100 py-2 shadow-sm fw-bold text-uppercase" 
                             style="letter-spacing: 0.5px; font-size: 0.9rem;"
                             disabled="@(!IsValidForm() || isSubmitting)">
@@ -523,7 +527,8 @@
             Items = invoiceItems.Select(i => new InvoiceItemDto { ProductoId = i.ProductoId, Cantidad = i.SafeCantidad }).ToList(),
             FormaDePago = formModel.FormaDePago,
             DiasCredito = formModel.FormaDePago == FormaDePago.Credito ? formModel.DiasCredito : null,
-            MontoAbonoInicial = formModel.FormaDePago == FormaDePago.Credito ? formModel.MontoAbonoInicial : 0
+            MontoAbonoInicial = formModel.FormaDePago == FormaDePago.Credito ? formModel.MontoAbonoInicial : 0,
+            EsBorrador = formModel.EsBorrador
         };
 
         if (customerSelectionType == "existing")
@@ -580,5 +585,6 @@
         public FormaDePago FormaDePago { get; set; } = FormaDePago.Contado;
         public int? DiasCredito { get; set; } = 30;
         public decimal MontoAbonoInicial { get; set; }
+        public bool EsBorrador { get; set; }
     }
 }

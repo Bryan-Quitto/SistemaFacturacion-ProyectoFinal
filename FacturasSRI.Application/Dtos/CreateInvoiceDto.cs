@@ -23,5 +23,7 @@ namespace FacturasSRI.Application.Dtos
         public string? IdentificacionComprador { get; set; }
         public string? DireccionComprador { get; set; }
         public string? EmailComprador { get; set; }
+
+        public bool EsBorrador { get; set; }
     }
 }

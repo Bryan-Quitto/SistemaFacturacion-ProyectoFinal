@@ -94,16 +94,24 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 _logger.LogInformation("Iniciando creación de factura...");
                 var (factura, cliente) = await CrearFacturaPendienteAsync(invoiceDto);
-                var (xmlGenerado, xmlFirmadoBytes, claveAcceso) = await GenerarYFirmarXmlAsync(factura, cliente);
 
-                var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == factura.Id);
-                facturaSri.XmlGenerado = xmlGenerado;
-                facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
-                await _context.SaveChangesAsync();
+                if (invoiceDto.EsBorrador)
+                {
+                    _logger.LogInformation("Factura creada como borrador. No se enviará al SRI. Número: {Numero}", factura.NumeroFactura);
+                }
+                else
+                {
+                    var (xmlGenerado, xmlFirmadoBytes, claveAcceso) = await GenerarYFirmarXmlAsync(factura, cliente);
 
-                // FIRE AND FORGET: Lanzamos proceso de fondo
-                _logger.LogInformation("Factura guardada. Iniciando envío background para {Numero}", factura.NumeroFactura);
-                _ = Task.Run(() => EnviarAlSriEnFondoAsync(factura.Id, xmlFirmadoBytes, claveAcceso));
+                    var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == factura.Id);
+                    facturaSri.XmlGenerado = xmlGenerado;
+                    facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
+                    await _context.SaveChangesAsync();
+
+                    // FIRE AND FORGET: Lanzamos proceso de fondo
+                    _logger.LogInformation("Factura guardada. Iniciando envío background para {Numero}", factura.NumeroFactura);
+                    _ = Task.Run(() => EnviarAlSriEnFondoAsync(factura.Id, xmlFirmadoBytes, claveAcceso));
+                }
 
                 var resultDto = await GetInvoiceByIdAsync(factura.Id);
                 return resultDto!;
@@ -347,7 +355,7 @@ namespace FacturasSRI.Infrastructure.Services
                         ClienteId = cliente.Id,
                         FechaEmision = DateTime.UtcNow,
                         NumeroFactura = numeroSecuencial,
-                        Estado = EstadoFactura.Pendiente, 
+                        Estado = invoiceDto.EsBorrador ? EstadoFactura.Borrador : EstadoFactura.Pendiente, 
                         UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
                         FechaCreacion = DateTime.UtcNow
                     };
@@ -824,6 +832,23 @@ namespace FacturasSRI.Infrastructure.Services
                 }
             });
             return Task.CompletedTask;
+        }
+
+        public async Task CancelInvoiceAsync(Guid invoiceId)
+        {
+            var invoice = await _context.Facturas.FindAsync(invoiceId);
+            if (invoice == null)
+            {
+                throw new InvalidOperationException("La factura no existe.");
+            }
+
+            if (invoice.Estado != EstadoFactura.Borrador)
+            {
+                throw new InvalidOperationException("Solo se pueden cancelar facturas en estado Borrador.");
+            }
+
+            invoice.Estado = EstadoFactura.Cancelada;
+            await _context.SaveChangesAsync();
         }
     }
 }

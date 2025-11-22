@@ -4,7 +4,6 @@ namespace FacturasSRI.Domain.Enums
     {
         Borrador = 0,
         Pendiente = 1,
-        Generada = 2,
         EnviadaSRI = 3,
         Autorizada = 4,
         RechazadaSRI = 5,
