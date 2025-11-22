@@ -16,5 +16,6 @@ namespace FacturasSRI.Application.Interfaces
         Task CancelInvoiceAsync(Guid invoiceId);
         Task<InvoiceDetailViewDto?> IssueDraftInvoiceAsync(Guid invoiceId);
         Task ReactivateCancelledInvoiceAsync(Guid invoiceId);
+        Task<InvoiceDto?> UpdateInvoiceAsync(UpdateInvoiceDto invoiceDto);
     }
 }

@@ -390,7 +390,7 @@ namespace FacturasSRI.Infrastructure.Services
                             ValorIVA = valorIvaItem,
                         };
 
-                        if (producto.ManejaInventario)
+                        if (producto.ManejaInventario && !invoiceDto.EsBorrador)
                         {
                             if (producto.ManejaLotes)
                             {
@@ -772,6 +772,7 @@ namespace FacturasSRI.Infrastructure.Services
                 Id = invoice.Id,
                 NumeroFactura = invoice.NumeroFactura,
                 FechaEmision = invoice.FechaEmision,
+                ClienteId = invoice.ClienteId.Value,
                 ClienteNombre = invoice.Cliente.RazonSocial,
                 ClienteIdentificacion = invoice.Cliente.NumeroIdentificacion,
                 ClienteDireccion = invoice.Cliente.Direccion,
@@ -783,6 +784,7 @@ namespace FacturasSRI.Infrastructure.Services
                 TaxSummaries = taxSummaries,
                 Estado = invoice.Estado,
                 FormaDePago = invoice.FormaDePago,
+                DiasCredito = invoice.DiasCredito,
                 SaldoPendiente = cuentaPorCobrar?.SaldoPendiente ?? 0,
                 ClaveAcceso = invoice.InformacionSRI?.ClaveAcceso,
                 NumeroAutorizacion = invoice.InformacionSRI?.NumeroAutorizacion,
@@ -851,39 +853,107 @@ namespace FacturasSRI.Infrastructure.Services
             await _context.SaveChangesAsync();
         }
 
-        public async Task<InvoiceDetailViewDto?> IssueDraftInvoiceAsync(Guid invoiceId)
-        {
-            var invoice = await _context.Facturas
-                .Include(i => i.Cliente)
-                .FirstOrDefaultAsync(i => i.Id == invoiceId);
+                public async Task<InvoiceDetailViewDto?> IssueDraftInvoiceAsync(Guid invoiceId)
 
-            if (invoice == null)
-            {
-                throw new InvalidOperationException("La factura no existe.");
-            }
+                {
 
-            if (invoice.Estado != EstadoFactura.Borrador)
-            {
-                throw new InvalidOperationException("Solo se pueden emitir facturas que están en estado Borrador.");
-            }
-            
-            _logger.LogInformation("Iniciando emisión de factura borrador ID: {Id}", invoiceId);
+                    var invoice = await _context.Facturas
 
-            var (xmlGenerado, xmlFirmadoBytes, claveAcceso) = await GenerarYFirmarXmlAsync(invoice, invoice.Cliente);
+                        .Include(i => i.Detalles)
 
-            var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == invoice.Id);
-            facturaSri.XmlGenerado = xmlGenerado;
-            facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
-            
-            invoice.Estado = EstadoFactura.Pendiente;
+                        .ThenInclude(d => d.Producto)
 
-            await _context.SaveChangesAsync();
+                        .Include(i => i.Cliente)
 
-            _logger.LogInformation("Factura borrador actualizada a Pendiente. Iniciando envío background para {Numero}", invoice.NumeroFactura);
-            _ = Task.Run(() => EnviarAlSriEnFondoAsync(invoice.Id, xmlFirmadoBytes, claveAcceso));
+                        .FirstOrDefaultAsync(i => i.Id == invoiceId);
 
-            return await GetInvoiceDetailByIdAsync(invoiceId);
-        }
+        
+
+                    if (invoice == null)
+
+                    {
+
+                        throw new InvalidOperationException("La factura no existe.");
+
+                    }
+
+        
+
+                    if (invoice.Estado != EstadoFactura.Borrador)
+
+                    {
+
+                        throw new InvalidOperationException("Solo se pueden emitir facturas que están en estado Borrador.");
+
+                    }
+
+                    
+
+                    _logger.LogInformation("Iniciando emisión de factura borrador ID: {Id}", invoiceId);
+
+        
+
+                    // Descontar el stock AHORA, al emitir, no al crear el borrador.
+
+                    foreach (var detalle in invoice.Detalles)
+
+                    {
+
+                        if (detalle.Producto.ManejaInventario)
+
+                        {
+
+                            if (detalle.Producto.ManejaLotes)
+
+                            {
+
+                                await DescontarStockDeLotes(detalle);
+
+                            }
+
+                            else
+
+                            {
+
+                                await DescontarStockGeneral(detalle.Producto, detalle.Cantidad);
+
+                            }
+
+                        }
+
+                    }
+
+        
+
+                    var (xmlGenerado, xmlFirmadoBytes, claveAcceso) = await GenerarYFirmarXmlAsync(invoice, invoice.Cliente);
+
+        
+
+                    var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == invoice.Id);
+
+                    facturaSri.XmlGenerado = xmlGenerado;
+
+                    facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
+
+                    
+
+                    invoice.Estado = EstadoFactura.Pendiente;
+
+        
+
+                    await _context.SaveChangesAsync();
+
+        
+
+                    _logger.LogInformation("Factura borrador actualizada a Pendiente. Iniciando envío background para {Numero}", invoice.NumeroFactura);
+
+                    _ = Task.Run(() => EnviarAlSriEnFondoAsync(invoice.Id, xmlFirmadoBytes, claveAcceso));
+
+        
+
+                    return await GetInvoiceDetailByIdAsync(invoiceId);
+
+                }
 
         public async Task ReactivateCancelledInvoiceAsync(Guid invoiceId)
         {
@@ -900,6 +970,94 @@ namespace FacturasSRI.Infrastructure.Services
 
             invoice.Estado = EstadoFactura.Borrador;
             await _context.SaveChangesAsync();
+        }
+
+        public async Task<InvoiceDto?> UpdateInvoiceAsync(UpdateInvoiceDto invoiceDto)
+        {
+            var invoice = await _context.Facturas
+                .Include(f => f.Detalles)
+                .FirstOrDefaultAsync(f => f.Id == invoiceDto.Id);
+
+            if (invoice == null)
+            {
+                throw new InvalidOperationException("La factura a actualizar no existe.");
+            }
+            if (invoice.Estado != EstadoFactura.Borrador)
+            {
+                throw new InvalidOperationException("Solo se pueden modificar facturas en estado Borrador.");
+            }
+
+            // Update scalar properties
+            if (invoiceDto.EsConsumidorFinal)
+            {
+                invoice.ClienteId = (await GetOrCreateConsumidorFinalClientAsync()).Id;
+            }
+            else if (invoiceDto.ClienteId.HasValue)
+            {
+                invoice.ClienteId = invoiceDto.ClienteId.Value;
+            }
+            else
+            {
+                throw new InvalidOperationException("Se requiere un ID de cliente para facturas que no son de consumidor final.");
+            }
+            
+            invoice.FormaDePago = invoiceDto.FormaDePago;
+            invoice.DiasCredito = invoiceDto.DiasCredito;
+            invoice.MontoAbonoInicial = invoiceDto.MontoAbonoInicial;
+
+            // Remove old details
+            _context.FacturaDetalles.RemoveRange(invoice.Detalles);
+            invoice.Detalles.Clear();
+
+            // Add new details and recalculate totals
+            decimal subtotalSinImpuestos = 0;
+            decimal totalIva = 0;
+
+            foreach (var item in invoiceDto.Items)
+            {
+                var producto = await _context.Productos
+                    .Include(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
+                    .SingleAsync(p => p.Id == item.ProductoId);
+
+                decimal valorIvaItem = 0;
+                var impuestoIva = producto.ProductoImpuestos.FirstOrDefault(pi => pi.Impuesto.Porcentaje > 0);
+                var subtotalItem = item.Cantidad * producto.PrecioVentaUnitario;
+
+                if (impuestoIva != null)
+                {
+                    valorIvaItem = subtotalItem * (impuestoIva.Impuesto.Porcentaje / 100);
+                }
+
+                var detalle = new FacturaDetalle
+                {
+                    FacturaId = invoice.Id,
+                    ProductoId = item.ProductoId,
+                    Producto = producto,
+                    Cantidad = item.Cantidad,
+                    PrecioVentaUnitario = producto.PrecioVentaUnitario,
+                    Subtotal = subtotalItem,
+                    ValorIVA = valorIvaItem,
+                };
+                invoice.Detalles.Add(detalle);
+                subtotalSinImpuestos += detalle.Subtotal;
+                totalIva += valorIvaItem;
+            }
+
+            invoice.SubtotalSinImpuestos = subtotalSinImpuestos;
+            invoice.TotalIVA = totalIva;
+            invoice.Total = subtotalSinImpuestos + totalIva;
+
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Borrador de factura {Id} actualizado.", invoice.Id);
+
+            if (invoiceDto.EmitirTrasGuardar)
+            {
+                _logger.LogInformation("Flag 'EmitirTrasGuardar' detectado. Emisión inmediata...");
+                await IssueDraftInvoiceAsync(invoice.Id);
+            }
+
+            return await GetInvoiceByIdAsync(invoice.Id);
         }
     }
 }

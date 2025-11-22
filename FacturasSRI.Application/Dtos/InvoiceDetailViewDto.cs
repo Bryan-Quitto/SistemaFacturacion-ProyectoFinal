@@ -10,6 +10,7 @@ namespace FacturasSRI.Application.Dtos
         public string NumeroFactura { get; set; } = string.Empty;
         public DateTime FechaEmision { get; set; }
         public string ClienteNombre { get; set; } = string.Empty;
+        public Guid ClienteId { get; set; }
         public string ClienteIdentificacion { get; set; } = string.Empty;
         public string ClienteDireccion { get; set; } = string.Empty;
         public string ClienteEmail { get; set; } = string.Empty;
@@ -21,6 +22,7 @@ namespace FacturasSRI.Application.Dtos
 
         public EstadoFactura Estado { get; set; }
         public FormaDePago FormaDePago { get; set; }
+        public int? DiasCredito { get; set; }
         public decimal SaldoPendiente { get; set; }
         public string? ClaveAcceso { get; set; }
         public string? NumeroAutorizacion { get; set; }

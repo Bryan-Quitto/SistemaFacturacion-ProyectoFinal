@@ -7,6 +7,7 @@
 @inject IInvoiceService InvoiceService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Facturas Emitidas</PageTitle>
 
@@ -114,46 +115,75 @@ else
                             }
                         </td>
                         <td class="text-end fw-bold">@invoice.Total.ToString("C")</td>
-                        <td class="text-end">
-                            <div class="btn-group" role="group">
-                                <a href="@($"invoices/{invoice.Id}")" class="btn btn-sm btn-outline-secondary" title="Ver Detalles">
-                                    <i class="bi bi-eye-fill"></i>
-                                </a>
-                                
-                                @if (invoice.Estado == EstadoFactura.Borrador)
-                                {
-                                    <a href="@($"invoices/edit/{invoice.Id}")" class="btn btn-sm btn-outline-primary" title="Editar Borrador">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </a>
-                                    <button class="btn btn-sm btn-outline-danger" title="Cancelar Borrador" @onclick="() => CancelInvoice(invoice.Id)">
-                                        <i class="bi bi-x-circle-fill"></i>
-                                    </button>
-                                }
-
-                                @if (invoice.Estado != EstadoFactura.Borrador && invoice.Estado != EstadoFactura.Cancelada)
-                                {
-                                    @if (invoice.FormaDePago == FormaDePago.Credito 
-                                        && invoice.SaldoPendiente > 0 
-                                        && invoice.Estado == EstadoFactura.Autorizada)
-                                    {
-                                        <a href="@($"invoices/register-payment/{invoice.Id}")" class="btn btn-sm btn-outline-success" title="Registrar Pago">
-                                            <i class="bi bi-cash-coin"></i>
-                                        </a>
-                                    }
-
-                                    <a href="/api/downloads/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
-                                        <i class="bi bi-file-earmark-pdf"></i>
-                                    </a>
-                                }
+                                                        <td class="text-end">
+                                                    <div class="btn-group" role="group">
+                                                        <a href="@($"invoices/{invoice.Id}")" class="btn btn-sm btn-outline-secondary" title="Ver Detalles">
+                                                            <i class="bi bi-eye-fill"></i>
+                                                        </a>
+                                                        
+                                                        @if (invoice.Estado == EstadoFactura.Borrador)
+                                                        {
+                                                            <a href="@($"invoices/edit/{invoice.Id}")" class="btn btn-sm btn-outline-primary" title="Editar Borrador">
+                                                                <i class="bi bi-pencil-fill"></i>
+                                                            </a>
+                                                            <button class="btn btn-sm btn-outline-danger" title="Cancelar Borrador" @onclick="() => OpenCancelModal(invoice.Id)">
+                                                                <i class="bi bi-x-circle-fill"></i>
+                                                            </button>
+                                                        }
+                                                        else if (invoice.Estado == EstadoFactura.Cancelada && userIsAdmin)
+                                                        {
+                                                            <button class="btn btn-sm btn-outline-warning" title="Reactivar Borrador" @onclick="() => ReactivateInvoice(invoice.Id)">
+                                                                <i class="bi bi-arrow-counterclockwise"></i>
+                                                            </button>
+                                                        }
+                        
+                        
+                                                        @if (invoice.Estado != EstadoFactura.Borrador && invoice.Estado != EstadoFactura.Cancelada)
+                                                        {
+                                                            @if (invoice.FormaDePago == FormaDePago.Credito 
+                                                                && invoice.SaldoPendiente > 0 
+                                                                && invoice.Estado == EstadoFactura.Autorizada)
+                                                            {
+                                                                <a href="@($"invoices/register-payment/{invoice.Id}")" class="btn btn-sm btn-outline-success" title="Registrar Pago">
+                                                                    <i class="bi bi-cash-coin"></i>
+                                                                </a>
+                                                            }
+                        
+                                                            <a href="/api/downloads/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
+                                                                <i class="bi bi-file-earmark-pdf"></i>
+                                                            </a>
+                                                        }
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
                             </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-}
-
+                        }
+                        
+                        @if (showCancelModal)
+                        {
+                            <div class="modal fade show d-block" tabindex="-1" role="dialog">
+                                <div class="modal-dialog modal-dialog-centered" role="document">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Confirmar Cancelación</h5>
+                                            <button type="button" class="btn-close" @onclick="CloseCancelModal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p>¿Está seguro de que desea cancelar este borrador?</p>
+                                            <p class="text-muted small">Esta acción no se puede deshacer directamente, pero un administrador podrá reactivar la factura si es necesario.</p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" @onclick="CloseCancelModal">Cerrar</button>
+                                            <button type="button" class="btn btn-danger" @onclick="ConfirmCancelInvoice">Sí, Cancelar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-backdrop fade show"></div>
+                        }
 @code {
     private List<InvoiceDto>? allInvoices;
     private string? errorMessage;
@@ -162,6 +192,8 @@ else
     private EstadoFactura? selectedStatus;
     private FormaDePago? selectedFormaDePago;
     private string selectedPaymentStatus = "All";
+
+    private bool userIsAdmin = false;
 
     private List<InvoiceDto> FilteredInvoices
     {
@@ -207,6 +239,10 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        userIsAdmin = user.IsInRole("Administrador");
+
         await LoadInvoices();
     }
 
@@ -237,6 +273,43 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Error al cancelar la factura: {ex.Message}";
+        }
+    }
+
+    private bool showCancelModal = false;
+    private Guid? invoiceToCancelId;
+
+    private void OpenCancelModal(Guid invoiceId)
+    {
+        invoiceToCancelId = invoiceId;
+        showCancelModal = true;
+    }
+
+    private void CloseCancelModal()
+    {
+        invoiceToCancelId = null;
+        showCancelModal = false;
+    }
+
+    private async Task ConfirmCancelInvoice()
+    {
+        if (invoiceToCancelId.HasValue)
+        {
+            await CancelInvoice(invoiceToCancelId.Value);
+        }
+        CloseCancelModal();
+    }
+    
+    private async Task ReactivateInvoice(Guid invoiceId)
+    {
+        try
+        {
+            await InvoiceService.ReactivateCancelledInvoiceAsync(invoiceId);
+            await LoadInvoices();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al reactivar la factura: {ex.Message}";
         }
     }
 

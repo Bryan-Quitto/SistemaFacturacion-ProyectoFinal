@@ -1,4 +1,5 @@
 @page "/invoices/create"
+@page "/invoices/edit/{InvoiceId:guid}"
 @attribute [Authorize]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
@@ -11,12 +12,12 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
-<PageTitle>Nueva Factura</PageTitle>
+<PageTitle>@(isEditMode ? "Editar Borrador" : "Nueva Factura")</PageTitle>
 
 <div class="container-fluid py-3">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <h1 class="h2 fw-bold mb-0 text-dark">Nueva Factura</h1>
+            <h1 class="h2 fw-bold mb-0 text-dark">@(isEditMode ? "Editar Borrador" : "Nueva Factura")</h1>
         </div>
         <button type="button" class="btn btn-sm btn-light border" @onclick='() => Navigation.NavigateTo("/invoices")'>
             <i class="bi bi-x-lg me-1"></i>Cancelar
@@ -32,7 +33,7 @@
         </div>
     }
 
-    <EditForm Model="@formModel" OnValidSubmit="@HandleCreateInvoice">
+    <EditForm Model="@formModel">
         <DataAnnotationsValidator />
 
         <div class="row g-3"> <div class="col-lg-8">
@@ -283,22 +284,39 @@
                 </div>
 
                 <div class="mt-auto">
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" role="switch" id="borradorSwitch" @bind="formModel.EsBorrador">
-                        <label class="form-check-label" for="borradorSwitch">Guardar como Borrador</label>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100 py-2 shadow-sm fw-bold text-uppercase" 
-                            style="letter-spacing: 0.5px; font-size: 0.9rem;"
-                            disabled="@(!IsValidForm() || isSubmitting)">
-                        @if (isSubmitting)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2"></span> <span>Procesando...</span>
-                        }
-                        else
-                        {
-                            <span><i class="bi bi-send-check-fill me-2"></i>Emitir Factura</span>
-                        }
-                    </button>
+                    @if (isEditMode)
+                    {
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-primary" @onclick="() => HandleSave(false)" disabled="@(!IsValidForm() || isSubmitting)">
+                                @if(isSubmitting) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                                <i class="bi bi-save-fill me-2"></i>Guardar Cambios
+                            </button>
+                            <button type="button" class="btn btn-success" @onclick="() => HandleSave(true)" disabled="@(!IsValidForm() || isSubmitting)">
+                                @if(isSubmitting) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                                <i class="bi bi-send-check-fill me-2"></i>Guardar y Emitir
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="borradorSwitch" @bind="formModel.EsBorrador">
+                            <label class="form-check-label" for="borradorSwitch">Guardar como Borrador</label>
+                        </div>
+                        <button type="button" class="btn btn-primary w-100 py-2 shadow-sm fw-bold text-uppercase"
+                                style="letter-spacing: 0.5px; font-size: 0.9rem;"
+                                @onclick="() => HandleSave(false)"
+                                disabled="@(!IsValidForm() || isSubmitting)">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span> <span>Procesando...</span>
+                            }
+                            else
+                            {
+                                <span><i class="bi bi-send-check-fill me-2"></i>@(formModel.EsBorrador ? "Guardar Borrador" : "Emitir Factura")</span>
+                            }
+                        </button>
+                    }
                 </div>
             </div>
         </div>
@@ -312,6 +330,11 @@
 </style>
 
 @code {
+    [Parameter]
+    public Guid? InvoiceId { get; set; }
+
+    private bool isEditMode => InvoiceId.HasValue;
+
     private string? errorMessage;
     private bool isSubmitting = false;
 
@@ -339,12 +362,55 @@
     {
         try
         {
+            if (isEditMode)
+            {
+                await LoadInvoiceForEdit();
+            }
+            
             allCustomers = await CustomerService.GetActiveCustomersAsync();
             allProducts = await ProductService.GetProductsAsync();
         }
         catch (Exception ex)
         {
             errorMessage = $"Error cargando datos: {ex.Message}";
+        }
+    }
+
+    private async Task LoadInvoiceForEdit()
+    {
+        var invoiceDto = await InvoiceService.GetInvoiceDetailByIdAsync(InvoiceId.Value);
+        if (invoiceDto != null && invoiceDto.Estado == EstadoFactura.Borrador)
+        {
+            formModel.FormaDePago = invoiceDto.FormaDePago;
+            formModel.DiasCredito = invoiceDto.DiasCredito;
+            formModel.MontoAbonoInicial = invoiceDto.SaldoPendiente > 0 ? (invoiceDto.Total - invoiceDto.SaldoPendiente) : 0; // Aproximación del abono
+
+            if (invoiceDto.ClienteIdentificacion == "9999999999999")
+            {
+                customerSelectionType = "finalConsumer";
+            }
+            else
+            {
+                customerSelectionType = "existing";
+                selectedCustomer = allCustomers.FirstOrDefault(c => c.Id == invoiceDto.ClienteId);
+                formModel.SelectedClienteId = selectedCustomer?.Id;
+            }
+
+            invoiceItems = invoiceDto.Items.Select(item => new InvoiceItemViewModel
+            {
+                ProductoId = item.ProductoId,
+                ProductName = item.ProductName,
+                SafeCantidad = item.Cantidad,
+                PrecioVentaUnitario = item.PrecioVentaUnitario,
+                Taxes = item.Taxes
+            }).ToList();
+
+            UpdateTotals();
+        }
+        else
+        {
+            errorMessage = "El borrador de la factura no se pudo encontrar o no es un borrador válido.";
+            // Bloquear la edición
         }
     }
 
@@ -498,7 +564,7 @@
         return true;
     }
 
-    private async Task HandleCreateInvoice()
+    private async Task HandleSave(bool emitir)
     {
         isSubmitting = true;
         errorMessage = null;
@@ -520,29 +586,40 @@
             return;
         }
 
-        CreateInvoiceDto createDto = new CreateInvoiceDto
-        {
-            UsuarioIdCreador = Guid.Parse(userId),
-            // Usamos SafeCantidad
-            Items = invoiceItems.Select(i => new InvoiceItemDto { ProductoId = i.ProductoId, Cantidad = i.SafeCantidad }).ToList(),
-            FormaDePago = formModel.FormaDePago,
-            DiasCredito = formModel.FormaDePago == FormaDePago.Credito ? formModel.DiasCredito : null,
-            MontoAbonoInicial = formModel.FormaDePago == FormaDePago.Credito ? formModel.MontoAbonoInicial : 0,
-            EsBorrador = formModel.EsBorrador
-        };
-
-        if (customerSelectionType == "existing")
-        {
-            createDto.ClienteId = formModel.SelectedClienteId!.Value;
-        }
-        else
-        {
-            createDto.EsConsumidorFinal = true;
-        }
-
         try
         {
-            await InvoiceService.CreateInvoiceAsync(createDto);
+            if (isEditMode)
+            {
+                var updateDto = new UpdateInvoiceDto
+                {
+                    Id = InvoiceId.Value,
+                    UsuarioIdModificador = Guid.Parse(userId),
+                    Items = invoiceItems.Select(i => new InvoiceItemDto { ProductoId = i.ProductoId, Cantidad = i.SafeCantidad }).ToList(),
+                    FormaDePago = formModel.FormaDePago,
+                    DiasCredito = formModel.FormaDePago == FormaDePago.Credito ? formModel.DiasCredito : null,
+                    MontoAbonoInicial = formModel.FormaDePago == FormaDePago.Credito ? formModel.MontoAbonoInicial : 0,
+                    ClienteId = formModel.SelectedClienteId,
+                    EsConsumidorFinal = customerSelectionType == "finalConsumer",
+                    EmitirTrasGuardar = emitir
+                };
+                await InvoiceService.UpdateInvoiceAsync(updateDto);
+            }
+            else
+            {
+                var createDto = new CreateInvoiceDto
+                {
+                    UsuarioIdCreador = Guid.Parse(userId),
+                    Items = invoiceItems.Select(i => new InvoiceItemDto { ProductoId = i.ProductoId, Cantidad = i.SafeCantidad }).ToList(),
+                    FormaDePago = formModel.FormaDePago,
+                    DiasCredito = formModel.FormaDePago == FormaDePago.Credito ? formModel.DiasCredito : null,
+                    MontoAbonoInicial = formModel.FormaDePago == FormaDePago.Credito ? formModel.MontoAbonoInicial : 0,
+                    EsBorrador = formModel.EsBorrador,
+                    ClienteId = formModel.SelectedClienteId,
+                    EsConsumidorFinal = customerSelectionType == "finalConsumer"
+                };
+                await InvoiceService.CreateInvoiceAsync(createDto);
+            }
+            
             Navigation.NavigateTo("/invoices");
         }
         catch (Exception ex)
