@@ -51,94 +51,93 @@ namespace FacturasSRI.Infrastructure.Services
         }
 
         // 1. PARA EL LISTADO (Ligero)
-        public async Task<List<CreditNoteListItemDto>> GetCreditNotesAsync()
+        public async Task<List<CreditNoteDto>> GetCreditNotesAsync()
         {
             return await _context.NotasDeCredito
                 .AsNoTracking()
                 .Include(nc => nc.Cliente)
                 .Include(nc => nc.Factura)
                 .OrderByDescending(nc => nc.FechaEmision)
-                .Select(nc => new CreditNoteListItemDto
+                .Select(nc => new CreditNoteDto
                 {
                     Id = nc.Id,
                     NumeroNotaCredito = nc.NumeroNotaCredito,
                     FechaEmision = nc.FechaEmision,
                     ClienteNombre = nc.Cliente.RazonSocial,
-                    NumeroFacturaAfectada = nc.Factura.NumeroFactura,
+                    NumeroFacturaModificada = nc.Factura.NumeroFactura, 
                     Total = nc.Total,
-                    Estado = nc.Estado
+                    Estado = nc.Estado,
+                    RazonModificacion = nc.RazonModificacion
                 })
                 .ToListAsync();
         }
 
-        // 2. PARA VER DETALLES (Pesado)
+        // 2. PARA VER DETALLES (Pesado - Con cálculo dinámico de impuestos)
         public async Task<CreditNoteDetailViewDto?> GetCreditNoteDetailByIdAsync(Guid id)
         {   
-        await CheckSriStatusAsync(id);
+            await CheckSriStatusAsync(id);
 
-        var nc = await _context.NotasDeCredito
-            .Include(n => n.Cliente)
-            .Include(n => n.Factura)
-            .Include(n => n.InformacionSRI)
-            .Include(n => n.Detalles)
-                .ThenInclude(d => d.Producto)
-                .ThenInclude(p => p.ProductoImpuestos)
-                .ThenInclude(pi => pi.Impuesto)
-            .FirstOrDefaultAsync(n => n.Id == id);
+            var nc = await _context.NotasDeCredito
+                .Include(n => n.Cliente)
+                .Include(n => n.Factura)
+                .Include(n => n.InformacionSRI)
+                .Include(n => n.Detalles)
+                    .ThenInclude(d => d.Producto)
+                    .ThenInclude(p => p.ProductoImpuestos)
+                    .ThenInclude(pi => pi.Impuesto)
+                .FirstOrDefaultAsync(n => n.Id == id);
 
-        if (nc == null) return null;
+            if (nc == null) return null;
 
-        // 1. Mapeamos los items
-        var itemsDto = nc.Detalles.Select(d => new CreditNoteItemDetailDto
-        {
-            ProductName = d.Producto.Nombre,
-            Cantidad = d.Cantidad,
-            PrecioVentaUnitario = d.PrecioVentaUnitario,
-            Subtotal = d.Subtotal
-        }).ToList();
-
-        // 2. CALCULO DINÁMICO DE IMPUESTOS (TaxSummaries)
-        // Agrupamos por Nombre y Porcentaje del impuesto del producto asociado
-        var taxSummaries = nc.Detalles
-            .SelectMany(d => d.Producto.ProductoImpuestos.Select(pi => new 
+            // 1. Mapeamos los items
+            var itemsDto = nc.Detalles.Select(d => new CreditNoteItemDetailDto
             {
-                d.Subtotal,
-                TaxName = pi.Impuesto.Nombre,
-                TaxRate = pi.Impuesto.Porcentaje
-            }))
-            .GroupBy(x => new { x.TaxName, x.TaxRate })
-            .Select(g => new TaxSummary
-            {
-                TaxName = g.Key.TaxName,
-                TaxRate = g.Key.TaxRate,
-                // Calculamos cuánto IVA generó este grupo
-                Amount = g.Sum(x => x.Subtotal * (x.TaxRate / 100m)) 
-            })
-            .Where(x => x.Amount > 0 || x.TaxRate == 0) // Incluimos tarifa 0 si quieres mostrar base 0
-            .ToList();
+                ProductName = d.Producto.Nombre,
+                Cantidad = d.Cantidad,
+                PrecioVentaUnitario = d.PrecioVentaUnitario,
+                Subtotal = d.Subtotal
+            }).ToList();
 
-        return new CreditNoteDetailViewDto
-        {
-            Id = nc.Id,
-            NumeroNotaCredito = nc.NumeroNotaCredito,
-            FechaEmision = nc.FechaEmision,
-            ClienteNombre = nc.Cliente.RazonSocial,
-            ClienteIdentificacion = nc.Cliente.NumeroIdentificacion,
-            ClienteDireccion = nc.Cliente.Direccion,
-            ClienteEmail = nc.Cliente.Email,
-            NumeroFacturaModificada = nc.Factura.NumeroFactura,
-            FechaEmisionFacturaModificada = nc.Factura.FechaEmision,
-            RazonModificacion = nc.RazonModificacion,
-            SubtotalSinImpuestos = nc.SubtotalSinImpuestos,
-            TotalIVA = nc.TotalIVA,
-            Total = nc.Total,
-            Estado = nc.Estado,
-            ClaveAcceso = nc.InformacionSRI?.ClaveAcceso,
-            NumeroAutorizacion = nc.InformacionSRI?.NumeroAutorizacion,
-            Items = itemsDto,
-            TaxSummaries = taxSummaries
-        };
-    }
+            // 2. CALCULO DINÁMICO DE IMPUESTOS (TaxSummaries)
+            var taxSummaries = nc.Detalles
+                .SelectMany(d => d.Producto.ProductoImpuestos.Select(pi => new 
+                {
+                    d.Subtotal,
+                    TaxName = pi.Impuesto.Nombre,
+                    TaxRate = pi.Impuesto.Porcentaje
+                }))
+                .GroupBy(x => new { x.TaxName, x.TaxRate })
+                .Select(g => new TaxSummary
+                {
+                    TaxName = g.Key.TaxName,
+                    TaxRate = g.Key.TaxRate,
+                    Amount = g.Sum(x => x.Subtotal * (x.TaxRate / 100m)) 
+                })
+                .Where(x => x.Amount > 0 || x.TaxRate == 0)
+                .ToList();
+
+            return new CreditNoteDetailViewDto
+            {
+                Id = nc.Id,
+                NumeroNotaCredito = nc.NumeroNotaCredito,
+                FechaEmision = nc.FechaEmision,
+                ClienteNombre = nc.Cliente.RazonSocial,
+                ClienteIdentificacion = nc.Cliente.NumeroIdentificacion,
+                ClienteDireccion = nc.Cliente.Direccion,
+                ClienteEmail = nc.Cliente.Email,
+                NumeroFacturaModificada = nc.Factura.NumeroFactura,
+                FechaEmisionFacturaModificada = nc.Factura.FechaEmision,
+                RazonModificacion = nc.RazonModificacion,
+                SubtotalSinImpuestos = nc.SubtotalSinImpuestos,
+                TotalIVA = nc.TotalIVA,
+                Total = nc.Total,
+                Estado = nc.Estado,
+                ClaveAcceso = nc.InformacionSRI?.ClaveAcceso,
+                NumeroAutorizacion = nc.InformacionSRI?.NumeroAutorizacion,
+                Items = itemsDto,
+                TaxSummaries = taxSummaries
+            };
+        }
 
         // 3. CREACIÓN
         public async Task<NotaDeCredito> CreateCreditNoteAsync(CreateCreditNoteDto dto)
@@ -267,14 +266,12 @@ namespace FacturasSRI.Infrastructure.Services
         // 4. VERIFICACIÓN MANUAL / AUTOMÁTICA DE ESTADO
         public async Task CheckSriStatusAsync(Guid ncId)
         {
-            // Solo verificamos si está en un estado intermedio
             var nc = await _context.NotasDeCredito.Include(n => n.InformacionSRI).FirstOrDefaultAsync(n => n.Id == ncId);
             if (nc == null || nc.InformacionSRI == null) return;
             if (nc.Estado == EstadoNotaDeCredito.Autorizada || nc.Estado == EstadoNotaDeCredito.Cancelada) return;
 
             try
             {
-                // Si no tiene clave de acceso, no podemos consultar
                 if(string.IsNullOrEmpty(nc.InformacionSRI.ClaveAcceso)) return;
 
                 string respAut = await _sriApiClientService.ConsultarAutorizacionAsync(nc.InformacionSRI.ClaveAcceso);
@@ -334,9 +331,16 @@ namespace FacturasSRI.Infrastructure.Services
                     string respuestaRecepcionXml = await scopedSriClient.EnviarRecepcionAsync(xmlFirmadoBytes);
                     var respuestaRecepcion = scopedParser.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
+                    // Agregamos Includes de impuestos para poder calcular el PDF correctamente en background
                     var nc = await scopedContext.NotasDeCredito
-                        .Include(n => n.Cliente).Include(n => n.Factura).Include(n => n.Detalles).ThenInclude(d => d.Producto)
+                        .Include(n => n.Cliente)
+                        .Include(n => n.Factura)
+                        .Include(n => n.Detalles)
+                            .ThenInclude(d => d.Producto)
+                            .ThenInclude(p => p.ProductoImpuestos)
+                            .ThenInclude(pi => pi.Impuesto)
                         .FirstOrDefaultAsync(n => n.Id == ncId);
+                    
                     var ncSri = await scopedContext.NotasDeCreditoSRI.FirstOrDefaultAsync(x => x.NotaDeCreditoId == ncId);
 
                     if (respuestaRecepcion.Estado == "DEVUELTA")
@@ -363,6 +367,31 @@ namespace FacturasSRI.Infrastructure.Services
                                 // 3. ENVIAR CORREO
                                 try
                                 {
+                                    var itemsDto = nc.Detalles.Select(d => new CreditNoteItemDetailDto { 
+                                        ProductName = d.Producto.Nombre, 
+                                        Cantidad = d.Cantidad, 
+                                        PrecioVentaUnitario = d.PrecioVentaUnitario, 
+                                        Subtotal = d.Subtotal 
+                                    }).ToList();
+                                    
+                                    // CALCULAMOS IMPUESTOS DINÁMICOS PARA EL PDF DE FONDO
+                                    var taxSummaries = nc.Detalles
+                                        .SelectMany(d => d.Producto.ProductoImpuestos.Select(pi => new 
+                                        {
+                                            d.Subtotal,
+                                            TaxName = pi.Impuesto.Nombre,
+                                            TaxRate = pi.Impuesto.Porcentaje
+                                        }))
+                                        .GroupBy(x => new { x.TaxName, x.TaxRate })
+                                        .Select(g => new TaxSummary
+                                        {
+                                            TaxName = g.Key.TaxName,
+                                            TaxRate = g.Key.TaxRate,
+                                            Amount = g.Sum(x => x.Subtotal * (x.TaxRate / 100m)) 
+                                        })
+                                        .Where(x => x.Amount > 0 || x.TaxRate == 0)
+                                        .ToList();
+
                                     var ncDto = new CreditNoteDetailViewDto
                                     {
                                         NumeroNotaCredito = nc.NumeroNotaCredito,
@@ -379,8 +408,10 @@ namespace FacturasSRI.Infrastructure.Services
                                         Total = nc.Total,
                                         ClaveAcceso = ncSri.ClaveAcceso,
                                         NumeroAutorizacion = ncSri.NumeroAutorizacion,
-                                        Items = nc.Detalles.Select(d => new CreditNoteItemDetailDto { ProductName = d.Producto.Nombre, Cantidad = d.Cantidad, PrecioVentaUnitario = d.PrecioVentaUnitario, Subtotal = d.Subtotal }).ToList()
+                                        Items = itemsDto,
+                                        TaxSummaries = taxSummaries
                                     };
+                                    
                                     byte[] pdfBytes = scopedPdf.GenerarNotaCreditoPdf(ncDto);
                                     string xmlSigned = ncSri.XmlFirmado;
                                     await scopedEmail.SendCreditNoteEmailAsync(nc.Cliente.Email, nc.Cliente.RazonSocial, nc.NumeroNotaCredito, nc.Id, pdfBytes, xmlSigned);
