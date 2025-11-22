@@ -10,6 +10,7 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject Supabase.Client Supabase
+@using FacturasSRI.Domain.Enums
 
 <PageTitle>Registrar Compra</PageTitle>
 
@@ -78,12 +79,17 @@
             </div>
             <div class="row">
                 <div class="col-md-6">
-                    <div class="mb-3 form-check">
-                        <InputCheckbox id="esCredito" class="form-check-input" @bind-Value="newPurchase.EsCredito" disabled="@isSubmitting" />
-                        <label for="esCredito" class="form-check-label">Es compra a crédito</label>
+                    <div class="mb-3">
+                        <label for="formaDePago" class="form-label">Forma de Pago</label>
+                        <InputSelect id="formaDePago" class="form-select" @bind-Value="newPurchase.FormaDePago" disabled="@isSubmitting">
+                            @foreach (var forma in Enum.GetValues(typeof(FormaDePago)))
+                            {
+                                <option value="@forma">@forma.ToString()</option>
+                            }
+                        </InputSelect>
                     </div>
 
-                    @if (newPurchase.EsCredito)
+                    @if (newPurchase.FormaDePago == FormaDePago.Credito)
                     {
                         <div class="mb-3">
                             <label for="fechaVencimiento" class="form-label">Fecha de Vencimiento</label>

@@ -32,10 +32,12 @@
         </InputSelect>
     </div>
     <div class="col-md-3">
-        <InputSelect class="form-select" @bind-Value="selectedFormaDePagoString">
+        <InputSelect class="form-select" @bind-Value="selectedFormaDePago">
             <option value="">Todas las Formas de Pago</option>
-            <option value="False">Contado</option>
-            <option value="True">Crédito</option>
+            @foreach (var forma in Enum.GetValues(typeof(FormaDePago)))
+            {
+                <option value="@forma">@forma.ToString()</option>
+            }
         </InputSelect>
     </div>
 </div>
@@ -73,8 +75,8 @@ else if (FilteredPurchases.Any())
                                     </span>
                                 </td>
                                 <td>
-                                    <span class="badge @(purchase.EsCredito ? "bg-info text-dark" : "bg-light text-dark")">
-                                        @(purchase.EsCredito ? "Crédito" : "Contado")
+                                    <span class="badge @(purchase.FormaDePago == FormaDePago.Credito ? "bg-info text-dark" : "bg-light text-dark")">
+                                        @purchase.FormaDePago.ToString()
                                     </span>
                                 </td>
                                 <td>@purchase.ProductName</td>
@@ -112,8 +114,8 @@ else
     private bool isLoading = true;
     
     private string searchTerm = string.Empty;
-    private EstadoCompra? selectedStatus;
-    private string selectedFormaDePagoString = ""; // New string property for binding
+    private EstadoCompra? selectedStatus; // Changed default to null
+    private FormaDePago? selectedFormaDePago; // Use FormaDePago directly
 
     private List<PurchaseListItemDto> FilteredPurchases
     {
@@ -126,16 +128,9 @@ else
                 filtered = filtered.Where(p => p.Estado == selectedStatus.Value).ToList();
             }
             
-            // Parse selectedFormaDePagoString to bool?
-            bool? selectedFormaDePago = null;
-            if (!string.IsNullOrEmpty(selectedFormaDePagoString))
-            {
-                selectedFormaDePago = bool.Parse(selectedFormaDePagoString);
-            }
-
             if (selectedFormaDePago.HasValue)
             {
-                filtered = filtered.Where(p => p.EsCredito == selectedFormaDePago.Value).ToList();
+                filtered = filtered.Where(p => p.FormaDePago == selectedFormaDePago.Value).ToList();
             }
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
@@ -154,7 +149,7 @@ else
         {
             isLoading = true;
             allPurchases = await PurchaseService.GetPurchasesAsync();
-            selectedFormaDePagoString = ""; // Initialize to empty string for "Todas las Formas de Pago"
+            selectedFormaDePago = null; // Initialize to null for "Todas las Formas de Pago"
         }
         finally
         {
@@ -183,4 +178,5 @@ else
     {
         Navigation.NavigateTo($"/purchases/pay/{purchaseId}");
     }
+}
 }

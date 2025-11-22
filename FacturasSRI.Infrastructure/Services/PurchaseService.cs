@@ -57,7 +57,7 @@ namespace FacturasSRI.Infrastructure.Services
                 if (producto == null) throw new InvalidOperationException("El producto no existe.");
                 if (!producto.ManejaInventario) throw new InvalidOperationException("No se puede registrar una compra para un producto que no maneja inventario.");
 
-                if (purchaseDto.EsCredito && !purchaseDto.FechaVencimiento.HasValue)
+                if (purchaseDto.FormaDePago == FormaDePago.Credito && !purchaseDto.FechaVencimiento.HasValue)
                 {
                     throw new InvalidOperationException("Para compras a crédito, la fecha de vencimiento es obligatoria.");
                 }
@@ -75,10 +75,10 @@ namespace FacturasSRI.Infrastructure.Services
                     FechaEmision = DateTime.UtcNow,
                     MontoTotal = purchaseDto.MontoTotal,
                     Cantidad = purchaseDto.Cantidad,
-                    Estado = purchaseDto.EsCredito ? EstadoCompra.Pendiente : EstadoCompra.Pagada,
-                    // --- CORRECCIÓN AQUÍ ---
-                    FechaVencimiento = purchaseDto.EsCredito ? purchaseDto.FechaVencimiento!.Value.ToUniversalTime() : null,
-                    FechaPago = !purchaseDto.EsCredito ? (DateTime?)DateTime.UtcNow : null,
+                    Estado = purchaseDto.FormaDePago == FormaDePago.Credito ? EstadoCompra.Pendiente : EstadoCompra.Pagada,
+                    FormaDePago = purchaseDto.FormaDePago,
+                    FechaVencimiento = purchaseDto.FormaDePago == FormaDePago.Credito ? purchaseDto.FechaVencimiento!.Value.ToUniversalTime() : null,
+                    FechaPago = purchaseDto.FormaDePago == FormaDePago.Contado ? (DateTime?)DateTime.UtcNow : null,
                     UsuarioIdCreador = purchaseDto.UsuarioIdCreador,
                     FechaCreacion = DateTime.UtcNow
                 };
@@ -172,7 +172,7 @@ namespace FacturasSRI.Infrastructure.Services
                     FechaPago = p.FechaPago,
                     FacturaCompraPath = p.FacturaCompraPath,
                     ComprobantePagoPath = p.ComprobantePagoPath,
-                    EsCredito = p.FechaVencimiento.HasValue
+                    FormaDePago = p.FormaDePago
                 })
                 .ToListAsync();
         }
@@ -194,7 +194,7 @@ namespace FacturasSRI.Infrastructure.Services
                     FechaPago = p.FechaPago,
                     FacturaCompraPath = p.FacturaCompraPath,
                     ComprobantePagoPath = p.ComprobantePagoPath,
-                    EsCredito = p.FechaVencimiento.HasValue
+                    FormaDePago = p.FormaDePago
                 })
                 .FirstOrDefaultAsync();
         }

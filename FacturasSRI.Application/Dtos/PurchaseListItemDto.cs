@@ -17,6 +17,6 @@ namespace FacturasSRI.Application.Dtos
         public string? FacturaCompraPath { get; set; }
         public string? ComprobantePagoPath { get; set; }
         public string CreadoPor { get; set; } = string.Empty;
-        public bool EsCredito { get; set; }
+        public FormaDePago FormaDePago { get; set; }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using FacturasSRI.Domain.Enums;
 
 namespace FacturasSRI.Application.Dtos
 {
@@ -23,8 +24,8 @@ namespace FacturasSRI.Application.Dtos
 
         public Guid UsuarioIdCreador { get; set; }
 
-        // Nuevos campos para compras a crédito
-        public bool EsCredito { get; set; }
+        // Campo para la forma de pago (Contado/Crédito)
+        public FormaDePago FormaDePago { get; set; }
         public DateTime? FechaVencimiento { get; set; }
     }
 }

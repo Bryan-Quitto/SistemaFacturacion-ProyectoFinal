@@ -18,6 +18,7 @@ namespace FacturasSRI.Domain.Entities
         public decimal MontoTotal { get; set; }
         public int Cantidad { get; set; }
         public EstadoCompra Estado { get; set; }
+        public FormaDePago FormaDePago { get; set; } // Corrected: using FormaDePago instead of TipoDePago
         public DateTime? FechaPago { get; set; }
         public Guid UsuarioIdCreador { get; set; }
         public DateTime FechaCreacion { get; set; }
