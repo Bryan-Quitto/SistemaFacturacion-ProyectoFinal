@@ -22,8 +22,28 @@
     </button>
 </div>
 
-<div class="mb-3">
-    <input type="text" class="form-control" placeholder="Buscar facturas por número o cliente..." @bind-value="searchTerm" @bind-value:event="oninput" />
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" class="form-control" placeholder="Buscar facturas por número o cliente..." @bind-value="searchTerm" @bind-value:event="oninput" />
+    </div>
+    <div class="col-md-3">
+        <InputSelect class="form-select" @bind-Value="selectedStatus">
+            <option value="">Todos los Estados</option>
+            @foreach (var s in Enum.GetValues(typeof(EstadoFactura)))
+            {
+                <option value="@s">@s.ToString()</option>
+            }
+        </InputSelect>
+    </div>
+    <div class="col-md-3">
+        <InputSelect class="form-select" @bind-Value="selectedFormaDePago">
+            <option value="">Todas las Formas de Pago</option>
+            @foreach (var s in Enum.GetValues(typeof(FormaDePago)))
+            {
+                <option value="@s">@s.ToString()</option>
+            }
+        </InputSelect>
+    </div>
 </div>
 
 @if (errorMessage != null)
@@ -98,16 +118,41 @@
     private List<InvoiceDto>? allInvoices; // Holds all invoices
     private string? errorMessage;
 
-    private string searchTerm = string.Empty; // New property for search
+    private string searchTerm = string.Empty;
+    private EstadoFactura? selectedStatus;
+    private FormaDePago? selectedFormaDePago;
     private bool showRegistrarPagoModal = false;
     private Guid selectedInvoiceId;
     private Guid currentUserId;
 
-    private List<InvoiceDto> FilteredInvoices => string.IsNullOrWhiteSpace(searchTerm)
-        ? allInvoices ?? new()
-        : allInvoices?.Where(invoice => invoice.NumeroFactura.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                                        (invoice.ClienteNombre?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
-                      .ToList() ?? new();
+    private List<InvoiceDto> FilteredInvoices
+    {
+        get
+        {
+            var filtered = allInvoices;
+
+            if (filtered == null) return new List<InvoiceDto>();
+
+            if (selectedStatus.HasValue)
+            {
+                filtered = filtered.Where(i => i.Estado == selectedStatus.Value).ToList();
+            }
+
+            if (selectedFormaDePago.HasValue)
+            {
+                filtered = filtered.Where(i => i.FormaDePago == selectedFormaDePago.Value).ToList();
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filtered = filtered.Where(invoice => invoice.NumeroFactura.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                                (invoice.ClienteNombre?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+                                     .ToList();
+            }
+
+            return filtered;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

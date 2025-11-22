@@ -19,7 +19,7 @@
 </div>
 
 <div class="row mb-3">
-    <div class="col-md-8">
+    <div class="col-md-5">
         <input type="text" class="form-control" placeholder="Buscar por producto o proveedor..." @bind-value="searchTerm" @bind-value:event="oninput" />
     </div>
     <div class="col-md-4">
@@ -29,6 +29,13 @@
             {
                 <option value="@s">@s.ToString()</option>
             }
+        </InputSelect>
+    </div>
+    <div class="col-md-3">
+        <InputSelect class="form-select" @bind-Value="selectedFormaDePago">
+            <option value="">Todas las Formas de Pago</option>
+            <option value="@(false)">Contado</option>
+            <option value="@(true)">Crédito</option>
         </InputSelect>
     </div>
 </div>
@@ -106,6 +113,7 @@ else
     
     private string searchTerm = string.Empty;
     private EstadoCompra? selectedStatus = EstadoCompra.Pendiente;
+    private bool? selectedFormaDePago;
 
     private List<PurchaseListItemDto> FilteredPurchases
     {
@@ -116,6 +124,11 @@ else
             if (selectedStatus.HasValue)
             {
                 filtered = filtered.Where(p => p.Estado == selectedStatus.Value).ToList();
+            }
+            
+            if (selectedFormaDePago.HasValue)
+            {
+                filtered = filtered.Where(p => p.EsCredito == selectedFormaDePago.Value).ToList();
             }
 
             if (!string.IsNullOrWhiteSpace(searchTerm))

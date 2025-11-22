@@ -249,81 +249,12 @@ namespace FacturasSRI.Infrastructure.Services
                     invoice.TotalIVA = totalIva;
                     invoice.Total = subtotalSinImpuestos + totalIva;
                     
-                    // Assign payment terms to the invoice
+                    // Assign payment terms to the invoice, to be used after authorization
                     invoice.FormaDePago = invoiceDto.FormaDePago;
                     invoice.DiasCredito = invoiceDto.DiasCredito;
+                    invoice.MontoAbonoInicial = invoiceDto.MontoAbonoInicial;
 
                     _context.Facturas.Add(invoice);
-
-                    // Handle Accounts Receivable and initial payments
-                    if (invoiceDto.FormaDePago == FormaDePago.Contado)
-                    {
-                        // Create a fully paid CuentaPorCobrar
-                        var cuentaPorCobrar = new CuentaPorCobrar
-                        {
-                            Id = Guid.NewGuid(),
-                            FacturaId = invoice.Id,
-                            ClienteId = cliente.Id,
-                            FechaEmision = invoice.FechaEmision,
-                            FechaVencimiento = invoice.FechaEmision, // Paid immediately
-                            MontoTotal = invoice.Total,
-                            SaldoPendiente = 0,
-                            Pagada = true,
-                            UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
-                            FechaCreacion = DateTime.UtcNow
-                        };
-                        _context.CuentasPorCobrar.Add(cuentaPorCobrar);
-
-                        // Create a Cobro record for the full payment
-                        var cobro = new Cobro
-                        {
-                            Id = Guid.NewGuid(),
-                            FacturaId = invoice.Id,
-                            FechaCobro = DateTime.UtcNow,
-                            Monto = invoice.Total,
-                            MetodoDePago = "Contado", // Or a more specific method if available
-                            UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
-                            FechaCreacion = DateTime.UtcNow
-                        };
-                        _context.Cobros.Add(cobro);
-                    }
-                    else // FormaDePago.Credito
-                    {
-                        decimal saldoPendiente = invoice.Total;
-                        
-                        // If there's an initial payment, create a Cobro for it
-                        if (invoiceDto.MontoAbonoInicial > 0)
-                        {
-                            var abonoInicial = new Cobro
-                            {
-                                Id = Guid.NewGuid(),
-                                FacturaId = invoice.Id,
-                                FechaCobro = DateTime.UtcNow,
-                                Monto = invoiceDto.MontoAbonoInicial,
-                                MetodoDePago = "Abono Inicial", // Or a more specific method
-                                UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
-                                FechaCreacion = DateTime.UtcNow
-                            };
-                            _context.Cobros.Add(abonoInicial);
-                            saldoPendiente -= invoiceDto.MontoAbonoInicial;
-                        }
-
-                        // Create the CuentaPorCobrar with the remaining balance
-                        var cuentaPorCobrar = new CuentaPorCobrar
-                        {
-                            Id = Guid.NewGuid(),
-                            FacturaId = invoice.Id,
-                            ClienteId = cliente.Id,
-                            FechaEmision = invoice.FechaEmision,
-                            FechaVencimiento = invoice.FechaEmision.AddDays(invoiceDto.DiasCredito ?? 30), // Default 30 days
-                            MontoTotal = invoice.Total,
-                            SaldoPendiente = saldoPendiente,
-                            Pagada = saldoPendiente <= 0,
-                            UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
-                            FechaCreacion = DateTime.UtcNow
-                        };
-                        _context.CuentasPorCobrar.Add(cuentaPorCobrar);
-                    }
 
                     var rucEmisor = _configuration["CompanyInfo:Ruc"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:Ruc'.");
                     var environmentType = _configuration["CompanyInfo:EnvironmentType"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EnvironmentType'.");
@@ -460,6 +391,8 @@ namespace FacturasSRI.Infrastructure.Services
                         invoice.InformacionSRI.FechaAutorizacion = respuestaAutorizacion.FechaAutorizacion;
                         invoice.InformacionSRI.RespuestaSRI = "AUTORIZADO";
 
+                        await CrearCuentaPorCobrarPostAutorizacionAsync(invoice);
+
                         await _context.SaveChangesAsync();
 
                         // Intentamos enviar el correo (Fire & Forget safe)
@@ -526,11 +459,83 @@ namespace FacturasSRI.Infrastructure.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error al consultar el estado de la factura {InvoiceId} en el SRI.", invoiceId);
-                invoice.InformacionSRI.RespuestaSRI = $"Error de conexión: {ex.Message}";
-                await _context.SaveChangesAsync();
+                if (invoice?.InformacionSRI != null)
+                {
+                    invoice.InformacionSRI.RespuestaSRI = $"Error de conexión: {ex.Message}";
+                    await _context.SaveChangesAsync();
+                }
             }
 
             return await GetInvoiceDetailByIdAsync(invoiceId);
+        }
+
+        private async Task CrearCuentaPorCobrarPostAutorizacionAsync(Factura invoice)
+        {
+            var cuentaExistente = await _context.CuentasPorCobrar.FirstOrDefaultAsync(c => c.FacturaId == invoice.Id);
+            if (cuentaExistente != null)
+            {
+                return; // Ya existe, no hacer nada.
+            }
+
+            if (invoice.FormaDePago == FormaDePago.Contado)
+            {
+                var cuentaPorCobrar = new CuentaPorCobrar
+                {
+                    FacturaId = invoice.Id,
+                    ClienteId = invoice.ClienteId,
+                    FechaEmision = invoice.FechaEmision,
+                    FechaVencimiento = invoice.FechaEmision,
+                    MontoTotal = invoice.Total,
+                    SaldoPendiente = 0,
+                    Pagada = true,
+                    UsuarioIdCreador = invoice.UsuarioIdCreador,
+                    FechaCreacion = DateTime.UtcNow
+                };
+                _context.CuentasPorCobrar.Add(cuentaPorCobrar);
+
+                var cobro = new Cobro
+                {
+                    FacturaId = invoice.Id,
+                    FechaCobro = DateTime.UtcNow,
+                    Monto = invoice.Total,
+                    MetodoDePago = "Contado",
+                    UsuarioIdCreador = invoice.UsuarioIdCreador,
+                    FechaCreacion = DateTime.UtcNow
+                };
+                _context.Cobros.Add(cobro);
+            }
+            else // Credito
+            {
+                decimal saldoPendiente = invoice.Total;
+                if (invoice.MontoAbonoInicial > 0)
+                {
+                    var abonoInicial = new Cobro
+                    {
+                        FacturaId = invoice.Id,
+                        FechaCobro = DateTime.UtcNow,
+                        Monto = invoice.MontoAbonoInicial,
+                        MetodoDePago = "Abono Inicial",
+                        UsuarioIdCreador = invoice.UsuarioIdCreador,
+                        FechaCreacion = DateTime.UtcNow
+                    };
+                    _context.Cobros.Add(abonoInicial);
+                    saldoPendiente -= invoice.MontoAbonoInicial;
+                }
+
+                var cuentaPorCobrar = new CuentaPorCobrar
+                {
+                    FacturaId = invoice.Id,
+                    ClienteId = invoice.ClienteId,
+                    FechaEmision = invoice.FechaEmision,
+                    FechaVencimiento = invoice.FechaEmision.AddDays(invoice.DiasCredito ?? 30),
+                    MontoTotal = invoice.Total,
+                    SaldoPendiente = saldoPendiente,
+                    Pagada = saldoPendiente <= 0,
+                    UsuarioIdCreador = invoice.UsuarioIdCreador,
+                    FechaCreacion = DateTime.UtcNow
+                };
+                _context.CuentasPorCobrar.Add(cuentaPorCobrar);
+            }
         }
 
 

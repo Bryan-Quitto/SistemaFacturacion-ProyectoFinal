@@ -12,6 +12,7 @@ namespace FacturasSRI.Domain.Entities
         public EstadoFactura Estado { get; set; }
         public FormaDePago FormaDePago { get; set; }
         public int? DiasCredito { get; set; }
+        public decimal MontoAbonoInicial { get; set; }
         public Guid? ClienteId { get; set; }
         public virtual Cliente Cliente { get; set; } = null!;
         public decimal SubtotalSinImpuestos { get; set; }
