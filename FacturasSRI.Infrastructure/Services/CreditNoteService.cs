@@ -26,7 +26,7 @@ namespace FacturasSRI.Infrastructure.Services
         private readonly XmlGeneratorService _xmlGeneratorService;
         private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        // Semáforo para evitar colisiones de secuenciales
+        // Semáforo para evitar concurrencia en la generación de números secuenciales
         private static readonly SemaphoreSlim _ncSemaphore = new SemaphoreSlim(1, 1);
 
         public CreditNoteService(
@@ -43,62 +43,87 @@ namespace FacturasSRI.Infrastructure.Services
             _serviceScopeFactory = serviceScopeFactory;
         }
 
+        public async Task<List<CreditNoteListItemDto>> GetCreditNotesAsync()
+        {
+            var creditNotes = await _context.NotasDeCredito
+                .AsNoTracking()
+                .Include(nc => nc.Cliente)
+                .Include(nc => nc.Factura)
+                .OrderByDescending(nc => nc.FechaEmision)
+                .Select(nc => new CreditNoteListItemDto
+                {
+                    Id = nc.Id,
+                    NumeroNotaCredito = nc.NumeroNotaCredito,
+                    FechaEmision = nc.FechaEmision,
+                    ClienteNombre = nc.Cliente.RazonSocial,
+                    NumeroFacturaAfectada = nc.Factura.NumeroFactura,
+                    Total = nc.Total,
+                    Estado = nc.Estado
+                })
+                .ToListAsync();
+
+            return creditNotes;
+        }
+
         public async Task<NotaDeCredito> CreateCreditNoteAsync(CreateCreditNoteDto dto)
         {
             await _ncSemaphore.WaitAsync();
             try
             {
-                // 1. Validaciones Básicas
+                // 1. Validar Factura Origen
                 var factura = await _context.Facturas
                     .Include(f => f.Cliente)
-                    .Include(f => f.Detalles).ThenInclude(d => d.Producto).ThenInclude(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
+                    .Include(f => f.Detalles)
+                        .ThenInclude(d => d.Producto)
+                        .ThenInclude(p => p.ProductoImpuestos)
+                        .ThenInclude(pi => pi.Impuesto)
                     .FirstOrDefaultAsync(f => f.Id == dto.FacturaId);
 
-                if (factura == null) throw new Exception("Factura no encontrada.");
-                if (factura.Estado != EstadoFactura.Autorizada) throw new Exception("Solo se pueden emitir Notas de Crédito a Facturas AUTORIZADAS.");
+                if (factura == null) 
+                    throw new InvalidOperationException("La factura original no existe.");
+                
+                // Opcional: Validar que esté autorizada
+                if (factura.Estado != EstadoFactura.Autorizada) 
+                    throw new InvalidOperationException("Solo se pueden emitir Notas de Crédito a facturas AUTORIZADAS por el SRI.");
 
-                // 2. Configuración SRI
+                // 2. Configuración Básica
                 var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"];
                 var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"];
                 var rucEmisor = _configuration["CompanyInfo:Ruc"];
                 var environmentType = _configuration["CompanyInfo:EnvironmentType"];
+                var certPath = _configuration["CompanyInfo:CertificatePath"];
+                var certPass = _configuration["CompanyInfo:CertificatePassword"];
 
-                // 3. Obtener Secuencial
+                // 3. Obtener y Aumentar Secuencial
                 var secuencialEntity = await _context.Secuenciales
                     .FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
                 
-                // NOTA: Deberías tener una propiedad 'UltimoSecuencialNotaCredito' en tu entidad Secuencial.
-                // Si no la tienes, usa una lógica temporal o agrega la columna a la BD. 
-                // Asumiremos que usas el mismo objeto Secuencial pero necesitas una columna nueva. 
-                // *SI NO TIENES LA COLUMNA*: Puedes usar una tabla separada o un contador en codigo (no recomendado).
-                // Por ahora simulo que usas una propiedad genérica o que agregaste la columna.
-                // Asumiré que agregas la columna 'UltimoSecuencialNotaCredito' a tu Entidad Secuencial.
-                
-                // *** IMPORTANTE: SI ESTO DA ERROR, AGREGA LA COLUMNA EN TU ENTIDAD Y MIGRACIÓN ***
-                // secuencialEntity.UltimoSecuencialNotaCredito++; 
-                // int nextNum = secuencialEntity.UltimoSecuencialNotaCredito;
-                
-                // COMO SOLUCIÓN RÁPIDA SI NO QUIERES MIGRAR YA: Consultar la última NC creada
-                var lastNc = await _context.NotasDeCredito
-                    .OrderByDescending(n => n.NumeroNotaCredito)
-                    .FirstOrDefaultAsync();
-                
-                int nextSequence = 1;
-                if(lastNc != null && int.TryParse(lastNc.NumeroNotaCredito, out int lastNum))
-                    nextSequence = lastNum + 1;
+                if (secuencialEntity == null)
+                {
+                    // Si no existe, crear uno (caso raro si ya facturaste)
+                    secuencialEntity = new Secuencial 
+                    { 
+                        Id = Guid.NewGuid(), 
+                        Establecimiento = establishmentCode, 
+                        PuntoEmision = emissionPointCode, 
+                        UltimoSecuencialFactura = 0,
+                        UltimoSecuencialNotaCredito = 0 
+                    };
+                    _context.Secuenciales.Add(secuencialEntity);
+                }
 
-                string numeroSecuencialStr = nextSequence.ToString("D9");
-                // Fin lógica secuencial temporal
+                secuencialEntity.UltimoSecuencialNotaCredito++;
+                string numeroSecuencialStr = secuencialEntity.UltimoSecuencialNotaCredito.ToString("D9");
 
-                // 4. Crear Entidad Nota Crédito
+                // 4. Construir la Nota de Crédito
                 var nc = new NotaDeCredito
                 {
                     Id = Guid.NewGuid(),
                     FacturaId = factura.Id,
                     ClienteId = factura.ClienteId.Value,
                     FechaEmision = DateTime.UtcNow,
-                    NumeroNotaCredito = numeroSecuencialStr,
-                    Estado = EstadoNotaDeCredito.Pendiente, // Se crea directo como pendiente para enviar
+                    NumeroNotaCredito = numeroSecuencialStr, // Solo el secuencial (ej: 000000005)
+                    Estado = EstadoNotaDeCredito.Pendiente, 
                     RazonModificacion = dto.RazonModificacion,
                     UsuarioIdCreador = dto.UsuarioIdCreador,
                     FechaCreacion = DateTime.UtcNow
@@ -107,39 +132,42 @@ namespace FacturasSRI.Infrastructure.Services
                 decimal subtotalAccum = 0;
                 decimal ivaAccum = 0;
 
-                // 5. Procesar Detalles y DEVOLVER STOCK
+                // 5. Procesar Items y Devolución de Stock
                 foreach (var itemDto in dto.Items)
                 {
                     if (itemDto.CantidadDevolucion <= 0) continue;
 
                     var detalleFactura = factura.Detalles.FirstOrDefault(d => d.ProductoId == itemDto.ProductoId);
-                    if (detalleFactura == null) throw new Exception($"Producto {itemDto.ProductoId} no existe en la factura original.");
+                    if (detalleFactura == null) 
+                        throw new Exception($"El producto ID {itemDto.ProductoId} no pertenece a la factura original.");
 
                     if (itemDto.CantidadDevolucion > detalleFactura.Cantidad)
-                        throw new Exception($"No puedes devolver más de lo comprado para el producto {detalleFactura.Producto.Nombre}.");
+                        throw new Exception($"Estás intentando devolver {itemDto.CantidadDevolucion} de {detalleFactura.Producto.Nombre}, pero solo se compraron {detalleFactura.Cantidad}.");
 
-                    // Calcular valores proporcionales
+                    // Cálculos económicos
                     decimal precioUnit = detalleFactura.PrecioVentaUnitario;
                     decimal subtotalItem = itemDto.CantidadDevolucion * precioUnit;
                     
-                    // Calcular IVA
-                    var impuestoIva = detalleFactura.Producto.ProductoImpuestos.FirstOrDefault(pi => pi.Impuesto.Porcentaje > 0);
+                    // Calcular IVA proporcional
                     decimal valorIvaItem = 0;
+                    var impuestoIva = detalleFactura.Producto.ProductoImpuestos
+                        .FirstOrDefault(pi => pi.Impuesto.Porcentaje > 0);
+
                     if (impuestoIva != null)
                     {
                         valorIvaItem = subtotalItem * (impuestoIva.Impuesto.Porcentaje / 100);
                     }
 
-                    // Crear Detalle NC
+                    // Crear Detalle de NC
                     var detalleNc = new NotaDeCreditoDetalle
                     {
                         Id = Guid.NewGuid(),
                         NotaDeCreditoId = nc.Id,
                         ProductoId = itemDto.ProductoId,
-                        Producto = detalleFactura.Producto, // EF Navigation
+                        Producto = detalleFactura.Producto, // Link EF
                         Cantidad = itemDto.CantidadDevolucion,
                         PrecioVentaUnitario = precioUnit,
-                        DescuentoAplicado = 0, // Simplificado por ahora
+                        DescuentoAplicado = 0, 
                         Subtotal = subtotalItem,
                         ValorIVA = valorIvaItem
                     };
@@ -148,7 +176,7 @@ namespace FacturasSRI.Infrastructure.Services
                     subtotalAccum += subtotalItem;
                     ivaAccum += valorIvaItem;
 
-                    // LOGICA CRÍTICA: DEVOLUCIÓN DE STOCK
+                    // LOGICA DE INVENTARIO
                     if (detalleFactura.Producto.ManejaInventario)
                     {
                         if (detalleFactura.Producto.ManejaLotes)
@@ -157,21 +185,30 @@ namespace FacturasSRI.Infrastructure.Services
                         }
                         else
                         {
+                            // Devolución simple
                             detalleFactura.Producto.StockTotal += itemDto.CantidadDevolucion;
                         }
                     }
                 }
 
+                // Totales NC
                 nc.SubtotalSinImpuestos = subtotalAccum;
                 nc.TotalIVA = ivaAccum;
                 nc.Total = subtotalAccum + ivaAccum;
 
                 _context.NotasDeCredito.Add(nc);
 
-                // 6. Generar Clave Acceso
+                // 6. Generar Clave Acceso (Tipo Comprobante "04")
                 var fechaEcuador = GetEcuadorTime(nc.FechaEmision);
-                // Tipo Comprobante "04" para Nota Crédito
-                string claveAcceso = GenerarClaveAcceso(fechaEcuador, "04", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencialStr, environmentType);
+                string claveAcceso = GenerarClaveAcceso(
+                    fechaEcuador, 
+                    "04", // 04 = Nota Crédito
+                    rucEmisor, 
+                    establishmentCode, 
+                    emissionPointCode, 
+                    numeroSecuencialStr, 
+                    environmentType
+                );
 
                 var ncSri = new NotaDeCreditoSRI
                 {
@@ -181,21 +218,23 @@ namespace FacturasSRI.Infrastructure.Services
                 _context.NotasDeCreditoSRI.Add(ncSri);
 
                 // 7. Generar XML y Firmar
-                var certPath = _configuration["CompanyInfo:CertificatePath"];
-                var certPass = _configuration["CompanyInfo:CertificatePassword"];
-
+                // NOTA: Aquí pasamos 'factura' porque el XML necesita el número y fecha de la factura original
                 var (xmlGenerado, xmlFirmadoBytes) = _xmlGeneratorService.GenerarYFirmarNotaCredito(
-                    claveAcceso, nc, factura.Cliente, factura, certPath, certPass);
+                    claveAcceso, 
+                    nc, 
+                    factura.Cliente, 
+                    factura, 
+                    certPath, 
+                    certPass
+                );
 
                 ncSri.XmlGenerado = xmlGenerado;
                 ncSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
-
-                // Actualizar estado a Enviada (optimista) o lista para enviar
-                nc.Estado = EstadoNotaDeCredito.EnviadaSRI; 
+                nc.Estado = EstadoNotaDeCredito.EnviadaSRI;
 
                 await _context.SaveChangesAsync();
 
-                // 8. Background Task para Enviar al SRI (Fire and Forget)
+                // 8. Enviar al SRI en segundo plano (Fire & Forget)
                 _ = Task.Run(() => EnviarNcAlSriEnFondoAsync(nc.Id, xmlFirmadoBytes));
 
                 return nc;
@@ -213,38 +252,30 @@ namespace FacturasSRI.Infrastructure.Services
 
         private async Task DevolverStockALotes(Guid detalleFacturaId, int cantidadADevolver)
         {
-            // Buscamos qué lotes se consumieron para esa línea de factura específica
+            // Buscamos qué lotes se consumieron específicamente en esa venta
             var consumos = await _context.FacturaDetalleConsumoLotes
                 .Where(c => c.FacturaDetalleId == detalleFacturaId)
                 .Include(c => c.Lote)
-                .OrderByDescending(c => c.Lote.FechaCaducidad) // Preferencia: Devolver al que vence más tarde (opcional)
+                .OrderByDescending(c => c.Lote.FechaCaducidad) 
                 .ToListAsync();
 
             int remanente = cantidadADevolver;
 
-            // Primero intentamos devolver a los mismos lotes de donde salieron
             foreach (var consumo in consumos)
             {
                 if (remanente <= 0) break;
-
-                // No hay límite estricto de cuánto devolver a un lote, 
-                // pero lo lógico es no devolver más de lo que salió de ese lote específico si quisiéramos ser estrictos.
-                // Para simplificar en 4to semestre: Simplemente sumamos al lote.
                 
-                consumo.Lote.CantidadDisponible += remanente; // Aquí sumamos todo al primer lote encontrado o distribuimos
-                // Si quisiéramos distribuir exactamente:
-                // int devolverAqui = Math.Min(remanente, consumo.CantidadConsumida); 
-                // consumo.Lote.CantidadDisponible += devolverAqui;
-                // remanente -= devolverAqui;
-
-                // Estrategia Simple: Devolvemos todo al lote más reciente usado
+                // Devolvemos al lote disponible
+                consumo.Lote.CantidadDisponible += remanente; 
+                
+                // Nota: Para simplificar, devolvemos todo el remanente al lote más nuevo que encontramos primero
+                // (o podrías distribuir según 'consumo.CantidadConsumida')
                 remanente = 0; 
             }
 
-            // Si por alguna razón no hubo consumo registrado (error de datos), sumamos al stock general o lanzamos alerta
             if (remanente > 0)
             {
-                 _logger.LogWarning($"No se encontró lote para devolver {remanente} items del detalle {detalleFacturaId}. Stock podría descuadrar a nivel de lote.");
+                 _logger.LogWarning($"Sobraron {remanente} items por devolver y no se encontraron lotes asociados. Se perderán del stock detallado.");
             }
         }
 
@@ -261,6 +292,7 @@ namespace FacturasSRI.Infrastructure.Services
                 {
                     scopedLogger.LogInformation($"[BG-NC] Enviando Nota Credito {ncId} al SRI...");
                     
+                    // 1. Enviar Recepción
                     string respuestaRecepcionXml = await scopedSriClient.EnviarRecepcionAsync(xmlFirmadoBytes);
                     var respuestaRecepcion = scopedParser.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
@@ -271,14 +303,14 @@ namespace FacturasSRI.Infrastructure.Services
                     {
                         nc.Estado = EstadoNotaDeCredito.RechazadaSRI;
                         ncSri.RespuestaSRI = JsonSerializer.Serialize(respuestaRecepcion.Errores);
-                        scopedLogger.LogWarning("[BG-NC] NC Rechazada.");
+                        scopedLogger.LogWarning("[BG-NC] NC Rechazada por SRI.");
                     }
                     else
                     {
-                        // Si fue recibida, intentamos autorizar inmediatamente
+                        // 2. Si fue recibida, intentamos Autorizar
                          try
                         {
-                            await Task.Delay(1500); // Espera prudencial
+                            await Task.Delay(2000); // Esperar al SRI
                             string respAut = await scopedSriClient.ConsultarAutorizacionAsync(ncSri.ClaveAcceso);
                             var autObj = scopedParser.ParsearRespuestaAutorizacion(respAut);
 
@@ -288,17 +320,17 @@ namespace FacturasSRI.Infrastructure.Services
                                 ncSri.NumeroAutorizacion = autObj.NumeroAutorizacion;
                                 ncSri.FechaAutorizacion = autObj.FechaAutorizacion;
                                 ncSri.RespuestaSRI = "AUTORIZADO";
+                                scopedLogger.LogInformation("[BG-NC] NC Autorizada Exitosamente.");
                             }
                             else
                             {
-                                // Queda en EnviadaSRI, un job posterior o consulta manual revisará
                                 ncSri.RespuestaSRI = JsonSerializer.Serialize(autObj.Errores);
                             }
                         }
                         catch
                         {
-                            // Si falla autorización, queda en RECIBIDA
-                            nc.Estado = EstadoNotaDeCredito.EnviadaSRI;
+                            // Si falla la conexión en autorización, se queda en EnviadaSRI
+                            // El usuario podrá reintentar luego si implementas un botón de "Refrescar Estado"
                         }
                     }
                     
@@ -306,17 +338,17 @@ namespace FacturasSRI.Infrastructure.Services
                 }
                 catch (Exception ex)
                 {
-                    scopedLogger.LogError(ex, "[BG-NC] Error enviando NC al SRI");
+                    scopedLogger.LogError(ex, "[BG-NC] Error crítico en envío background.");
                 }
             }
         }
 
-        // --- LÓGICA DUPLICADA DE KEY GENERATION (Mover a SharedHelper en el futuro) ---
+        // Helper privado para Clave Acceso (Copia de InvoiceService)
         private string GenerarClaveAcceso(DateTime fechaEmision, string tipoComprobante, string ruc, string establecimiento, string puntoEmision, string secuencial, string tipoAmbiente)
         {
             var fecha = fechaEmision.ToString("ddMMyyyy");
-            var tipoEmision = "1"; // Normal
-            var codigoNumerico = "12345678"; // Estático para pruebas o random
+            var tipoEmision = "1"; 
+            var codigoNumerico = "12345678"; 
             var clave = new StringBuilder();
             clave.Append(fecha);
             clave.Append(tipoComprobante);

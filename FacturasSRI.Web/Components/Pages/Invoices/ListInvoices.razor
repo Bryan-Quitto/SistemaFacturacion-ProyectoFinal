@@ -93,7 +93,6 @@ else
                             @GetStatusBadge(invoice.Estado)
                         </td>
                         <td class="text-end">
-                            @* LOGICA SALDO: Si no está autorizada, no importa el saldo *@
                             @if (invoice.Estado != EstadoFactura.Autorizada)
                             {
                                 <span class="text-muted small">No aplica</span>
@@ -115,52 +114,61 @@ else
                             }
                         </td>
                         <td class="text-end fw-bold">@invoice.Total.ToString("C")</td>
-                                                        <td class="text-end">
-                                                    <div class="btn-group" role="group">
-                                                        <a href="@($"invoices/{invoice.Id}")" class="btn btn-sm btn-outline-secondary" title="Ver Detalles">
-                                                            <i class="bi bi-eye-fill"></i>
-                                                        </a>
-                                                        
-                                                        @if (invoice.Estado == EstadoFactura.Borrador)
-                                                        {
-                                                            <a href="@($"invoices/edit/{invoice.Id}")" class="btn btn-sm btn-outline-primary" title="Editar Borrador">
-                                                                <i class="bi bi-pencil-fill"></i>
-                                                            </a>
-                                                            <button class="btn btn-sm btn-outline-danger" title="Cancelar Borrador" @onclick="() => OpenCancelModal(invoice.Id)">
-                                                                <i class="bi bi-x-circle-fill"></i>
-                                                            </button>
-                                                        }
-                                                        else if (invoice.Estado == EstadoFactura.Cancelada && userIsAdmin)
-                                                        {
-                                                            <button class="btn btn-sm btn-outline-warning" title="Reactivar Borrador" @onclick="() => ReactivateInvoice(invoice.Id)">
-                                                                <i class="bi bi-arrow-counterclockwise"></i>
-                                                            </button>
-                                                        }
-                        
-                        
-                                                        @if (invoice.Estado != EstadoFactura.Borrador && invoice.Estado != EstadoFactura.Cancelada)
-                                                        {
-                                                            @if (invoice.FormaDePago == FormaDePago.Credito 
-                                                                && invoice.SaldoPendiente > 0 
-                                                                && invoice.Estado == EstadoFactura.Autorizada)
-                                                            {
-                                                                <a href="@($"invoices/register-payment/{invoice.Id}")" class="btn btn-sm btn-outline-success" title="Registrar Pago">
-                                                                    <i class="bi bi-cash-coin"></i>
-                                                                </a>
-                                                            }
-                        
-                                                            <a href="/api/downloads/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
-                                                                <i class="bi bi-file-earmark-pdf"></i>
-                                                            </a>
-                                                        }
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
+                        <td class="text-end">
+                            <div class="btn-group" role="group">
+                                <a href="@($"invoices/{invoice.Id}")" class="btn btn-sm btn-outline-secondary" title="Ver Detalles">
+                                    <i class="bi bi-eye-fill"></i>
+                                </a>
+
+                                @if (invoice.Estado == EstadoFactura.Borrador)
+                                {
+                                    <a href="@($"invoices/edit/{invoice.Id}")" class="btn btn-sm btn-outline-primary" title="Editar Borrador">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-danger" title="Cancelar Borrador" @onclick="() => OpenCancelModal(invoice.Id)">
+                                        <i class="bi bi-x-circle-fill"></i>
+                                    </button>
+                                }
+                                else if (invoice.Estado == EstadoFactura.Cancelada && userIsAdmin)
+                                {
+                                    <button class="btn btn-sm btn-outline-warning" title="Reactivar Borrador" @onclick="() => ReactivateInvoice(invoice.Id)">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                }
+
+                                @if (invoice.Estado != EstadoFactura.Borrador && invoice.Estado != EstadoFactura.Cancelada)
+                                {
+                                    @* BOTÓN DE PAGO (Solo crédito y con saldo) *@
+                                    @if (invoice.FormaDePago == FormaDePago.Credito
+                                       && invoice.SaldoPendiente > 0
+                                       && invoice.Estado == EstadoFactura.Autorizada)
+                                    {
+                                        <a href="@($"invoices/register-payment/{invoice.Id}")" class="btn btn-sm btn-outline-success" title="Registrar Pago">
+                                            <i class="bi bi-cash-coin"></i>
+                                        </a>
+                                    }
+                                    
+                                    @* === NUEVO BOTÓN: NOTA DE CRÉDITO === *@
+                                    @if (invoice.Estado == EstadoFactura.Autorizada)
+                                    {
+                                         <a href="@($"credit-notes/create/{invoice.Id}")" class="btn btn-sm btn-outline-warning" title="Emitir Nota de Crédito">
+                                            <i class="bi bi-arrow-return-left"></i>
+                                        </a>                                       
+                                    }
+
+                                    @* BOTÓN RIDE PDF *@
+                                    <a href="/api/downloads/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                    </a>
+                                }
                             </div>
-                        }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
                         
                         @if (showCancelModal)
                         {

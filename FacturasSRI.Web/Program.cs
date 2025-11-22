@@ -60,6 +60,7 @@ builder.Services.AddScoped<FacturasSRI.Core.Services.FirmaDigitalService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.XmlGeneratorService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.SriApiClientService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.SriResponseParserService>();
+builder.Services.AddScoped<CreditNoteService>();
 
 builder.Services.AddScoped<FacturasSRI.Infrastructure.Services.PdfGeneratorService>();
 

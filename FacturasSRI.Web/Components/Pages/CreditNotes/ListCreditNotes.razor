@@ -1,0 +1,103 @@
+@page "/credit-notes"
+@attribute [Authorize]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Infrastructure.Services
+@using FacturasSRI.Domain.Enums
+@inject CreditNoteService CreditNoteService
+@inject NavigationManager Navigation
+
+<PageTitle>Notas de Crédito</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Notas de Crédito Emitidas</h1>
+</div>
+
+@if (allCreditNotes == null)
+{
+    <p><em>Cargando notas de crédito...</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Factura Afectada</th>
+                    <th>Cliente</th>
+                    <th>Fecha</th>
+                    <th>Estado SRI</th>
+                    <th class="text-end">Total</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var cn in allCreditNotes)
+                {
+                    <tr>
+                        <td class="fw-bold">@cn.NumeroNotaCredito</td>
+                        <td>@cn.NumeroFacturaAfectada</td>
+                        <td>@cn.ClienteNombre</td>
+                        <td>@cn.FechaEmision.ToShortDateString()</td>
+                        <td>
+                            @GetStatusBadge(cn.Estado)
+                        </td>
+                        <td class="text-end fw-bold">@cn.Total.ToString("C")</td>
+                        <td class="text-end">
+                            <div class="btn-group" role="group">
+                                <a href="@($"credit-notes/{cn.Id}")" class="btn btn-sm btn-outline-secondary" title="Ver Detalles">
+                                    <i class="bi bi-eye-fill"></i>
+                                </a>
+                                <a href="/api/downloads/credit-note-ride/@cn.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<CreditNoteListItemDto>? allCreditNotes;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allCreditNotes = await CreditNoteService.GetCreditNotesAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar las notas de crédito: {ex.Message}";
+        }
+    }
+
+    private RenderFragment GetStatusBadge(EstadoNotaDeCredito estado)
+    {
+        return builder =>
+        {
+            var (badgeClass, iconClass, text) = estado switch
+            {
+                EstadoNotaDeCredito.Autorizada => ("bg-success", "bi-check-circle-fill", "Autorizada"),
+                EstadoNotaDeCredito.Pendiente => ("bg-secondary", "bi-clock-history", "Pendiente"),
+                EstadoNotaDeCredito.EnviadaSRI => ("bg-info text-dark", "bi-send", "Enviada"),
+                EstadoNotaDeCredito.RechazadaSRI => ("bg-danger", "bi-x-octagon-fill", "Rechazada"),
+                _ => ("bg-dark", "bi-question-circle", estado.ToString())
+            };
+
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", $"badge {badgeClass}");
+            
+            builder.OpenElement(2, "i");
+            builder.AddAttribute(3, "class", $"bi {iconClass} me-1");
+            builder.CloseElement();
+            
+            builder.AddContent(4, text);
+            builder.CloseElement();
+        };
+    }
+}

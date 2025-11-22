@@ -1,0 +1,362 @@
+@page "/credit-notes/create/{InvoiceId:guid}"
+@attribute [Authorize]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Infrastructure.Services
+@using System.Security.Claims
+@using FacturasSRI.Domain.Enums
+@inject IInvoiceService InvoiceService
+@inject CreditNoteService CreditNoteService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Emitir Nota de Crédito</PageTitle>
+
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h2 fw-bold mb-0 text-dark">Emitir Nota de Crédito</h1>
+            <small class="text-muted">Factura Afectada: <strong>@invoiceNumber</strong></small>
+        </div>
+        <button type="button" class="btn btn-sm btn-light border" @onclick='() => Navigation.NavigateTo("/invoices")'>
+            <i class="bi bi-x-lg me-1"></i>Cancelar
+        </button>
+    </div>
+
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger py-2 px-3 d-flex align-items-center shadow-sm mb-3 border-0 small" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div class="flex-grow-1">@errorMessage</div>
+            <button type="button" class="btn-close btn-close-white small" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    <EditForm Model="@formModel" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+
+        <div class="row g-3">
+            <!-- COLUMNA IZQUIERDA: ITEMS -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0 rounded-3 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="m-0 fw-bold text-primary"><i class="bi bi-box-seam me-2"></i>Seleccione los productos a devolver</h6>
+                    </div>
+                    <div class="card-body p-0 d-flex flex-column">
+                        
+                        <div class="table-responsive flex-grow-1">
+                            <table class="table table-hover table-sm table-compact align-middle mb-0">
+                                <thead class="bg-white text-uppercase text-secondary border-bottom">
+                                    <tr>
+                                        <th class="ps-3" style="width: 40%;">Producto</th>
+                                        <th class="text-center" style="width: 15%;">Comprado</th>
+                                        <th class="text-center" style="width: 15%;">Devolver</th>
+                                        <th class="text-end" style="width: 15%;">Precio</th>
+                                        <th class="text-end pe-3" style="width: 15%;">Total Dev.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (items == null)
+                                    {
+                                        <tr><td colspan="5" class="text-center py-4">Cargando detalles...</td></tr>
+                                    }
+                                    else if (!items.Any())
+                                    {
+                                        <tr><td colspan="5" class="text-center py-4">Esta factura no tiene items.</td></tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var item in items)
+                                        {
+                                            <tr class="@(item.ReturnQuantity > 0 ? "bg-primary bg-opacity-10" : "")">
+                                                <td class="ps-3">
+                                                    <div class="fw-medium text-dark text-truncate" title="@item.ProductName">@item.ProductName</div>
+                                                </td>
+                                                <td class="text-center text-muted">
+                                                    @item.OriginalQuantity
+                                                </td>
+                                                <td class="text-center">
+                                                    <!-- Input controlado: No puede ser menor a 0 ni mayor a lo comprado -->
+                                                    <InputNumber class="form-control form-control-sm text-center fw-bold border-0 p-0 shadow-none"
+                                                                 @bind-Value="item.ReturnQuantity"
+                                                                 @bind-Value:after="UpdateTotals"
+                                                                 min="0" max="@item.OriginalQuantity"
+                                                                 style="width: 60px; margin: 0 auto; background: transparent;" />
+                                                </td>
+                                                <td class="text-end text-muted">@item.UnitTestPrice.ToString("F2")</td>
+                                                <td class="text-end pe-3 fw-bold text-dark">
+                                                    @((item.ReturnQuantity * item.UnitTestPrice).ToString("F2"))
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="bg-light bg-opacity-10 p-3 mt-auto border-top">
+                            <div class="row justify-content-end">
+                                <div class="col-md-7 col-lg-5">
+                                    <table class="table table-borderless table-sm mb-0 small">
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-secondary text-end py-0">Subtotal 15%:</td>
+                                                <td class="text-end fw-medium py-0" style="width: 90px;">@subtotal15.ToString("C")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-secondary text-end py-0">Subtotal 0%:</td>
+                                                <td class="text-end fw-medium py-0">@subtotal0.ToString("C")</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-secondary text-end py-0">IVA 15%:</td>
+                                                <td class="text-end fw-medium py-0">@totalIva.ToString("C")</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    
+                                    <div class="invoice-total-row d-flex justify-content-between align-items-center border border-primary border-opacity-10 bg-white mt-2 p-2 rounded">
+                                        <span class="fw-bold text-brand small text-uppercase">Total Devolución</span>
+                                        <span class="fs-5 fw-bold text-brand">@total.ToString("C")</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUMNA DERECHA: INFO Y ACCIONES -->
+            <div class="col-lg-4 d-flex flex-column gap-3">
+                
+                <!-- DATOS FACTURA ORIGEN -->
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-body p-3">
+                        <h6 class="fw-bold mb-2 small text-uppercase text-muted d-flex align-items-center">
+                            <i class="bi bi-info-circle me-2"></i> Factura Original
+                        </h6>
+                        <div class="bg-light rounded p-2 border small">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">Cliente:</span>
+                                <span class="fw-bold text-end text-truncate" style="max-width: 150px;">@customerName</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">Identificación:</span>
+                                <span>@customerIdent</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Fecha Emisión:</span>
+                                <span>@invoiceDate.ToShortDateString()</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RAZÓN DE LA MODIFICACIÓN -->
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-body p-3">
+                        <h6 class="fw-bold mb-2 small text-uppercase text-muted d-flex align-items-center">
+                            <i class="bi bi-pencil-square me-2"></i> Motivo (Obligatorio)
+                        </h6>
+                        <InputTextArea @bind-Value="formModel.RazonModificacion" 
+                                       class="form-control form-control-sm shadow-none" 
+                                       rows="3" 
+                                       placeholder="Ej: Devolución de mercadería por daño..." />
+                        <ValidationMessage For="@(() => formModel.RazonModificacion)" class="text-danger small" />
+                    </div>
+                </div>
+
+                <!-- BOTÓN SUBMIT -->
+                <div class="mt-auto">
+                     <div class="alert alert-info small border-0 bg-info bg-opacity-10">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        Al emitir, el stock de los productos devueltos se sumará automáticamente al inventario.
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-2 shadow-sm fw-bold text-uppercase"
+                            style="letter-spacing: 0.5px; font-size: 0.9rem;"
+                            disabled="@(isSubmitting || total <= 0)">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span> <span>Procesando...</span>
+                        }
+                        else
+                        {
+                            <span><i class="bi bi-send-check-fill me-2"></i> Emitir Nota Crédito</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </EditForm>
+</div>
+
+<style>
+    .hover-opacity-100:hover { opacity: 1 !important; }
+    .text-brand { color: var(--bs-primary); } /* Asumiendo que usas Bootstrap colors */
+</style>
+
+@code {
+    [Parameter]
+    public Guid InvoiceId { get; set; }
+
+    private string? errorMessage;
+    private bool isSubmitting = false;
+
+    // Datos de visualización
+    private string invoiceNumber = "Cargando...";
+    private string customerName = "";
+    private string customerIdent = "";
+    private DateTime invoiceDate;
+
+    // Modelo para la lógica visual de los items
+    private List<CreditNoteItemVm> items = new();
+
+    // Modelo para el DTO de envío
+    private CreateCreditNoteDto formModel = new();
+
+    // Totales calculados
+    private decimal subtotal15 = 0;
+    private decimal subtotal0 = 0;
+    private decimal totalIva = 0;
+    private decimal total = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var invoice = await InvoiceService.GetInvoiceDetailByIdAsync(InvoiceId);
+
+            if (invoice == null)
+            {
+                errorMessage = "Factura no encontrada.";
+                return;
+            }
+
+            if (invoice.Estado != EstadoFactura.Autorizada)
+            {
+                errorMessage = "Solo se puede emitir Nota de Crédito a una factura AUTORIZADA.";
+                return;
+            }
+
+            // Mapear datos de cabecera
+            invoiceNumber = invoice.NumeroFactura;
+            customerName = invoice.ClienteNombre;
+            customerIdent = invoice.ClienteIdentificacion;
+            invoiceDate = invoice.FechaEmision;
+
+            // Mapear items a ViewModel local para manejar la cantidad a devolver
+            items = invoice.Items.Select(i => new CreditNoteItemVm
+            {
+                ProductId = i.ProductoId,
+                ProductName = i.ProductName,
+                UnitTestPrice = i.PrecioVentaUnitario,
+                OriginalQuantity = i.Cantidad,
+                ReturnQuantity = 0, // Por defecto 0, el usuario elige qué devolver
+                Taxes = i.Taxes
+            }).ToList();
+            
+            // Inicializar modelo de envío
+            formModel.FacturaId = InvoiceId;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar la factura: {ex.Message}";
+        }
+    }
+
+    private void UpdateTotals()
+    {
+        subtotal15 = 0;
+        subtotal0 = 0;
+        totalIva = 0;
+
+        foreach (var item in items)
+        {
+            // Corregir si el usuario puso algo inválido
+            if (item.ReturnQuantity < 0) item.ReturnQuantity = 0;
+            if (item.ReturnQuantity > item.OriginalQuantity) item.ReturnQuantity = item.OriginalQuantity;
+
+            if (item.ReturnQuantity > 0)
+            {
+                var itemSubtotal = item.ReturnQuantity * item.UnitTestPrice;
+                
+                var hasIva = item.Taxes.Any(t => t.Porcentaje > 0);
+                if (hasIva)
+                {
+                    var ivaRate = item.Taxes.First(t => t.Porcentaje > 0).Porcentaje;
+                    subtotal15 += itemSubtotal;
+                    totalIva += itemSubtotal * (ivaRate / 100m);
+                }
+                else
+                {
+                    subtotal0 += itemSubtotal;
+                }
+            }
+        }
+
+        total = subtotal15 + subtotal0 + totalIva;
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            // 1. Validaciones UI
+            if (string.IsNullOrWhiteSpace(formModel.RazonModificacion))
+            {
+                errorMessage = "Debe ingresar el motivo de la modificación.";
+                isSubmitting = false;
+                return;
+            }
+
+            var itemsToReturn = items.Where(i => i.ReturnQuantity > 0).ToList();
+            if (!itemsToReturn.Any())
+            {
+                errorMessage = "Debe devolver al menos un producto (Cantidad > 0).";
+                isSubmitting = false;
+                return;
+            }
+
+            // 2. Preparar DTO
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(userId)) throw new Exception("Usuario no autenticado.");
+
+            formModel.UsuarioIdCreador = Guid.Parse(userId);
+            formModel.Items = itemsToReturn.Select(i => new CreditNoteItemDto
+            {
+                ProductoId = i.ProductId,
+                CantidadDevolucion = i.ReturnQuantity
+            }).ToList();
+
+            // 3. Llamar al servicio
+            await CreditNoteService.CreateCreditNoteAsync(formModel);
+
+            // 4. Redirigir
+            Navigation.NavigateTo("/invoices");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al emitir la nota de crédito: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    // ViewModel interno para controlar la lógica de UI de cada fila
+    public class CreditNoteItemVm
+    {
+        public Guid ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public decimal UnitTestPrice { get; set; }
+        public int OriginalQuantity { get; set; }
+        public int ReturnQuantity { get; set; }
+        public List<TaxDto> Taxes { get; set; } = new();
+    }
+}
