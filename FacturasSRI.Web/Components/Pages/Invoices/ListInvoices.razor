@@ -92,9 +92,9 @@
                                     </a>
                                     @if (invoice.FormaDePago == FormaDePago.Credito && invoice.SaldoPendiente > 0)
                                     {
-                                        <button class="btn btn-sm btn-success ms-1" @onclick="() => OpenRegisterPaymentModal(invoice.Id)">
+                                        <a href="@($"invoices/register-payment/{invoice.Id}")" class="btn btn-sm btn-success ms-1">
                                             <i class="bi bi-cash-coin"></i> Registrar Pago
-                                        </button>
+                                        </a>
                                     }
                                     <a href="/api/downloads/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
                                         <i class="bi bi-file-earmark-pdf"></i> PDF
@@ -109,10 +109,6 @@
     </div>
 </div>
 
-<RegisterPaymentModal @bind-IsVisible="showRegistrarPagoModal" 
-                      FacturaId="@selectedInvoiceId" 
-                      UsuarioIdCreador="@currentUserId" 
-                      OnPaymentRegistered="HandlePaymentRegistered" />
 
 @code {
     private List<InvoiceDto>? allInvoices; // Holds all invoices
@@ -121,8 +117,6 @@
     private string searchTerm = string.Empty;
     private EstadoFactura? selectedStatus;
     private FormaDePago? selectedFormaDePago;
-    private bool showRegistrarPagoModal = false;
-    private Guid selectedInvoiceId;
     private Guid currentUserId;
 
     private List<InvoiceDto> FilteredInvoices
@@ -179,19 +173,6 @@
         {
             errorMessage = $"No se pudieron cargar las facturas. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
-    }
-
-    private void OpenRegisterPaymentModal(Guid invoiceId)
-    {
-        selectedInvoiceId = invoiceId;
-        showRegistrarPagoModal = true;
-    }
-
-    private async Task HandlePaymentRegistered()
-    {
-        showRegistrarPagoModal = false;
-        await LoadInvoices();
-        StateHasChanged();
     }
 
     private void GoToCreateInvoice()

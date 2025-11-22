@@ -258,19 +258,14 @@ else
                                         @if(invoice.FormaDePago == FormaDePago.Credito && invoice.SaldoPendiente > 0)
                                         {
                                             <div class="card-footer text-center">
-                                                <button class="btn btn-primary" @onclick="() => showRegistrarPagoModal = true">
+                                                <a href="@($"invoices/register-payment/{InvoiceId}")" class="btn btn-primary">
                                                     <i class="bi bi-plus-circle me-2"></i>Registrar Pago
-                                                </button>
+                                                </a>
                                             </div>
                                         }
                                     </div>
                                 </div>
                             </div>
-                        
-                            <RegisterPaymentModal @bind-IsVisible="showRegistrarPagoModal" 
-                                                  FacturaId="@InvoiceId" 
-                                                  UsuarioIdCreador="@currentUserId" 
-                                                  OnPaymentRegistered="LoadInvoiceData" />
                         }
                         
                         
@@ -291,7 +286,6 @@ else
                             private bool isCheckingStatus = false;
                             private bool sendingEmail = false;
                             private bool emailSuccess = false;
-                            private bool showRegistrarPagoModal = false;
                             private Guid currentUserId;
                         
                             protected override async Task OnInitializedAsync()
