@@ -171,7 +171,8 @@ namespace FacturasSRI.Infrastructure.Services
                     FechaVencimiento = p.FechaVencimiento,
                     FechaPago = p.FechaPago,
                     FacturaCompraPath = p.FacturaCompraPath,
-                    ComprobantePagoPath = p.ComprobantePagoPath
+                    ComprobantePagoPath = p.ComprobantePagoPath,
+                    EsCredito = p.FechaVencimiento.HasValue
                 })
                 .ToListAsync();
         }
@@ -193,6 +194,7 @@ namespace FacturasSRI.Infrastructure.Services
                     FechaPago = p.FechaPago,
                     FacturaCompraPath = p.FacturaCompraPath,
                     ComprobantePagoPath = p.ComprobantePagoPath,
+                    EsCredito = p.FechaVencimiento.HasValue
                 })
                 .FirstOrDefaultAsync();
         }

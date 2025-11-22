@@ -46,6 +46,7 @@ else if (FilteredPurchases.Any())
                     <thead>
                         <tr>
                             <th>Estado</th>
+                            <th>Forma de Pago</th>
                             <th>Producto</th>
                             <th>Proveedor</th>
                             <th class="text-end">Monto Total</th>
@@ -62,6 +63,11 @@ else if (FilteredPurchases.Any())
                                 <td>
                                     <span class="badge @GetBadgeClass(purchase.Estado)">
                                         @purchase.Estado.ToString()
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge @(purchase.EsCredito ? "bg-info text-dark" : "bg-light text-dark")">
+                                        @(purchase.EsCredito ? "Crédito" : "Contado")
                                     </span>
                                 </td>
                                 <td>@purchase.ProductName</td>

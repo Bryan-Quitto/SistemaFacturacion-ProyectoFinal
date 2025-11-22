@@ -1,0 +1,48 @@
+PLAN DE ACCIÓN: HU-15 - Gestión de Pagos (Mejoras Adicionales)
+
+**OBJETIVO:** Implementar la funcionalidad para registrar pagos de facturas a crédito por parte de administradores y vendedores, y mejorar la visibilidad de la forma de pago en la lista de compras.
+
+**TAREAS:**
+
+1.  **Actualizar Formas de Pago en Módulo de Compras:**
+    *   **Análisis:**
+        *   Leer `FacturasSRI.Domain/Entities/CuentaPorPagar.cs` para entender la entidad de la deuda de compras.
+        *   Leer `FacturasSRI.Domain/Entities/Compra.cs` para añadir la propiedad `FormaDePago`.
+        *   Leer `FacturasSRI.Application/Dtos/PurchaseDto.cs` para incluir la `FormaDePago` en el DTO.
+        *   Leer `FacturasSRI.Infrastructure/Services/PurchaseService.cs` para ver cómo se cargan las compras y dónde poblar el DTO.
+        *   Leer `FacturasSRI.Web/Components/Pages/Purchases/ListPurchases.razor` para añadir la columna en la interfaz de usuario.
+    *   **Implementación:**
+        *   Modificar `FacturasSRI.Domain/Entities/Compra.cs`: Añadir `public FormaDePago FormaDePago { get; set; }`.
+        *   Modificar `FacturasSRI.Application/Dtos/PurchaseDto.cs`: Añadir `public FormaDePago FormaDePago { get; set; }`.
+        *   Modificar `FacturasSRI.Infrastructure/Services/PurchaseService.cs`:
+            *   Actualizar el método `CreatePurchaseAsync` para asignar la `FormaDePago` al crear una nueva compra (por defecto `Contado` si no se especifica, o basarse en un nuevo campo en `CreatePurchaseDto`). Se necesitará un `FormaDePago` en `CreatePurchaseDto`.
+            *   Actualizar el método `GetPurchasesAsync` para poblar el `FormaDePago` en el `PurchaseDto` resultante.
+        *   Modificar `FacturasSRI.Web/Components/Pages/Purchases/ListPurchases.razor`: Añadir una nueva columna en la tabla para mostrar la `FormaDePago` de cada compra.
+
+2.  **Implementar Registro de Pagos desde la Lista de Facturas (`ListInvoices.razor`):**
+    *   **Crear Componente `RegisterPaymentModal.razor` (reutilizable):**
+        *   Crear el archivo `FacturasSRI.Web/Components/Modals/RegisterPaymentModal.razor`.
+        *   Este componente será un modal de Bootstrap que recibirá un `FacturaId` como parámetro.
+        *   Tendrá un formulario para `Monto`, `MetodoDePago`, `Referencia` y `FechaCobro`.
+        *   Inyectará `ICobroService` para llamar a `RegistrarCobroAsync`.
+        *   Tendrá un evento `OnPaymentRegistered` para notificar al componente padre que un pago fue registrado exitosamente.
+    *   **Modificar `FacturasSRI.Web/Components/Pages/Invoices/ListInvoices.razor`:**
+        *   Añadir el componente `RegisterPaymentModal` al final del archivo.
+        *   Implementar un estado `showRegistrarPagoModal` y `selectedFacturaId` para controlar la visibilidad del modal y la factura a la que se le registrará el pago.
+        *   Añadir un botón "Registrar Pago" en la columna "Acciones" de la tabla. Este botón solo será visible si la factura tiene `FormaDePago.Credito` y `SaldoPendiente > 0` (se necesitará añadir `FormaDePago` y `SaldoPendiente` al `InvoiceDto` para esto).
+        *   El botón abrirá el modal y le pasará el `FacturaId`.
+        *   Implementar el manejo del evento `OnPaymentRegistered` para recargar la lista de facturas.
+
+3.  **Refactorizar `InvoiceDetail.razor` para Reutilizar el Modal de Registro de Pagos:**
+    *   Modificar `FacturasSRI.Web/Components/Pages/Invoices/InvoiceDetail.razor`:
+        *   Eliminar el código HTML y la lógica de estado relacionados con el modal de registro de pagos.
+        *   Reemplazarlo por una instancia del nuevo componente `RegisterPaymentModal`, pasándole el `InvoiceId` y manejando el evento `OnPaymentRegistered`.
+
+**CONSIDERACIONES ADICIONALES:**
+
+*   **CreatePurchaseDto:** Es probable que necesitemos añadir la `FormaDePago` también a `CreatePurchaseDto` para que el usuario pueda especificarla al registrar una compra.
+*   **Migraciones:** Cada cambio en las entidades requerirá una nueva migración de Entity Framework.
+
+**RECORDATORIO:** Sigue el principio de "proyecto universitario de 4to semestre" - soluciones claras y no excesivamente complejas.
+
+Listo para tu aprobación y para comenzar a implementar.
