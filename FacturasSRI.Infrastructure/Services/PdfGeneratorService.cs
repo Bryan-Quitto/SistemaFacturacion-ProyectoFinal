@@ -1,4 +1,5 @@
 using FacturasSRI.Application.Dtos;
+using FacturasSRI.Domain.Enums;
 using Microsoft.AspNetCore.Hosting;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -6,10 +7,10 @@ using QuestPDF.Infrastructure;
 using System;
 using System.IO;
 using System.Linq;
-using SkiaSharp;                 
-using ZXing;                     
-using ZXing.SkiaSharp;           
-using ZXing.Common;             
+using SkiaSharp;
+using ZXing;
+using ZXing.SkiaSharp;
+using ZXing.Common;
 
 namespace FacturasSRI.Infrastructure.Services
 {
@@ -53,7 +54,6 @@ namespace FacturasSRI.Infrastructure.Services
         {
             container.Row(row =>
             {
-                // COLUMNA IZQUIERDA
                 row.RelativeItem().Column(column =>
                 {
                     column.Item().Row(r =>
@@ -81,7 +81,6 @@ namespace FacturasSRI.Infrastructure.Services
 
                 row.ConstantItem(10);
 
-                // COLUMNA DERECHA (RIDE)
                 row.RelativeItem().Element(ContainerBox).Column(column =>
                 {
                     column.Item().Text("R.U.C.: 1850641927001").Bold().FontSize(12);
@@ -96,7 +95,6 @@ namespace FacturasSRI.Infrastructure.Services
                         r.RelativeItem().Column(c =>
                         {
                             c.Item().Text("FECHA Y HORA DE AUTORIZACIÓN").SemiBold().FontSize(6);
-                            // Validación básica de fecha para evitar errores si viene null
                             var fecha = factura.FechaEmision == default ? DateTime.Now : factura.FechaEmision;
                             c.Item().Text($"{fecha:dd/MM/yyyy HH:mm:ss}").FontSize(8);
                         });
@@ -109,7 +107,6 @@ namespace FacturasSRI.Infrastructure.Services
                     var claveAcceso = factura.ClaveAcceso ?? "0000000000000000000000000000000000000000000000000";
                     column.Item().Text(claveAcceso).FontSize(8);
 
-                    // --- GENERACIÓN CÓDIGO DE BARRAS ---
                     byte[] barcodeBytes = GenerarCodigoBarras(claveAcceso);
 
                     if (barcodeBytes.Length > 0)
@@ -117,42 +114,37 @@ namespace FacturasSRI.Infrastructure.Services
                         column.Item().PaddingTop(10)
                               .AlignCenter()
                               .Height(40)
-                              .Image(barcodeBytes) // QuestPDF acepta los bytes de Skia perfectamente
+                              .Image(barcodeBytes)
                               .FitArea();
                     }
                     else
                     {
-                        // Mensaje de error visible en el PDF si falla la generación
                         column.Item().PaddingTop(10).Text("[ERROR GENERANDO BARRAS]").FontColor(Colors.Red.Medium);
                     }
                 });
             });
         }
 
-        // --- MÉTODO ACTUALIZADO PARA USAR SKIASHARP ---
         private byte[] GenerarCodigoBarras(string texto)
         {
             if (string.IsNullOrWhiteSpace(texto)) return Array.Empty<byte>();
 
             try
             {
-                // Usamos BarcodeWriterPixelData que es compatible con Skia
                 var writer = new BarcodeWriter
                 {
                     Format = BarcodeFormat.CODE_128,
                     Options = new EncodingOptions
                     {
-                        Width = 400, // Un poco más ancho para las claves del SRI
+                        Width = 400,
                         Height = 60,
                         PureBarcode = true, 
                         Margin = 0
                     }
                 };
 
-                // Generamos la imagen como un SKBitmap (Nativo de SkiaSharp)
                 var bitmap = writer.Write(texto);
 
-                // Convertimos el SKBitmap a bytes PNG
                 using (var image = SKImage.FromBitmap(bitmap))
                 using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
                 {
@@ -161,8 +153,6 @@ namespace FacturasSRI.Infrastructure.Services
             }
             catch (Exception)
             {
-                // Ahora si fallara, al menos verías el texto rojo en el PDF
-                // Console.WriteLine(ex.ToString()); // Útil si pudieras ver la consola
                 return Array.Empty<byte>();
             }
         }
@@ -171,7 +161,6 @@ namespace FacturasSRI.Infrastructure.Services
         {
             container.PaddingVertical(10).Column(column =>
             {
-                // Datos Cliente
                 column.Item().Element(ContainerBox).Column(col =>
                 {
                     col.Item().Row(row =>
@@ -189,7 +178,6 @@ namespace FacturasSRI.Infrastructure.Services
 
                 column.Item().PaddingVertical(5);
 
-                // Tabla
                 column.Item().Table(table =>
                 {
                     table.ColumnsDefinition(columns =>
@@ -223,7 +211,6 @@ namespace FacturasSRI.Infrastructure.Services
                     }
                 });
 
-                // Totales
                 column.Item().PaddingTop(5).Row(row =>
                 {
                     row.RelativeItem(6).Column(c =>
@@ -232,7 +219,23 @@ namespace FacturasSRI.Infrastructure.Services
                         {
                             info.Item().Text("Información Adicional").Bold().FontSize(8);
                             info.Item().Text($"Email: {factura.ClienteEmail ?? "N/A"}").FontSize(7);
-                            info.Item().Text("Forma de Pago: UTILIZACION DEL SISTEMA FINANCIERO").FontSize(7);
+                            info.Item().Text($"Forma de Pago: {factura.FormaDePago}").FontSize(7);
+
+                            if (factura.FormaDePago == FormaDePago.Credito)
+                            {
+                                decimal abono = factura.Total - factura.SaldoPendiente;
+                                info.Item().PaddingTop(3).Text("DETALLE DE CRÉDITO:").Bold().FontSize(7);
+                                
+                                info.Item().Row(r => {
+                                    r.RelativeItem().Text("Abono Inicial:").FontSize(7);
+                                    r.RelativeItem().AlignRight().Text(abono.ToString("N2")).FontSize(7);
+                                });
+                                
+                                info.Item().Row(r => {
+                                    r.RelativeItem().Text("Saldo Pendiente:").FontSize(7);
+                                    r.RelativeItem().AlignRight().Text(factura.SaldoPendiente.ToString("N2")).FontSize(7).Bold();
+                                });
+                            }
                         });
                     });
 
