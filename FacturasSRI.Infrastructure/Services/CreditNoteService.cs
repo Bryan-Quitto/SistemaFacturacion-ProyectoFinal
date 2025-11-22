@@ -287,30 +287,37 @@ namespace FacturasSRI.Infrastructure.Services
                 var scopedSriClient = scope.ServiceProvider.GetRequiredService<SriApiClientService>();
                 var scopedParser = scope.ServiceProvider.GetRequiredService<SriResponseParserService>();
                 var scopedLogger = scope.ServiceProvider.GetRequiredService<ILogger<CreditNoteService>>();
+                var scopedPdf = scope.ServiceProvider.GetRequiredService<PdfGeneratorService>();
+                var scopedEmail = scope.ServiceProvider.GetRequiredService<IEmailService>();
 
                 try
                 {
                     scopedLogger.LogInformation($"[BG-NC] Enviando Nota Credito {ncId} al SRI...");
                     
-                    // 1. Enviar Recepción
+                    // 1. RECEPCIÓN
                     string respuestaRecepcionXml = await scopedSriClient.EnviarRecepcionAsync(xmlFirmadoBytes);
                     var respuestaRecepcion = scopedParser.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
-                    var nc = await scopedContext.NotasDeCredito.FindAsync(ncId);
+                    var nc = await scopedContext.NotasDeCredito
+                        .Include(n => n.Cliente)
+                        .Include(n => n.Factura)
+                        .Include(n => n.Detalles).ThenInclude(d => d.Producto)
+                        .FirstOrDefaultAsync(n => n.Id == ncId);
+
                     var ncSri = await scopedContext.NotasDeCreditoSRI.FirstOrDefaultAsync(x => x.NotaDeCreditoId == ncId);
 
                     if (respuestaRecepcion.Estado == "DEVUELTA")
                     {
                         nc.Estado = EstadoNotaDeCredito.RechazadaSRI;
                         ncSri.RespuestaSRI = JsonSerializer.Serialize(respuestaRecepcion.Errores);
-                        scopedLogger.LogWarning("[BG-NC] NC Rechazada por SRI.");
+                        scopedLogger.LogWarning("[BG-NC] Rechazada.");
                     }
                     else
                     {
-                        // 2. Si fue recibida, intentamos Autorizar
-                         try
+                        // 2. AUTORIZACIÓN
+                        try
                         {
-                            await Task.Delay(2000); // Esperar al SRI
+                            await Task.Delay(2000); // Espera obligatoria
                             string respAut = await scopedSriClient.ConsultarAutorizacionAsync(ncSri.ClaveAcceso);
                             var autObj = scopedParser.ParsearRespuestaAutorizacion(respAut);
 
@@ -320,7 +327,53 @@ namespace FacturasSRI.Infrastructure.Services
                                 ncSri.NumeroAutorizacion = autObj.NumeroAutorizacion;
                                 ncSri.FechaAutorizacion = autObj.FechaAutorizacion;
                                 ncSri.RespuestaSRI = "AUTORIZADO";
-                                scopedLogger.LogInformation("[BG-NC] NC Autorizada Exitosamente.");
+                                scopedLogger.LogInformation("[BG-NC] AUTORIZADA.");
+
+                                // 3. ENVIAR CORREO
+                                try 
+                                {
+                                    // Construir DTO para PDF (Mapping manual simple)
+                                    var ncDto = new CreditNoteDetailViewDto
+                                    {
+                                        NumeroNotaCredito = nc.NumeroNotaCredito,
+                                        FechaEmision = nc.FechaEmision,
+                                        ClienteNombre = nc.Cliente.RazonSocial,
+                                        ClienteIdentificacion = nc.Cliente.NumeroIdentificacion,
+                                        ClienteDireccion = nc.Cliente.Direccion,
+                                        ClienteEmail = nc.Cliente.Email,
+                                        NumeroFacturaModificada = nc.Factura.NumeroFactura,
+                                        FechaEmisionFacturaModificada = nc.Factura.FechaEmision,
+                                        RazonModificacion = nc.RazonModificacion,
+                                        SubtotalSinImpuestos = nc.SubtotalSinImpuestos,
+                                        TotalIVA = nc.TotalIVA,
+                                        Total = nc.Total,
+                                        ClaveAcceso = ncSri.ClaveAcceso,
+                                        NumeroAutorizacion = ncSri.NumeroAutorizacion,
+                                        Items = nc.Detalles.Select(d => new CreditNoteItemDetailDto {
+                                            ProductName = d.Producto.Nombre,
+                                            Cantidad = d.Cantidad,
+                                            PrecioVentaUnitario = d.PrecioVentaUnitario,
+                                            Subtotal = d.Subtotal
+                                        }).ToList()
+                                    };
+
+                                    byte[] pdfBytes = scopedPdf.GenerarNotaCreditoPdf(ncDto);
+                                    string xmlSigned = ncSri.XmlFirmado;
+
+                                    await scopedEmail.SendCreditNoteEmailAsync(
+                                        nc.Cliente.Email,
+                                        nc.Cliente.RazonSocial,
+                                        nc.NumeroNotaCredito,
+                                        nc.Id,
+                                        pdfBytes,
+                                        xmlSigned
+                                    );
+                                    scopedLogger.LogInformation("[BG-NC] Correo enviado.");
+                                }
+                                catch(Exception exEmail)
+                                {
+                                    scopedLogger.LogError(exEmail, "[BG-NC] Error enviando correo.");
+                                }
                             }
                             else
                             {
@@ -329,8 +382,7 @@ namespace FacturasSRI.Infrastructure.Services
                         }
                         catch
                         {
-                            // Si falla la conexión en autorización, se queda en EnviadaSRI
-                            // El usuario podrá reintentar luego si implementas un botón de "Refrescar Estado"
+                            // Ignorar error autorización
                         }
                     }
                     
@@ -338,7 +390,7 @@ namespace FacturasSRI.Infrastructure.Services
                 }
                 catch (Exception ex)
                 {
-                    scopedLogger.LogError(ex, "[BG-NC] Error crítico en envío background.");
+                    scopedLogger.LogError(ex, "[BG-NC] Error crítico.");
                 }
             }
         }

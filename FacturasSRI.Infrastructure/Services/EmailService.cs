@@ -116,6 +116,51 @@ namespace FacturasSRI.Infrastructure.Services
             await client.SendEmailAsync(msg);
         }
 
+        // === NUEVO MÉTODO IMPLEMENTADO PARA NOTAS DE CRÉDITO ===
+        public async Task SendCreditNoteEmailAsync(string toEmail, string clienteNombre, string numeroNC, Guid ncId, byte[] pdfBytes, string xmlSignedContent)
+        {
+            if (string.IsNullOrWhiteSpace(toEmail) || toEmail == "consumidorfinal@example.com")
+            {
+                return;
+            }
+
+            var baseUrl = _configuration["App:BaseUrl"] ?? "https://tu-dominio.com";
+            baseUrl = baseUrl.TrimEnd('/');
+            
+            // Enlace público para descargar el RIDE de la NC
+            var downloadLink = $"{baseUrl}/api/public/nc-ride/{ncId}";
+
+            var subject = $"Comprobante Electrónico - Nota de Crédito {numeroNC}";
+            var plainTextContent = $"Estimado(a) {clienteNombre},\n\nAdjunto encontrará su Nota de Crédito Electrónica No. {numeroNC}.\n\nSaludos.";
+
+            var htmlContent = BuildEmailTemplate("Nueva Nota de Crédito",
+            $"<p>Estimado(a) <strong>{clienteNombre}</strong>,</p>" +
+            $"<p>Le informamos que se ha generado su Nota de Crédito Electrónica <strong>No. {numeroNC}</strong>.</p>" +
+            "<p>Adjunto a este correo encontrará los archivos XML y PDF visuales (RIDE).</p>" +
+            "<p>Puede descargar el documento directamente desde el siguiente enlace:</p>",
+            downloadLink, // URL HABILITADA
+            "Descargar Nota Crédito PDF");
+
+            var client = new SendGridClient(_apiKey);
+            var msg = new SendGridMessage()
+            {
+                From = new EmailAddress(_fromEmail, _fromName),
+                Subject = subject,
+                PlainTextContent = plainTextContent,
+                HtmlContent = htmlContent
+            };
+            msg.AddTo(new EmailAddress(toEmail));
+
+            var pdfBase64 = Convert.ToBase64String(pdfBytes);
+            msg.AddAttachment($"NotaCredito_{numeroNC}.pdf", pdfBase64, "application/pdf");
+
+            var xmlBytes = Encoding.UTF8.GetBytes(xmlSignedContent);
+            var xmlBase64 = Convert.ToBase64String(xmlBytes);
+            msg.AddAttachment($"NotaCredito_{numeroNC}.xml", xmlBase64, "application/xml");
+
+            await client.SendEmailAsync(msg);
+        }
+
         private string BuildEmailTemplate(string title, string bodyContent, string buttonUrl, string buttonText)
         {
             string companyName = _configuration["CompanyInfo:NombreComercial"] ?? _fromName;
@@ -132,9 +177,15 @@ namespace FacturasSRI.Infrastructure.Services
 
             html.Append($"<div style='padding: 30px; color: #333333; line-height: 1.6;'>");
             html.Append(bodyContent);
-            html.Append($"<p style='text-align: center; margin: 30px 0;'>");
-            html.Append($"<a href='{buttonUrl}' target='_blank' style='display: inline-block; background-color: #007bff; color: #ffffff; text-decoration: none; padding: 12px 25px; border-radius: 5px; font-weight: bold;'>{buttonText}</a>");
-            html.Append($"</p>");
+            
+            // Solo mostramos el botón si hay URL
+            if (!string.IsNullOrEmpty(buttonUrl) && buttonUrl != "#")
+            {
+                html.Append($"<p style='text-align: center; margin: 30px 0;'>");
+                html.Append($"<a href='{buttonUrl}' target='_blank' style='display: inline-block; background-color: #007bff; color: #ffffff; text-decoration: none; padding: 12px 25px; border-radius: 5px; font-weight: bold;'>{buttonText}</a>");
+                html.Append($"</p>");
+            }
+            
             html.Append($"<p style='margin-top: 30px;'>Saludos,<br>El equipo de {_fromName}</p>");
             html.Append("</div>");
 
