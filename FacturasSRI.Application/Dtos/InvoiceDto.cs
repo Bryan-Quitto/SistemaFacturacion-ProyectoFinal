@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using FacturasSRI.Domain.Enums; // Added
+using FacturasSRI.Domain.Enums;
 
 namespace FacturasSRI.Application.Dtos
 {
@@ -18,5 +18,7 @@ namespace FacturasSRI.Application.Dtos
         public decimal Total { get; set; }
         public string CreadoPor { get; set; } = string.Empty;
         public List<InvoiceDetailDto> Detalles { get; set; } = new();
+        public FormaDePago FormaDePago { get; set; }
+        public decimal SaldoPendiente { get; set; }
     }
 }

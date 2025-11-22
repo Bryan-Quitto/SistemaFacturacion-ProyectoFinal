@@ -669,6 +669,8 @@ namespace FacturasSRI.Infrastructure.Services
         public Task<List<InvoiceDto>> GetInvoicesAsync()
         {
             return (from invoice in _context.Facturas
+                        join cpc in _context.CuentasPorCobrar on invoice.Id equals cpc.FacturaId into cpcJoin
+                        from cpc in cpcJoin.DefaultIfEmpty()
                         join usuario in _context.Usuarios on invoice.UsuarioIdCreador equals usuario.Id into usuarioJoin
                         from usuario in usuarioJoin.DefaultIfEmpty()
                         join cliente in _context.Clientes on invoice.ClienteId equals cliente.Id into clienteJoin
@@ -686,7 +688,9 @@ namespace FacturasSRI.Infrastructure.Services
                             TotalDescuento = invoice.TotalDescuento,
                             TotalIVA = invoice.TotalIVA,
                             Total = invoice.Total,
-                            CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado"
+                            CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
+                            FormaDePago = invoice.FormaDePago,
+                            SaldoPendiente = cpc != null ? cpc.SaldoPendiente : 0
                         }).ToListAsync();
         }
 

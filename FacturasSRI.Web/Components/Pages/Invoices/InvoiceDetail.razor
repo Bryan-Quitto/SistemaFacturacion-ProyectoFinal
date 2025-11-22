@@ -5,6 +5,7 @@
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Domain.Enums
 @using Microsoft.AspNetCore.Components.Authorization
+@using FacturasSRI.Web.Components.Shared
 @inject IInvoiceService InvoiceService
 @inject ICobroService CobroService
 @inject IUserService UserService
@@ -254,52 +255,10 @@ else
         </div>
     </div>
 
-    @if (showRegistrarPagoModal)
-    {
-        <div class="modal fade show" tabindex="-1" style="display:block;" role="dialog">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Registrar Nuevo Pago</h5>
-                        <button type="button" class="btn-close" @onclick="() => showRegistrarPagoModal = false"></button>
-                    </div>
-                    <div class="modal-body">
-                        @if (!string.IsNullOrEmpty(paymentErrorMessage))
-                        {
-                            <div class="alert alert-danger">@paymentErrorMessage</div>
-                        }
-                        <EditForm Model="nuevoCobro" OnValidSubmit="HandleRegistrarPago">
-                            <DataAnnotationsValidator />
-                            <div class="mb-3">
-                                <label class="form-label">Monto</label>
-                                <InputNumber @bind-Value="nuevoCobro.Monto" class="form-control" />
-                                <ValidationMessage For="@(() => nuevoCobro.Monto)" />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Método de Pago</label>
-                                <InputText @bind-Value="nuevoCobro.MetodoDePago" class="form-control" />
-                                <ValidationMessage For="@(() => nuevoCobro.MetodoDePago)" />
-                            </div>
-                             <div class="mb-3">
-                                <label class="form-label">Fecha del Cobro</label>
-                                <InputDate @bind-Value="nuevoCobro.FechaCobro" class="form-control" />
-                                <ValidationMessage For="@(() => nuevoCobro.FechaCobro)" />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Referencia (Opcional)</label>
-                                <InputText @bind-Value="nuevoCobro.Referencia" class="form-control" />
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" @onclick="() => showRegistrarPagoModal = false">Cancelar</button>
-                                <button type="submit" class="btn btn-primary">Guardar Pago</button>
-                            </div>
-                        </EditForm>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="modal-backdrop fade show"></div>
-    }
+    <RegisterPaymentModal @bind-IsVisible="showRegistrarPagoModal" 
+                          FacturaId="@InvoiceId" 
+                          UsuarioIdCreador="@currentUserId" 
+                          OnPaymentRegistered="LoadInvoiceData" />
 }
 
 
@@ -312,17 +271,16 @@ else
 
     private InvoiceDetailViewDto? invoice;
     private List<CobroDto> cobros = new();
-    private RegistrarCobroDto nuevoCobro = new();
     
     private string? errorMessage;
     private string? sriCheckMessage;
     private string? emailMessage;
-    private string? paymentErrorMessage;
 
     private bool isCheckingStatus = false;
     private bool sendingEmail = false;
     private bool emailSuccess = false;
     private bool showRegistrarPagoModal = false;
+    private Guid currentUserId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -333,8 +291,7 @@ else
             var userId = user.FindFirst(c => c.Type == "sub")?.Value;
             if(!string.IsNullOrEmpty(userId))
             {
-                var userIdSafe = userId;
-                nuevoCobro.UsuarioIdCreador = Guid.Parse(userIdSafe);
+                currentUserId = Guid.Parse(userId);
             }
         }
         await LoadInvoiceData();
@@ -348,7 +305,6 @@ else
             if (invoice != null)
             {
                 cobros = await CobroService.GetCobrosByFacturaIdAsync(InvoiceId);
-                nuevoCobro.FacturaId = invoice.Id;
             }
             else
             {
@@ -358,24 +314,6 @@ else
         catch (Exception ex)
         {
             errorMessage = $"No se pudieron cargar los detalles de la factura. {ex.Message}";
-        }
-    }
-
-    private async Task HandleRegistrarPago()
-    {
-        paymentErrorMessage = null;
-        try
-        {
-            var usuarioId = nuevoCobro.UsuarioIdCreador;
-            await CobroService.RegistrarCobroAsync(nuevoCobro);
-            showRegistrarPagoModal = false;
-            nuevoCobro = new RegistrarCobroDto();
-            nuevoCobro.UsuarioIdCreador = usuarioId;
-            await LoadInvoiceData(); // Refresh data
-        }
-        catch (Exception ex)
-        {
-            paymentErrorMessage = ex.Message;
         }
     }
 

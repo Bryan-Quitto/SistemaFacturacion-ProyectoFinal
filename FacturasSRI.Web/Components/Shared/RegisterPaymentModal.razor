@@ -1,0 +1,125 @@
+@using Microsoft.AspNetCore.Components
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+
+@inject ICobroService CobroService
+
+@if (IsVisible)
+{
+    <div class="modal fade show" tabindex="-1" style="display:block;" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Registrar Pago para Factura</h5>
+                    <button type="button" class="btn-close" @onclick="() => CloseModal()"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+                    <EditForm Model="nuevoCobro" OnValidSubmit="HandleRegistrarPago">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label">Monto</label>
+                            <InputNumber @bind-Value="nuevoCobro.Monto" class="form-control" />
+                            <ValidationMessage For="@(() => nuevoCobro.Monto)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Método de Pago</label>
+                            <InputText @bind-Value="nuevoCobro.MetodoDePago" class="form-control" />
+                            <ValidationMessage For="@(() => nuevoCobro.MetodoDePago)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Fecha del Cobro</label>
+                            <InputDate @bind-Value="nuevoCobro.FechaCobro" class="form-control" />
+                            <ValidationMessage For="@(() => nuevoCobro.FechaCobro)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Referencia (Opcional)</label>
+                            <InputText @bind-Value="nuevoCobro.Referencia" class="form-control" />
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="() => CloseModal()">Cancelar</button>
+                            <button type="submit" class="btn btn-primary" disabled="isSubmitting">
+                                @if (isSubmitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    <span> Guardando...</span>
+                                }
+                                else
+                                {
+                                    <span>Guardar Pago</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> IsVisibleChanged { get; set; }
+
+    [Parameter]
+    public Guid FacturaId { get; set; }
+    
+    [Parameter]
+    public Guid UsuarioIdCreador { get; set; }
+
+    [Parameter]
+    public EventCallback OnPaymentRegistered { get; set; }
+
+    private RegistrarCobroDto nuevoCobro = new();
+    private string? errorMessage;
+    private bool isSubmitting = false;
+
+    protected override void OnParametersSet()
+    {
+        if (FacturaId != Guid.Empty)
+        {
+            nuevoCobro = new RegistrarCobroDto
+            {
+                FacturaId = this.FacturaId,
+                UsuarioIdCreador = this.UsuarioIdCreador,
+                FechaCobro = DateTime.UtcNow
+            };
+        }
+    }
+
+    private async Task HandleRegistrarPago()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+        try
+        {
+            await CobroService.RegistrarCobroAsync(nuevoCobro);
+            await CloseModal(true);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task CloseModal(bool paymentRegistered = false)
+    {
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(IsVisible);
+        if (paymentRegistered)
+        {
+            await OnPaymentRegistered.InvokeAsync();
+        }
+    }
+}

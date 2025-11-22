@@ -2,9 +2,13 @@
 @attribute [Authorize]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Domain.Enums
+@using FacturasSRI.Web.Components.Shared
+@using System.Security.Claims
 @inject IInvoiceService InvoiceService
 @inject ICustomerService CustomerService
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Facturas</PageTitle>
 
@@ -41,9 +45,9 @@
                         <tr>
                             <th>Número de Factura</th>
                             <th>Cliente</th>
-                            <th>Fecha de Emisión</th>
+                            <th>Forma de Pago</th>
                             <th>Estado</th>
-                            <th>Creado Por</th>
+                            <th class="text-end">Saldo Pendiente</th>
                             <th class="text-end">Total</th>
                             <th class="text-center">Acciones</th>
                         </tr>
@@ -54,14 +58,24 @@
                             <tr>
                                 <td><strong>@invoice.NumeroFactura</strong></td>
                                 <td>@invoice.ClienteNombre</td>
-                                <td>@invoice.FechaEmision.ToLocalTime().ToString("g")</td>
+                                <td>
+                                    <span class="badge @(invoice.FormaDePago == FormaDePago.Credito ? "bg-info text-dark" : "bg-light text-dark")">
+                                        @invoice.FormaDePago.ToString()
+                                    </span>
+                                </td>
                                 <td>@invoice.Estado</td>
-                                <td>@invoice.CreadoPor</td>
+                                <td class="text-end">@invoice.SaldoPendiente.ToString("C")</td>
                                 <td class="text-end">@invoice.Total.ToString("C")</td>
                                 <td class="text-center">
                                     <a href="@($"invoices/{invoice.Id}")" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye-fill"></i> Ver Detalles
                                     </a>
+                                    @if (invoice.FormaDePago == FormaDePago.Credito && invoice.SaldoPendiente > 0)
+                                    {
+                                        <button class="btn btn-sm btn-success ms-1" @onclick="() => OpenRegisterPaymentModal(invoice.Id)">
+                                            <i class="bi bi-cash-coin"></i> Registrar Pago
+                                        </button>
+                                    }
                                     <a href="/api/downloads/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
                                         <i class="bi bi-file-earmark-pdf"></i> PDF
                                     </a>
@@ -75,12 +89,19 @@
     </div>
 </div>
 
+<RegisterPaymentModal @bind-IsVisible="showRegistrarPagoModal" 
+                      FacturaId="@selectedInvoiceId" 
+                      UsuarioIdCreador="@currentUserId" 
+                      OnPaymentRegistered="HandlePaymentRegistered" />
 
 @code {
     private List<InvoiceDto>? allInvoices; // Holds all invoices
     private string? errorMessage;
 
     private string searchTerm = string.Empty; // New property for search
+    private bool showRegistrarPagoModal = false;
+    private Guid selectedInvoiceId;
+    private Guid currentUserId;
 
     private List<InvoiceDto> FilteredInvoices => string.IsNullOrWhiteSpace(searchTerm)
         ? allInvoices ?? new()
@@ -90,6 +111,21 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity.IsAuthenticated)
+        {
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!string.IsNullOrEmpty(userId))
+            {
+                currentUserId = Guid.Parse(userId);
+            }
+        }
+        await LoadInvoices();
+    }
+
+    private async Task LoadInvoices()
+    {
         try
         {
             allInvoices = await InvoiceService.GetInvoicesAsync(); // Load all invoices
@@ -98,6 +134,19 @@
         {
             errorMessage = $"No se pudieron cargar las facturas. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
         }
+    }
+
+    private void OpenRegisterPaymentModal(Guid invoiceId)
+    {
+        selectedInvoiceId = invoiceId;
+        showRegistrarPagoModal = true;
+    }
+
+    private async Task HandlePaymentRegistered()
+    {
+        showRegistrarPagoModal = false;
+        await LoadInvoices();
+        StateHasChanged();
     }
 
     private void GoToCreateInvoice()
