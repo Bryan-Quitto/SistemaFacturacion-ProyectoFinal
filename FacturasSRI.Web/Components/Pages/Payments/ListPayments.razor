@@ -2,21 +2,43 @@
 @attribute [Authorize(Roles = "Administrador, Vendedor")]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Domain.Enums
 @inject ICobroService CobroService
 @inject NavigationManager Navigation
 
-<PageTitle>Historial de Pagos</PageTitle>
+<PageTitle>Facturas con Pagos Registrados</PageTitle>
 
 <div class="page-header d-flex justify-content-between align-items-center">
     <div>
-        <h1>Historial de Pagos</h1>
-        <p>Consulta todos los pagos y abonos registrados en el sistema.</p>
+        <h1>Facturas con Pagos Registrados</h1>
+        <p>Consulta el estado de pago de las facturas.</p>
     </div>
 </div>
 
-<div class="mb-3">
-    <input type="text" class="form-control" placeholder="Buscar por número de factura, cliente o método de pago..." @bind-value="searchTerm" @bind-value:event="oninput" />
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" class="form-control" placeholder="Buscar por número de factura o cliente..." @bind-value="searchTerm" @bind-value:event="oninput" />
+    </div>
+    <div class="col-md-3">
+        <InputSelect class="form-select" @bind-Value="selectedFormaDePago">
+            <option value="">Todas las Formas de Pago</option>
+            @foreach (var s in Enum.GetValues(typeof(FormaDePago)))
+            {
+                <option value="@s">@s.ToString()</option>
+            }
+        </InputSelect>
+    </div>
+    <div class="col-md-3">
+        <InputSelect class="form-select" @bind-Value="selectedEstadoFactura">
+            <option value="">Todos los Estados</option>
+            @foreach (var s in Enum.GetValues(typeof(EstadoFactura)))
+            {
+                <option value="@s">@s.ToString()</option>
+            }
+        </InputSelect>
+    </div>
 </div>
+
 
 @if (errorMessage != null)
 {
@@ -25,7 +47,7 @@
 
 <div class="card">
     <div class="card-body">
-        @if (allCobros == null)
+        @if (allFacturasConPagos == null)
         {
             <p><em>Cargando historial de pagos...</em></p>
         }
@@ -37,26 +59,32 @@
                         <tr>
                             <th>Número de Factura</th>
                             <th>Cliente</th>
-                            <th>Fecha de Cobro</th>
-                            <th>Método de Pago</th>
-                            <th>Registrado Por</th>
-                            <th class="text-end">Monto</th>
+                            <th>Forma de Pago</th>
+                            <th>Estado Factura</th>
+                            <th class="text-end">Total Factura</th>
+                            <th class="text-end">Total Pagado</th>
+                            <th class="text-end">Saldo Pendiente</th>
                             <th class="text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var cobro in FilteredCobros)
+                        @foreach (var facturaConPagos in FilteredFacturasConPagos)
                         {
                             <tr>
-                                <td><strong>@cobro.NumeroFactura</strong></td>
-                                <td>@cobro.ClienteNombre</td>
-                                <td>@cobro.FechaCobro.ToLocalTime().ToString("g")</td>
-                                <td>@cobro.MetodoDePago</td>
-                                <td>@cobro.CreadoPor</td>
-                                <td class="text-end">@cobro.Monto.ToString("C")</td>
+                                <td><strong>@facturaConPagos.NumeroFactura</strong></td>
+                                <td>@facturaConPagos.ClienteNombre</td>
+                                <td>
+                                    <span class="badge @(facturaConPagos.FormaDePago == FormaDePago.Credito ? "bg-info text-dark" : "bg-light text-dark")">
+                                        @facturaConPagos.FormaDePago.ToString()
+                                    </span>
+                                </td>
+                                <td>@facturaConPagos.EstadoFactura</td>
+                                <td class="text-end">@facturaConPagos.TotalFactura.ToString("C")</td>
+                                <td class="text-end">@facturaConPagos.TotalPagado.ToString("C")</td>
+                                <td class="text-end">@facturaConPagos.SaldoPendiente.ToString("C")</td>
                                 <td class="text-center">
-                                    <a href="@($"invoices/{cobro.FacturaId}")" class="btn btn-sm btn-outline-primary" title="Ver Factura">
-                                        <i class="bi bi-file-earmark-text"></i> Ver Factura
+                                    <a href="@($"payments/details/{facturaConPagos.FacturaId}")" class="btn btn-sm btn-outline-primary" title="Ver Pagos">
+                                        <i class="bi bi-wallet"></i> Ver Pagos
                                     </a>
                                 </td>
                             </tr>
@@ -69,22 +97,47 @@
 </div>
 
 @code {
-    private List<CobroDto>? allCobros;
+    private List<FacturasConPagosDto>? allFacturasConPagos;
     private string? errorMessage;
     private string searchTerm = string.Empty;
+    private FormaDePago? selectedFormaDePago;
+    private EstadoFactura? selectedEstadoFactura;
 
-    private List<CobroDto> FilteredCobros => string.IsNullOrWhiteSpace(searchTerm)
-        ? allCobros ?? new()
-        : allCobros?.Where(c => c.NumeroFactura.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                                (c.ClienteNombre?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                                c.MetodoDePago.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
-                      .ToList() ?? new();
+
+    private List<FacturasConPagosDto> FilteredFacturasConPagos
+    {
+        get
+        {
+            var filtered = allFacturasConPagos;
+
+            if (filtered == null) return new List<FacturasConPagosDto>();
+
+            if (selectedFormaDePago.HasValue)
+            {
+                filtered = filtered.Where(f => f.FormaDePago == selectedFormaDePago.Value).ToList();
+            }
+
+            if (selectedEstadoFactura.HasValue)
+            {
+                filtered = filtered.Where(f => f.EstadoFactura == selectedEstadoFactura.Value).ToList();
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filtered = filtered.Where(f => f.NumeroFactura.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                                          (f.ClienteNombre?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+                                     .ToList();
+            }
+
+            return filtered;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            allCobros = await CobroService.GetAllCobrosAsync();
+            allFacturasConPagos = await CobroService.GetFacturasConPagosAsync();
         }
         catch (Exception ex)
         {

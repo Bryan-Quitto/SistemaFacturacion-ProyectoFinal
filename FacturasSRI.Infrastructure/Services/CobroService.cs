@@ -163,5 +163,28 @@ namespace FacturasSRI.Infrastructure.Services
                 throw;
             }
         }
+
+        public async Task<List<FacturasConPagosDto>> GetFacturasConPagosAsync()
+        {
+            var facturasConPagos = await _context.Facturas
+                .Include(f => f.Cliente)
+                .Include(f => f.Cobros)
+                .Include(f => _context.CuentasPorCobrar.Where(cpc => cpc.FacturaId == f.Id))
+                .Where(f => f.Cobros.Any()) // Only include invoices that have at least one payment
+                .Select(f => new FacturasConPagosDto
+                {
+                    FacturaId = f.Id,
+                    NumeroFactura = f.NumeroFactura,
+                    ClienteNombre = f.Cliente != null ? f.Cliente.RazonSocial : "N/A",
+                    TotalFactura = f.Total,
+                    SaldoPendiente = _context.CuentasPorCobrar.Where(cpc => cpc.FacturaId == f.Id).Select(cpc => cpc.SaldoPendiente).FirstOrDefault(),
+                    TotalPagado = f.Cobros.Sum(c => c.Monto),
+                    FormaDePago = f.FormaDePago,
+                    EstadoFactura = f.Estado
+                })
+                .ToListAsync();
+
+            return facturasConPagos;
+        }
     }
 }

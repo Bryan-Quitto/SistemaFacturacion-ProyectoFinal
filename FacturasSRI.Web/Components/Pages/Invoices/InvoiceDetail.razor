@@ -40,6 +40,12 @@ else
             <a href="/api/public/invoice-ride/@invoice.Id" target="_blank" class="btn btn-danger me-2">
                 <i class="bi bi-file-earmark-pdf me-2"></i>Descargar PDF
             </a>
+            @if (invoice.FormaDePago == FormaDePago.Credito)
+            {
+                <a href="@($"payments/details/{InvoiceId}")" class="btn btn-info me-2">
+                    <i class="bi bi-wallet me-2"></i>Ver Historial de Pagos
+                </a>
+            }
 
             @if (invoice.Estado == EstadoFactura.Autorizada)
             {

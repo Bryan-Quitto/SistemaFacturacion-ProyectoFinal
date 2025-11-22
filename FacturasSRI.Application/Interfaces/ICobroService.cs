@@ -10,5 +10,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<CobroDto> RegistrarCobroAsync(RegistrarCobroDto cobroDto, System.IO.Stream fileStream, string fileName);
         Task<List<CobroDto>> GetCobrosByFacturaIdAsync(Guid facturaId);
         Task<List<CobroDto>> GetAllCobrosAsync();
+        Task<List<FacturasConPagosDto>> GetFacturasConPagosAsync();
     }
 }
