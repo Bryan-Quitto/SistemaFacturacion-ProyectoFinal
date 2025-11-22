@@ -22,20 +22,23 @@
                     <EditForm Model="nuevoCobro" OnValidSubmit="HandleRegistrarPago">
                         <DataAnnotationsValidator />
                         <div class="mb-3">
-                            <label class="form-label">Monto</label>
-                            <InputNumber @bind-Value="nuevoCobro.Monto" class="form-control" />
-                            <ValidationMessage For="@(() => nuevoCobro.Monto)" />
-                        </div>
-                        <div class="mb-3">
                             <label class="form-label">Método de Pago</label>
-                            <InputText @bind-Value="nuevoCobro.MetodoDePago" class="form-control" />
-                            <ValidationMessage For="@(() => nuevoCobro.MetodoDePago)" />
+                            <InputSelect @bind-Value="selectedMetodoDePago" class="form-control">
+                                @foreach (var metodo in metodosDePago)
+                                {
+                                    <option value="@metodo">@metodo</option>
+                                }
+                            </InputSelect>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Fecha del Cobro</label>
-                            <InputDate @bind-Value="nuevoCobro.FechaCobro" class="form-control" />
-                            <ValidationMessage For="@(() => nuevoCobro.FechaCobro)" />
-                        </div>
+
+                        @if (selectedMetodoDePago == "Otro")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Especificar Otro Método de Pago</label>
+                                <InputText @bind-Value="otroMetodoDePago" class="form-control" />
+                            </div>
+                        }
+
                         <div class="mb-3">
                             <label class="form-label">Referencia (Opcional)</label>
                             <InputText @bind-Value="nuevoCobro.Referencia" class="form-control" />
@@ -92,6 +95,10 @@
     private IBrowserFile? comprobanteFile;
     private string? fileValidationMessage;
     
+    private List<string> metodosDePago = new() { "Efectivo", "Transferencia", "Cheque", "Tarjeta de Crédito/Débito", "Otro" };
+    private string selectedMetodoDePago = "Efectivo";
+    private string otroMetodoDePago = "";
+
     protected override void OnParametersSet()
     {
         if (FacturaId != Guid.Empty)
@@ -99,12 +106,14 @@
             nuevoCobro = new RegistrarCobroDto
             {
                 FacturaId = this.FacturaId,
-                UsuarioIdCreador = this.UsuarioIdCreador,
-                FechaCobro = DateTime.UtcNow
+                UsuarioIdCreador = this.UsuarioIdCreador
             };
+            // Reset fields
             comprobanteFile = null;
             errorMessage = null;
             fileValidationMessage = null;
+            selectedMetodoDePago = "Efectivo";
+            otroMetodoDePago = "";
         }
     }
 
@@ -131,6 +140,17 @@
         if (comprobanteFile == null)
         {
             errorMessage = "Error: Debe adjuntar el comprobante de pago.";
+            isSubmitting = false;
+            return;
+        }
+
+        // Assign payment method from dropdown/text input
+        nuevoCobro.MetodoDePago = selectedMetodoDePago == "Otro" ? otroMetodoDePago : selectedMetodoDePago;
+        nuevoCobro.FechaCobro = DateTime.UtcNow;
+
+        if (string.IsNullOrWhiteSpace(nuevoCobro.MetodoDePago))
+        {
+            errorMessage = "Error: Debe especificar un método de pago.";
             isSubmitting = false;
             return;
         }

@@ -46,3 +46,52 @@ PLAN DE ACCIÓN: HU-15 - Gestión de Pagos (Mejoras Adicionales)
 **RECORDATORIO:** Sigue el principio de "proyecto universitario de 4to semestre" - soluciones claras y no excesivamente complejas.
 
 Listo para tu aprobación y para comenzar a implementar.
+
+---
+**NUEVO PLAN DE ACCIÓN Y ACLARACIONES (22/11/2025) - Ronda 2**
+
+¡Excelentes observaciones! Vamos a refinar la lógica para que sea más robusta y cumpla con un flujo de trabajo más realista.
+
+**Decisión Tomada:**
+*   **Escenario A (Pagos Parciales):** Has elegido este escenario. Perfecto, mantendremos la flexibilidad de registrar abonos a las facturas de crédito. El campo "Monto" seguirá siendo editable.
+
+---
+
+**ACLARACIONES Y PLAN PROPUESTO**
+
+**1. Página "Historial de Pagos" y el botón "Ver Detalles"**
+
+Tu idea de tener una vista de detalles para los pagos de una factura es muy buena. Sin embargo, la página actual de "Historial de Pagos" (`/payments`) muestra cada pago individualmente. Esto hace que un botón de "detalles" en cada fila sea un poco confuso.
+
+**Propuesta de Flujo de Trabajo:**
+Te propongo rediseñar ligeramente esta sección para que sea más intuitiva:
+
+*   **Paso 1: Modificar la página `/payments` ("Historial de Pagos").** En lugar de mostrar una larga lista de pagos individuales, esta página mostrará una lista de **facturas que tienen pagos registrados**. Cada fila mostrará un resumen: Número de Factura, Cliente, Monto Total, Saldo Pendiente, etc.
+*   **Paso 2: Botón "Ver Detalles de Pagos".** En cada fila de esta nueva lista, habrá un botón "Ver Detalles" o "Ver Pagos".
+*   **Paso 3: Crear la página de detalles.** Este botón llevará a una nueva página, por ejemplo, `/payments/details/{FacturaId}`, donde se mostrarán **todos los pagos (abonos) de esa factura específica**, con su monto, fecha, referencia y un botón para descargar cada comprobante.
+
+**¿Te parece bien este flujo?** Es más organizado y permite ver el historial completo de una factura de forma clara.
+
+**2. Manejo de Métodos de Pago ("Otro")**
+
+Tu observación sobre la opción "Otro" es correcta. Si la mantenemos, necesitamos un campo adicional para especificar de qué se trata.
+
+**Propuesta:**
+*   En el formulario para registrar un pago, si el usuario selecciona "Otro" de la lista desplegable, aparecerá dinámicamente un campo de texto para que pueda escribir el método de pago específico (ej: "Canje por servicio", "Crédito de la casa", etc.).
+
+---
+
+**PLAN DE ACCIÓN INMEDIATO (LO QUE HARÉ AHORA)**
+
+Independientemente de tu respuesta a la pregunta del flujo de trabajo, puedo avanzar con las siguientes mejoras que son seguras:
+
+1.  **Eliminar Fecha Manual:** Quitaré el campo de fecha del formulario de pago. La fecha se registrará automáticamente en el servidor (`DateTime.UtcNow`).
+2.  **Mejorar Selección de Método de Pago:**
+    *   Cambiaré el campo de texto de "Método de Pago" por una lista desplegable.
+    *   Implementaré la lógica para que al seleccionar "Otro", aparezca un campo de texto adicional para especificar el método.
+
+**Próximos Pasos:**
+1.  **Espero tu confirmación** sobre la propuesta para el flujo de la página "Historial de Pagos".
+2.  Mientras tanto, **comenzaré a implementar las mejoras 1 y 2** en el modal de registro de pago (`RegisterPaymentModal.razor`).
+
+Quedo atento a tus comentarios.
