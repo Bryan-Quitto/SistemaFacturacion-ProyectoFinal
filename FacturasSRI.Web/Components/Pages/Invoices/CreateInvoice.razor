@@ -184,313 +184,694 @@
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0"><i class="bi bi-receipt-cutoff me-2"></i>Resumen de la Factura</h5>
-                    </div>
-                    <div class="card-body">
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Subtotal
-                                <span>@subtotal.ToString("C")</span>
-                            </li>
-                            @foreach (var taxSummary in taxSummaries)
-                            {
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    @taxSummary.TaxName (@taxSummary.TaxRate.ToString("0.##")%)
-                                    <span>@taxSummary.Amount.ToString("C")</span>
-                                </li>
-                            }
-                            <li class="list-group-item d-flex justify-content-between align-items-center fs-5 fw-bold bg-light">
-                                Total
-                                <span>@total.ToString("C")</span>
-                            </li>
-                        </ul>
-                    </div>
+                                <div class="card">
+
+                                    <div class="card-header">
+
+                                        <h5 class="card-title mb-0"><i class="bi bi-credit-card me-2"></i>Condiciones de Pago</h5>
+
+                                    </div>
+
+                                    <div class="card-body">
+
+                                        <div class="mb-3">
+
+                                            <label class="form-label">Forma de Pago</label>
+
+                                            <InputSelect @bind-Value="formModel.FormaDePago" class="form-select">
+
+                                                @foreach (var formaDePago in Enum.GetValues(typeof(FormaDePago)))
+
+                                                {
+
+                                                    <option value="@formaDePago">@formaDePago.ToString()</option>
+
+                                                }
+
+                                            </InputSelect>
+
+                                        </div>
+
+                
+
+                                        @if (formModel.FormaDePago == FormaDePago.Credito)
+
+                                        {
+
+                                            <div class="mb-3">
+
+                                                <label class="form-label">Días de Crédito</label>
+
+                                                <InputNumber @bind-Value="formModel.DiasCredito" class="form-control" />
+
+                                            </div>
+
+                                            <div class="mb-3">
+
+                                                <label class="form-label">Monto Abono Inicial</label>
+
+                                                <InputNumber @bind-Value="formModel.MontoAbonoInicial" class="form-control" />
+
+                                            </div>
+
+                                        }
+
+                                    </div>
+
+                                </div>
+
+                                
+
+                                <div class="card mt-4">
+
+                                    <div class="card-header">
+
+                                        <h5 class="card-title mb-0"><i class="bi bi-receipt-cutoff me-2"></i>Resumen de la Factura</h5>
+
+                                    </div>
+
+                                    <div class="card-body">
+
+                                        <ul class="list-group list-group-flush">
+
+                                            <li class="list-group-item d-flex justify-content-between align-items-center">
+
+                                                Subtotal
+
+                                                <span>@subtotal.ToString("C")</span>
+
+                                            </li>
+
+                                            @foreach (var taxSummary in taxSummaries)
+
+                                            {
+
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+
+                                                    @taxSummary.TaxName (@taxSummary.TaxRate.ToString("0.##")%)
+
+                                                    <span>@taxSummary.Amount.ToString("C")</span>
+
+                                                </li>
+
+                                            }
+
+                                            <li class="list-group-item d-flex justify-content-between align-items-center fs-5 fw-bold bg-light">
+
+                                                Total
+
+                                                <span>@total.ToString("C")</span>
+
+                                            </li>
+
+                                        </ul>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                
+
+                        <div class="row mt-4">
+
+                            <div class="col-12 d-flex justify-content-end">
+
+                                <button type="button" class="btn btn-secondary me-2" @onclick='() => Navigation.NavigateTo("/invoices")'>
+
+                                    <i class="bi bi-x-circle me-2"></i>Cancelar
+
+                                </button>
+
+                                <button type="submit" class="btn btn-primary" disabled="@(!invoiceItems.Any() || isSubmitting || (customerSelectionType == "existing" && !formModel.SelectedClienteId.HasValue))">
+
+                                     @if (isSubmitting)
+
+                                    {
+
+                                        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+
+                                        <span>Generando...</span>
+
+                                    }
+
+                                    else
+
+                                    {
+
+                                        <i class="bi bi-check-circle-fill me-2"></i>
+
+                                        <span>Generar Factura</span>
+
+                                    }
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </EditForm>
+
                 </div>
-            </div>
-        </div>
 
-        <div class="row mt-4">
-            <div class="col-12 d-flex justify-content-end">
-                <button type="button" class="btn btn-secondary me-2" @onclick='() => Navigation.NavigateTo("/invoices")'>
-                    <i class="bi bi-x-circle me-2"></i>Cancelar
-                </button>
-                <button type="submit" class="btn btn-primary" disabled="@(!invoiceItems.Any() || isSubmitting || (customerSelectionType == "existing" && !formModel.SelectedClienteId.HasValue))">
-                     @if (isSubmitting)
+                
+
+                @code {
+
+                    private string? errorMessage;
+
+                    private bool isSubmitting = false;
+
+                
+
+                    private List<CustomerDto> allCustomers = new();
+
+                    private List<ProductDto> allProducts = new();
+
+                
+
+                    private string customerSearchTerm = string.Empty;
+
+                    private List<CustomerDto> customerSearchResults = new();
+
+                    private CustomerDto? selectedCustomer;
+
+                
+
+                    private string productSearchTerm = string.Empty;
+
+                    private List<ProductDto> productSearchResults = new();
+
+                
+
+                    private List<InvoiceItemViewModel> invoiceItems = new();
+
+                    private CreateInvoiceFormModel formModel = new();
+
+                    private string customerSelectionType = "existing";
+
+                    
+
+                    private decimal subtotal = 0;
+
+                    private decimal total = 0;
+
+                    private List<TaxSummary> taxSummaries = new();
+
+                
+
+                    protected override async Task OnInitializedAsync()
+
                     {
-                        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-                        <span>Generando...</span>
+
+                        try
+
+                        {
+
+                            allCustomers = await CustomerService.GetActiveCustomersAsync();
+
+                            allProducts = await ProductService.GetProductsAsync();
+
+                        }
+
+                        catch (Exception ex)
+
+                        {
+
+                            errorMessage = $"No se pudieron cargar los datos iniciales (clientes o productos). Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+
+                        }
+
                     }
-                    else
+
+                
+
+                    private void SearchCustomers()
+
                     {
-                        <i class="bi bi-check-circle-fill me-2"></i>
-                        <span>Generar Factura</span>
+
+                        if (customerSelectionType != "existing" || string.IsNullOrWhiteSpace(customerSearchTerm))
+
+                        {
+
+                            customerSearchResults.Clear();
+
+                            return;
+
+                        }
+
+                        customerSearchResults = allCustomers
+
+                            .Where(c => c.RazonSocial.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) || 
+
+                                        c.NumeroIdentificacion.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase))
+
+                            .Take(5)
+
+                            .ToList();
+
                     }
-                </button>
-            </div>
-        </div>
-    </EditForm>
-</div>
 
-@code {
-    private string? errorMessage;
-    private bool isSubmitting = false;
+                
 
-    private List<CustomerDto> allCustomers = new();
-    private List<ProductDto> allProducts = new();
+                    private void SelectCustomer(CustomerDto customer)
 
-    private string customerSearchTerm = string.Empty;
-    private List<CustomerDto> customerSearchResults = new();
-    private CustomerDto? selectedCustomer;
+                    {
 
-    private string productSearchTerm = string.Empty;
-    private List<ProductDto> productSearchResults = new();
+                        selectedCustomer = customer;
 
-    private List<InvoiceItemViewModel> invoiceItems = new();
-    private CreateInvoiceFormModel formModel = new();
-    private string customerSelectionType = "existing";
-    
-    private decimal subtotal = 0;
-    private decimal total = 0;
-    private List<TaxSummary> taxSummaries = new();
+                        formModel.SelectedClienteId = customer.Id;
 
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            allCustomers = await CustomerService.GetActiveCustomersAsync();
-            allProducts = await ProductService.GetProductsAsync();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"No se pudieron cargar los datos iniciales (clientes o productos). Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
-        }
-    }
+                        customerSearchTerm = string.Empty;
 
-    private void SearchCustomers()
-    {
-        if (customerSelectionType != "existing" || string.IsNullOrWhiteSpace(customerSearchTerm))
-        {
-            customerSearchResults.Clear();
-            return;
-        }
-        customerSearchResults = allCustomers
-            .Where(c => c.RazonSocial.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) || 
-                        c.NumeroIdentificacion.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase))
-            .Take(5)
-            .ToList();
-    }
+                        customerSearchResults.Clear();
 
-    private void SelectCustomer(CustomerDto customer)
-    {
-        selectedCustomer = customer;
-        formModel.SelectedClienteId = customer.Id;
-        customerSearchTerm = string.Empty;
-        customerSearchResults.Clear();
-    }
-    
-    private void ClearCustomer()
-    {
-        selectedCustomer = null;
-        formModel.SelectedClienteId = null;
-    }
+                    }
 
-    private void OnCustomerSelectionTypeChanged()
-    {
-        selectedCustomer = null;
-        formModel.SelectedClienteId = null;
-        customerSearchTerm = string.Empty;
-        customerSearchResults.Clear();
-    }
+                    
 
-    private void SearchProducts()
-    {
-        if (string.IsNullOrWhiteSpace(productSearchTerm))
-        {
-            productSearchResults.Clear();
-            return;
-        }
-        productSearchResults = allProducts
-            .Where(p => p.IsActive && // Add this condition to filter by active products
-                        (p.Nombre.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase) || 
-                        p.CodigoPrincipal.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase)))
-            .Take(5)
-            .ToList();
-    }
+                    private void ClearCustomer()
 
-    private async Task AddItem(ProductDto product)
-    {
-        var existingItem = invoiceItems.FirstOrDefault(i => i.ProductoId == product.Id);
-        if (existingItem != null)
-        {
-            existingItem.Cantidad++;
-        }
-        else
-        {
-            var productDetails = await ProductService.GetProductDetailsByIdAsync(product.Id);
-            if (productDetails != null)
-            {
-                invoiceItems.Add(new InvoiceItemViewModel
-                {
-                    ProductoId = productDetails.Id,
-                    ProductName = productDetails.Nombre,
-                    Cantidad = 1,
-                    PrecioVentaUnitario = productDetails.PrecioVentaUnitario,
-                    Taxes = productDetails.Taxes
-                });
-            }
-        }
-        
-        productSearchTerm = string.Empty;
-        productSearchResults.Clear();
-        UpdateTotals();
-    }
-    
-    private void RemoveItem(Guid productId)
-    {
-        var item = invoiceItems.FirstOrDefault(i => i.ProductoId == productId);
-        if (item != null)
-        {
-            invoiceItems.Remove(item);
-            UpdateTotals();
-        }
-    }
+                    {
 
-    private void UpdateTotals()
-    {
-        subtotal = invoiceItems.Sum(i => i.Cantidad * i.PrecioVentaUnitario);
-        
-        taxSummaries = invoiceItems
-            .SelectMany(item => item.Taxes.Select(tax => new {
-                item.Cantidad,
-                item.PrecioVentaUnitario,
-                TaxName = tax.Nombre,
-                TaxRate = tax.Porcentaje
-            }))
-            .GroupBy(t => new { t.TaxName, t.TaxRate })
-            .Select(g => new TaxSummary {
-                TaxName = g.Key.TaxName,
-                TaxRate = g.Key.TaxRate,
-                Amount = g.Sum(x => x.Cantidad * x.PrecioVentaUnitario * (x.TaxRate / 100))
-            })
-            .ToList();
+                        selectedCustomer = null;
 
-        total = subtotal + taxSummaries.Sum(ts => ts.Amount);
-        StateHasChanged();
-    }
+                        formModel.SelectedClienteId = null;
 
-    private async Task HandleCreateInvoice()
-    {
-        isSubmitting = true;
-        errorMessage = null;
+                    }
 
-        if (!invoiceItems.Any())
-        {
-            errorMessage = "Debe añadir al menos un producto.";
-            isSubmitting = false;
-            StateHasChanged();
-            return;
-        }
+                
 
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+                    private void OnCustomerSelectionTypeChanged()
 
-        if (string.IsNullOrEmpty(userId))
-        {
-            errorMessage = "No se pudo identificar al usuario. Por favor, inicie sesión de nuevo.";
-            isSubmitting = false;
-            StateHasChanged();
-            return;
-        }
+                    {
 
-        CreateInvoiceDto createDto = new CreateInvoiceDto
-        {
-            UsuarioIdCreador = Guid.Parse(userId),
-            Items = invoiceItems.Select(i => new InvoiceItemDto
-            {
-                ProductoId = i.ProductoId,
-                Cantidad = i.Cantidad
-            }).ToList()
-        };
+                        selectedCustomer = null;
 
-        if (customerSelectionType == "existing")
-        {
-            if (!formModel.SelectedClienteId.HasValue)
-            {
-                errorMessage = "Debe seleccionar un cliente existente.";
-                isSubmitting = false;
-                StateHasChanged();
-                return;
-            }
-            createDto.ClienteId = formModel.SelectedClienteId.Value;
-        }
-        else if (customerSelectionType == "finalConsumer")
-        {
-            createDto.EsConsumidorFinal = true;
-        }
-        else
-        {
-            errorMessage = "Debe seleccionar un tipo de cliente.";
-            isSubmitting = false;
-            StateHasChanged();
-            return;
-        }
+                        formModel.SelectedClienteId = null;
 
-        try
-        {
-            await InvoiceService.CreateInvoiceAsync(createDto);
-            Navigation.NavigateTo("/invoices");
-        }
-        catch (InvalidOperationException stockEx)
-        {
-            errorMessage = stockEx.Message;
-            StateHasChanged();
-        }
-        catch (ArgumentException argEx)
-        {
-            errorMessage = argEx.Message;
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Ocurrió un error inesperado al generar la factura. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
-            StateHasChanged();
-        }
-        finally
-        {
-            isSubmitting = false;
-            StateHasChanged();
-        }
-    }
+                        customerSearchTerm = string.Empty;
 
-    private void ClearErrorMessage()
-    {
-        errorMessage = null;
-    }
+                        customerSearchResults.Clear();
 
-    public class InvoiceItemViewModel
-    {
-        public Guid ProductoId { get; set; }
-        public string ProductName { get; set; } = string.Empty;
-        
-        [Range(1, int.MaxValue, ErrorMessage = "La cantidad debe ser al menos 1.")]
-        public int Cantidad { get; set; }
-        
-        public decimal PrecioVentaUnitario { get; set; }
-        public List<TaxDto> Taxes { get; set; } = new();
-    }
+                    }
 
-    public class TaxSummary
-    {
-        public string TaxName { get; set; } = string.Empty;
-        public decimal TaxRate { get; set; }
-        public decimal Amount { get; set; }
-    }
+                
 
-    public class CreateInvoiceFormModel
-    {
-        public Guid? SelectedClienteId { get; set; }
-    }
-}
+                    private void SearchProducts()
+
+                    {
+
+                        if (string.IsNullOrWhiteSpace(productSearchTerm))
+
+                        {
+
+                            productSearchResults.Clear();
+
+                            return;
+
+                        }
+
+                        productSearchResults = allProducts
+
+                            .Where(p => p.IsActive && // Add this condition to filter by active products
+
+                                        (p.Nombre.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase) || 
+
+                                        p.CodigoPrincipal.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase)))
+
+                            .Take(5)
+
+                            .ToList();
+
+                    }
+
+                
+
+                    private async Task AddItem(ProductDto product)
+
+                    {
+
+                        var existingItem = invoiceItems.FirstOrDefault(i => i.ProductoId == product.Id);
+
+                        if (existingItem != null)
+
+                        {
+
+                            existingItem.Cantidad++;
+
+                        }
+
+                        else
+
+                        {
+
+                            var productDetails = await ProductService.GetProductDetailsByIdAsync(product.Id);
+
+                            if (productDetails != null)
+
+                            {
+
+                                invoiceItems.Add(new InvoiceItemViewModel
+
+                                {
+
+                                    ProductoId = productDetails.Id,
+
+                                    ProductName = productDetails.Nombre,
+
+                                    Cantidad = 1,
+
+                                    PrecioVentaUnitario = productDetails.PrecioVentaUnitario,
+
+                                    Taxes = productDetails.Taxes
+
+                                });
+
+                            }
+
+                        }
+
+                        
+
+                        productSearchTerm = string.Empty;
+
+                        productSearchResults.Clear();
+
+                        UpdateTotals();
+
+                    }
+
+                    
+
+                    private void RemoveItem(Guid productId)
+
+                    {
+
+                        var item = invoiceItems.FirstOrDefault(i => i.ProductoId == productId);
+
+                        if (item != null)
+
+                        {
+
+                            invoiceItems.Remove(item);
+
+                            UpdateTotals();
+
+                        }
+
+                    }
+
+                
+
+                    private void UpdateTotals()
+
+                    {
+
+                        subtotal = invoiceItems.Sum(i => i.Cantidad * i.PrecioVentaUnitario);
+
+                        
+
+                        taxSummaries = invoiceItems
+
+                            .SelectMany(item => item.Taxes.Select(tax => new {
+
+                                item.Cantidad,
+
+                                item.PrecioVentaUnitario,
+
+                                TaxName = tax.Nombre,
+
+                                TaxRate = tax.Porcentaje
+
+                            }))
+
+                            .GroupBy(t => new { t.TaxName, t.TaxRate })
+
+                            .Select(g => new TaxSummary {
+
+                                TaxName = g.Key.TaxName,
+
+                                TaxRate = g.Key.TaxRate,
+
+                                Amount = g.Sum(x => x.Cantidad * x.PrecioVentaUnitario * (x.TaxRate / 100))
+
+                            })
+
+                            .ToList();
+
+                
+
+                        total = subtotal + taxSummaries.Sum(ts => ts.Amount);
+
+                        StateHasChanged();
+
+                    }
+
+                
+
+                    private async Task HandleCreateInvoice()
+
+                    {
+
+                        isSubmitting = true;
+
+                        errorMessage = null;
+
+                
+
+                        if (!invoiceItems.Any())
+
+                        {
+
+                            errorMessage = "Debe añadir al menos un producto.";
+
+                            isSubmitting = false;
+
+                            StateHasChanged();
+
+                            return;
+
+                        }
+
+                
+
+                        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+                        var user = authState.User;
+
+                        var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                
+
+                        if (string.IsNullOrEmpty(userId))
+
+                        {
+
+                            errorMessage = "No se pudo identificar al usuario. Por favor, inicie sesión de nuevo.";
+
+                            isSubmitting = false;
+
+                            StateHasChanged();
+
+                            return;
+
+                        }
+
+                
+
+                        CreateInvoiceDto createDto = new CreateInvoiceDto
+
+                        {
+
+                            UsuarioIdCreador = Guid.Parse(userId),
+
+                            Items = invoiceItems.Select(i => new InvoiceItemDto
+
+                            {
+
+                                ProductoId = i.ProductoId,
+
+                                Cantidad = i.Cantidad
+
+                            }).ToList(),
+
+                            FormaDePago = formModel.FormaDePago,
+
+                            DiasCredito = formModel.FormaDePago == FormaDePago.Credito ? formModel.DiasCredito : null,
+
+                            MontoAbonoInicial = formModel.FormaDePago == FormaDePago.Credito ? formModel.MontoAbonoInicial : 0
+
+                        };
+
+                
+
+                        if (customerSelectionType == "existing")
+
+                        {
+
+                            if (!formModel.SelectedClienteId.HasValue)
+
+                            {
+
+                                errorMessage = "Debe seleccionar un cliente existente.";
+
+                                isSubmitting = false;
+
+                                StateHasChanged();
+
+                                return;
+
+                            }
+
+                            createDto.ClienteId = formModel.SelectedClienteId.Value;
+
+                        }
+
+                        else if (customerSelectionType == "finalConsumer")
+
+                        {
+
+                            createDto.EsConsumidorFinal = true;
+
+                        }
+
+                        else
+
+                        {
+
+                            errorMessage = "Debe seleccionar un tipo de cliente.";
+
+                            isSubmitting = false;
+
+                            StateHasChanged();
+
+                            return;
+
+                        }
+
+                
+
+                        try
+
+                        {
+
+                            await InvoiceService.CreateInvoiceAsync(createDto);
+
+                            Navigation.NavigateTo("/invoices");
+
+                        }
+
+                        catch (InvalidOperationException stockEx)
+
+                        {
+
+                            errorMessage = stockEx.Message;
+
+                            StateHasChanged();
+
+                        }
+
+                        catch (ArgumentException argEx)
+
+                        {
+
+                            errorMessage = argEx.Message;
+
+                            StateHasChanged();
+
+                        }
+
+                        catch (Exception ex)
+
+                        {
+
+                            errorMessage = $"Ocurrió un error inesperado al generar la factura. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+
+                            StateHasChanged();
+
+                        }
+
+                        finally
+
+                        {
+
+                            isSubmitting = false;
+
+                            StateHasChanged();
+
+                        }
+
+                    }
+
+                
+
+                    private void ClearErrorMessage()
+
+                    {
+
+                        errorMessage = null;
+
+                    }
+
+                
+
+                    public class InvoiceItemViewModel
+
+                    {
+
+                        public Guid ProductoId { get; set; }
+
+                        public string ProductName { get; set; } = string.Empty;
+
+                        
+
+                        [Range(1, int.MaxValue, ErrorMessage = "La cantidad debe ser al menos 1.")]
+
+                        public int Cantidad { get; set; }
+
+                        
+
+                        public decimal PrecioVentaUnitario { get; set; }
+
+                        public List<TaxDto> Taxes { get; set; } = new();
+
+                    }
+
+                
+
+                    public class TaxSummary
+
+                    {
+
+                        public string TaxName { get; set; } = string.Empty;
+
+                        public decimal TaxRate { get; set; }
+
+                        public decimal Amount { get; set; }
+
+                    }
+
+                
+
+                    public class CreateInvoiceFormModel
+
+                    {
+
+                        public Guid? SelectedClienteId { get; set; }
+
+                        public FormaDePago FormaDePago { get; set; } = FormaDePago.Contado;
+
+                        public int? DiasCredito { get; set; }
+
+                        public decimal MontoAbonoInicial { get; set; }
+
+                    }
+
+                }
+
+                
