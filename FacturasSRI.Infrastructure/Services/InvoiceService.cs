@@ -59,10 +59,6 @@ namespace FacturasSRI.Infrastructure.Services
             _serviceScopeFactory = serviceScopeFactory;
         }
 
-        // ... (MÉTODOS DE CREACIÓN SE MANTIENEN IGUAL) ...
-        // Solo he modificado EnviarAlSriEnFondoAsync y CheckSriStatusAsync.
-        // Copio todo el archivo para garantizar consistencia.
-
         private async Task<Cliente> GetOrCreateConsumidorFinalClientAsync()
         {
             var consumidorFinalId = "9999999999999";
@@ -108,29 +104,22 @@ namespace FacturasSRI.Infrastructure.Services
             finally { _invoiceCreationSemaphore.Release(); }
         }
 
-        // === MÉTODO MEJORADO: CADENA DE AUTOMATIZACIÓN ===
         private async Task EnviarAlSriEnFondoAsync(Guid facturaId, byte[] xmlFirmadoBytes, string claveAcceso)
         {
             using (var scope = _serviceScopeFactory.CreateScope())
             {
-                // Resolvemos dependencias dentro del scope nuevo
                 var scopedContext = scope.ServiceProvider.GetRequiredService<FacturasSRIDbContext>();
                 var scopedSriClient = scope.ServiceProvider.GetRequiredService<SriApiClientService>();
                 var scopedParser = scope.ServiceProvider.GetRequiredService<SriResponseParserService>();
                 var scopedLogger = scope.ServiceProvider.GetRequiredService<ILogger<InvoiceService>>();
-                // Necesarios para el post-proceso
                 var scopedEmail = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 var scopedPdf = scope.ServiceProvider.GetRequiredService<PdfGeneratorService>();
                 
-                // Inyección manual para reutilizar métodos privados (truco: creamos una instancia nueva con el contexto scoped)
-                // Nota: Para evitar complejidad, replicaré la lógica de 'CrearCuentaPorCobrar' aquí dentro usando el contexto scoped.
-
                 try
                 {
                     scopedLogger.LogInformation($"[BG] Enviando Recepción SRI para {facturaId}...");
                     string respuestaRecepcionXml = await scopedSriClient.EnviarRecepcionAsync(xmlFirmadoBytes);
                     
-                    // Recargamos la factura con relaciones para poder enviar email/pdf
                     var invoice = await scopedContext.Facturas
                         .Include(f => f.Cliente)
                         .Include(f => f.InformacionSRI)
@@ -138,7 +127,7 @@ namespace FacturasSRI.Infrastructure.Services
                         .FirstOrDefaultAsync(f => f.Id == facturaId);
 
                     if (invoice == null) return;
-                    var facturaSri = invoice.InformacionSRI; // Ya incluido
+                    var facturaSri = invoice.InformacionSRI; 
 
                     var respuestaRecepcion = scopedParser.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
@@ -150,10 +139,9 @@ namespace FacturasSRI.Infrastructure.Services
                     }
                     else
                     {
-                        // === FASE 2: INTENTO DE AUTORIZACIÓN INMEDIATA ===
                         try 
                         {
-                            await Task.Delay(2500); // Espera prudencial para el SRI
+                            await Task.Delay(2500); 
                             string respuestaAutorizacionXml = await scopedSriClient.ConsultarAutorizacionAsync(claveAcceso);
                             var respuestaAutorizacion = scopedParser.ParsearRespuestaAutorizacion(respuestaAutorizacionXml);
 
@@ -164,14 +152,11 @@ namespace FacturasSRI.Infrastructure.Services
                                 facturaSri.FechaAutorizacion = respuestaAutorizacion.FechaAutorizacion;
                                 facturaSri.RespuestaSRI = "AUTORIZADO";
 
-                                // Generar CxC (Lógica replicada para usar el contexto scoped)
                                 await CrearCxCScoped(scopedContext, invoice);
                                 await scopedContext.SaveChangesAsync();
 
-                                // Generar PDF y Enviar Correo
                                 try
                                 {
-                                    // Mapeo manual rápido para el PDF
                                     var items = invoice.Detalles.Select(d => new InvoiceItemDetailDto
                                     {
                                         ProductoId = d.ProductoId, ProductName = d.Producto.Nombre, Cantidad = d.Cantidad, PrecioVentaUnitario = d.PrecioVentaUnitario, Subtotal = d.Subtotal,
@@ -202,13 +187,11 @@ namespace FacturasSRI.Infrastructure.Services
                             }
                             else 
                             {
-                                // Se queda como ENVIADA si sigue procesando
                                 invoice.Estado = EstadoFactura.EnviadaSRI; 
                             }
                         }
                         catch 
                         {
-                            // Si falla la auth por red, queda en ENVIADA
                             invoice.Estado = EstadoFactura.EnviadaSRI;
                         }
                     }
@@ -222,7 +205,6 @@ namespace FacturasSRI.Infrastructure.Services
             }
         }
 
-        // Método auxiliar privado para crear CxC dentro del scope del background
         private async Task CrearCxCScoped(FacturasSRIDbContext context, Factura invoice)
         {
             var cuentaExistente = await context.CuentasPorCobrar.FirstOrDefaultAsync(c => c.FacturaId == invoice.Id);
@@ -255,13 +237,11 @@ namespace FacturasSRI.Infrastructure.Services
             var invoice = await _context.Facturas.Include(i => i.InformacionSRI).Include(i => i.Cliente).FirstOrDefaultAsync(i => i.Id == invoiceId);
             if (invoice == null || invoice.InformacionSRI == null) return null;
 
-            // Si ya está finalizada, solo retornamos
             if (invoice.Estado == EstadoFactura.Autorizada || invoice.Estado == EstadoFactura.RechazadaSRI) 
                 return await GetInvoiceDetailByIdAsync(invoiceId);
 
             try
             {
-                // Si está Pendiente (ni siquiera recibida), enviamos recepción primero
                 if (invoice.Estado == EstadoFactura.Pendiente)
                 {
                     byte[] xmlBytes = Encoding.UTF8.GetBytes(invoice.InformacionSRI.XmlFirmado);
@@ -273,13 +253,11 @@ namespace FacturasSRI.Infrastructure.Services
                         await _context.SaveChangesAsync();
                         return await GetInvoiceDetailByIdAsync(invoiceId);
                     }
-                    // Si pasa, seguimos a auth
                     invoice.Estado = EstadoFactura.EnviadaSRI;
                     await _context.SaveChangesAsync();
                     await Task.Delay(2000);
                 }
 
-                // Consultamos Autorización
                 string authXml = await _sriApiClientService.ConsultarAutorizacionAsync(invoice.InformacionSRI.ClaveAcceso);
                 var respAuth = _sriResponseParserService.ParsearRespuestaAutorizacion(authXml);
                 await ProcesarEstadoAutorizacionAsync(invoice, respAuth, invoiceId);
@@ -581,7 +559,7 @@ namespace FacturasSRI.Infrastructure.Services
                 };
                 _context.Cobros.Add(cobro);
             }
-            else // Credito
+            else 
             {
                 decimal saldoPendiente = invoice.Total;
                 if (invoice.MontoAbonoInicial > 0)
@@ -939,8 +917,6 @@ namespace FacturasSRI.Infrastructure.Services
 
         
 
-                    // Descontar el stock AHORA, al emitir, no al crear el borrador.
-
                     foreach (var detalle in invoice.Detalles)
 
                     {
@@ -1038,7 +1014,6 @@ namespace FacturasSRI.Infrastructure.Services
                 throw new InvalidOperationException("Solo se pueden modificar facturas en estado Borrador.");
             }
 
-            // Update scalar properties
             if (invoiceDto.EsConsumidorFinal)
             {
                 invoice.ClienteId = (await GetOrCreateConsumidorFinalClientAsync()).Id;
@@ -1056,11 +1031,9 @@ namespace FacturasSRI.Infrastructure.Services
             invoice.DiasCredito = invoiceDto.DiasCredito;
             invoice.MontoAbonoInicial = invoiceDto.MontoAbonoInicial;
 
-            // Remove old details
             _context.FacturaDetalles.RemoveRange(invoice.Detalles);
             invoice.Detalles.Clear();
 
-            // Add new details and recalculate totals
             decimal subtotalSinImpuestos = 0;
             decimal totalIva = 0;
 
