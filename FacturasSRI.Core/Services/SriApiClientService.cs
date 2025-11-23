@@ -30,6 +30,7 @@ namespace FacturasSRI.Core.Services
 
             _httpClient = new HttpClient(handler);
             _httpClient.Timeout = TimeSpan.FromSeconds(60); 
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("FacturasSRI-Client/1.0");
         }
 
         public async Task<string> EnviarRecepcionAsync(byte[] xmlFirmadoBytes)
@@ -51,24 +52,18 @@ namespace FacturasSRI.Core.Services
             try 
             {
                 _logger.LogInformation("Enviando solicitud de recepción al SRI...");
+                
+                HttpResponseMessage respuesta = await _httpClient.PostAsync(URL_RECEPCION_PRUEBAS, httpContent);
 
-                // Nota: A veces el SRI requiere headers específicos, pero con text/xml suele bastar
-                using (var requestMessage = new HttpRequestMessage(HttpMethod.Post, URL_RECEPCION_PRUEBAS))
-                {
-                    requestMessage.Content = httpContent;
-                    
-                    HttpResponseMessage respuesta = await _httpClient.SendAsync(requestMessage);
+                // Aseguramos que si el server responde 500 (común en SOAP faults), leamos el contenido igual
+                string respuestaSoap = await respuesta.Content.ReadAsStringAsync();
 
-                    // Aseguramos que si el server responde 500 (común en SOAP faults), leamos el contenido igual
-                    string respuestaSoap = await respuesta.Content.ReadAsStringAsync();
+                _logger.LogInformation("==========================================");
+                _logger.LogInformation("RESPUESTA SRI (RECEPCIÓN):");
+                _logger.LogInformation("{Respuesta}", respuestaSoap);
+                _logger.LogInformation("==========================================");
 
-                    _logger.LogInformation("==========================================");
-                    _logger.LogInformation("RESPUESTA SRI (RECEPCIÓN):");
-                    _logger.LogInformation("{Respuesta}", respuestaSoap);
-                    _logger.LogInformation("==========================================");
-
-                    return respuestaSoap;
-                }
+                return respuestaSoap;
             }
             catch (Exception ex)
             {

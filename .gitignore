@@ -54,5 +54,3 @@ FacturasSRI.Infrastructure/appsettings.json
 *.cer
 *.pem
 *.p12
-
-instruccion.txt
