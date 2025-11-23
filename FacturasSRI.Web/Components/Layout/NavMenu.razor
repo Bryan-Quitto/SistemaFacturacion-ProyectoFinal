@@ -1,4 +1,4 @@
-﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using FacturasSRI.Web.Services
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
@@ -26,7 +26,7 @@
             </NavLink>
         </div>
 
-        <AuthorizeView Roles="Administrador, Vendedor">
+        <AuthorizeView Roles="Administrador, Vendedor, Bodeguero">
             <div class="nav-section">
                 <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isFacturasOpen); }">
                     <i class="bi bi-file-earmark-text-fill"></i>
@@ -36,14 +36,17 @@
                 @if (isFacturasOpen || IsCollapsed)
                 {
                     <ul class="nav-submenu">
-                        <li><NavLink href="invoices/create"><i class="bi bi-file-earmark-plus submenu-icon"></i><span>Crear Factura</span></NavLink></li>
+                        <AuthorizeView Roles="Administrador, Vendedor" Context="innerContext">
+                            <li><NavLink href="invoices/create"><i class="bi bi-file-earmark-plus submenu-icon"></i><span>Crear Factura</span></NavLink></li>
+                            <li><NavLink href="credit-notes" Match="NavLinkMatch.All"><i class="bi bi-arrow-return-left submenu-icon"></i><span>Notas de Crédito</span></NavLink></li>
+                            <li><NavLink href="payments" Match="NavLinkMatch.All"><i class="bi bi-credit-card submenu-icon"></i><span>Historial de Pagos</span></NavLink></li>
+                        </AuthorizeView>
                         <li><NavLink href="invoices" Match="NavLinkMatch.All"><i class="bi bi-card-list submenu-icon"></i><span>Listar Facturas</span></NavLink></li>
-                        <li><NavLink href="credit-notes" Match="NavLinkMatch.All"><i class="bi bi-arrow-return-left submenu-icon"></i><span>Notas de Crédito</span></NavLink></li>
-                        <li><NavLink href="payments" Match="NavLinkMatch.All"><i class="bi bi-credit-card submenu-icon"></i><span>Historial de Pagos</span></NavLink></li>
                     </ul>
                 }
             </div>
-
+        </AuthorizeView>
+        <AuthorizeView Roles="Administrador, Vendedor">
             <div class="nav-section">
                 <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isClientesOpen); }">
                     <i class="bi bi-people-fill"></i>
@@ -70,7 +73,9 @@
                 @if (isProductosOpen || IsCollapsed)
                 {
                     <ul class="nav-submenu">
-                        <li><NavLink href="products/create"><i class="bi bi-box-seam submenu-icon"></i><span>Crear Producto</span></NavLink></li>
+                        <AuthorizeView Roles="Administrador, Bodeguero" Context="innerContext">
+                            <li><NavLink href="products/create"><i class="bi bi-box-seam submenu-icon"></i><span>Crear Producto</span></NavLink></li>
+                        </AuthorizeView>
                         <li><NavLink href="products" Match="NavLinkMatch.All"><i class="bi bi-boxes submenu-icon"></i><span>Listar Productos</span></NavLink></li>
                     </ul>
                 }

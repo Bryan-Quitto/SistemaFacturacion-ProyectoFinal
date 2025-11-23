@@ -1,5 +1,5 @@
 @page "/roles"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Administrador")]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @inject IRoleService RoleService

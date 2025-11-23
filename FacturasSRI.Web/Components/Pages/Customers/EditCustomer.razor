@@ -1,5 +1,5 @@
 @page "/customers/edit/{CustomerId:guid}"
-@attribute [Authorize(Policy = "VendedorPolicy")]
+@attribute [Authorize(Roles = "Administrador, Vendedor")]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Domain.Enums

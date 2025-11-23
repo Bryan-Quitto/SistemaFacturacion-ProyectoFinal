@@ -1,5 +1,5 @@
 @page "/invoices/register-payment/{FacturaId:guid}"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Administrador, Vendedor")]
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
 @using FacturasSRI.Application.Dtos

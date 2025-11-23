@@ -1,5 +1,5 @@
 @page "/products/create"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Administrador, Bodeguero")]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @inject IProductService ProductService

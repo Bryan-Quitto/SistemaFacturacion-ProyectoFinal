@@ -1,5 +1,5 @@
 @page "/purchases/pay/{PurchaseId:guid}"
-@attribute [Authorize(Roles = "Administrador")]
+@attribute [Authorize(Roles = "Administrador, Bodeguero")]
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using System.Security.Claims

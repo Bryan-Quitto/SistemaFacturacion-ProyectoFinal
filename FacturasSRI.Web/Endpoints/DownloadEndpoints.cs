@@ -55,10 +55,10 @@ namespace FacturasSRI.Web.Endpoints
                 }
 
                 var user = httpContext.User;
-                var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
                 var isAdmin = user.IsInRole("Administrador");
+                var isBodeguero = user.IsInRole("Bodeguero");
 
-                if (cuentaPorPagar.UsuarioIdCreador.ToString() != userId && !isAdmin)
+                if (!isAdmin && !isBodeguero)
                 {
                     return Results.Forbid();
                 }

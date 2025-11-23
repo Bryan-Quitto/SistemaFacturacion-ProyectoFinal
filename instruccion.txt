@@ -1,0 +1,7 @@
+Hola Gemini, eres un experto en UX/UI, además de un experto en auditoria, contabilidad, y gestión.
+
+Necesito que por favor, en este proyecto, revises la navmenu, y lo organices correctamente. Puedes añadir, títulos como Ventas, Bodega, Gestion de usuarios, y que contengan las opciones (ojo solo titulo no un desplegable)
+
+Es decir, para Gestion de usuarios, podrías poner a Usuarios, y Clientes, y bueno tu eres el experto analízalo
+
+E igual, como experto debes analizar que opciones deberían de poder manejar los roles que existen en el proyecto (admin, bodeguero, vendedor), porque como experto debes saber si por ejemplo un vendedor puede emitir notas de crédito, o si eso solo puede hacerlo el admin
