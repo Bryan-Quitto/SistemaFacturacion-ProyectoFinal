@@ -57,7 +57,7 @@
                     <div class="mb-3">
                         <label for="precioVentaUnitario" class="form-label">Precio de Venta Unitario</label>
                         <InputNumber id="precioVentaUnitario" class="form-control"
-                            @bind-Value="newProduct.PrecioVentaUnitario" />
+                            @bind-Value="newProduct.PrecioVentaUnitario" step="0.01" />
                         <ValidationMessage For="@(() => newProduct.PrecioVentaUnitario)" />
                     </div>
                     <div class="mb-3">

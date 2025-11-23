@@ -18,7 +18,12 @@ namespace FacturasSRI.Application.Dtos
         public string Descripcion { get; set; } = string.Empty;
 
         [Range(0.01, double.MaxValue, ErrorMessage = "El precio debe ser mayor que cero.")]
-        public decimal PrecioVentaUnitario { get; set; }
+        private decimal _precioVentaUnitario;
+        public decimal PrecioVentaUnitario 
+        { 
+            get => _precioVentaUnitario;
+            set => _precioVentaUnitario = Math.Round(value, 2);
+        }
         public bool ManejaInventario { get; set; } = true;
         public bool ManejaLotes { get; set; } = true;
         public int StockTotal { get; set; }

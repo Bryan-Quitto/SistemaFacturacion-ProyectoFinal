@@ -68,7 +68,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="montoTotal" class="form-label">Monto Total de la Factura (IVA incluido)</label>
-                        <InputNumber id="montoTotal" class="form-control" @bind-Value="newPurchase.MontoTotal" disabled="@isSubmitting" />
+                        <InputNumber id="montoTotal" class="form-control" @bind-Value="newPurchase.MontoTotal" disabled="@isSubmitting" step="0.01" />
                         <ValidationMessage For="@(() => newPurchase.MontoTotal)" />
                     </div>
                     <div class="mb-3">

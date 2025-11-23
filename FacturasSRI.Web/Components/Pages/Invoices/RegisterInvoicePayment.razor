@@ -54,7 +54,7 @@
             <DataAnnotationsValidator />
             <div class="mb-3">
                 <label class="form-label">Monto</label>
-                <InputNumber @bind-Value="nuevoCobro.Monto" class="form-control" />
+                <InputNumber @bind-Value="Monto" class="form-control" step="0.01" />
                 <ValidationMessage For="@(() => nuevoCobro.Monto)" />
             </div>
             <div class="mb-3">
@@ -119,6 +119,12 @@
     private List<string> metodosDePago = new() { "Efectivo", "Transferencia", "Cheque", "Tarjeta de Crédito/Débito", "Otro" };
     private string selectedMetodoDePago = "Efectivo";
     private string otroMetodoDePago = "";
+
+    private decimal Monto
+    {
+        get => nuevoCobro.Monto;
+        set => nuevoCobro.Monto = Math.Round(value, 2);
+    }
 
     protected override async Task OnInitializedAsync()
     {

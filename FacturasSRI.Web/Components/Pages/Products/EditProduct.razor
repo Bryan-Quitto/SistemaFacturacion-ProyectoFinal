@@ -54,7 +54,7 @@ else
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Precio de Venta</label>
-                            <InputNumber class="form-control" @bind-Value="product.PrecioVentaUnitario" />
+                            <InputNumber class="form-control" @bind-Value="product.PrecioVentaUnitario" step="0.01" />
                             <ValidationMessage For="@(() => product.PrecioVentaUnitario)" />
                         </div>
                         <div class="mb-3">

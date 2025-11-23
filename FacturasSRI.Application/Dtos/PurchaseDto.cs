@@ -13,7 +13,12 @@ namespace FacturasSRI.Application.Dtos
         public int Cantidad { get; set; }
 
         [Range(0.01, double.MaxValue, ErrorMessage = "El monto total debe ser mayor que cero.")]
-        public decimal MontoTotal { get; set; }
+        private decimal _montoTotal;
+        public decimal MontoTotal 
+        { 
+            get => _montoTotal;
+            set => _montoTotal = Math.Round(value, 2);
+        }
         
         public DateTime? FechaCaducidad { get; set; }
         

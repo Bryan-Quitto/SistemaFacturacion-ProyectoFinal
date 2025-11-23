@@ -259,7 +259,7 @@
                                         <label class="compact-form-label">Abono</label>
                                         <div class="input-group input-group-sm">
                                             <span class="input-group-text bg-white border-end-0 text-muted px-1">$</span>
-                                            <InputNumber @bind-Value="formModel.MontoAbonoInicial" class="form-control border-start-0 ps-1 shadow-none" />
+                                            <InputNumber @bind-Value="formModel.MontoAbonoInicial" class="form-control border-start-0 ps-1 shadow-none" step="0.01" />
                                         </div>
                                     </div>
                                     <div class="col-12">
@@ -665,7 +665,12 @@
         public Guid? SelectedClienteId { get; set; }
         public FormaDePago FormaDePago { get; set; } = FormaDePago.Contado;
         public int? DiasCredito { get; set; } = 30;
-        public decimal MontoAbonoInicial { get; set; }
+        private decimal _montoAbonoInicial;
+        public decimal MontoAbonoInicial 
+        { 
+            get => _montoAbonoInicial;
+            set => _montoAbonoInicial = Math.Round(value, 2);
+        }
         public bool EsBorrador { get; set; }
     }
 }
