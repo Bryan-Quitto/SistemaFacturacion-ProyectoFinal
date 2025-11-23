@@ -599,7 +599,7 @@ namespace FacturasSRI.Infrastructure.Services
         public async Task<CreditNoteDto?> UpdateCreditNoteAsync(UpdateCreditNoteDto dto)
         {
             var nc = await _context.NotasDeCredito
-                .Include(n => n.Detalles).ThenInclude(d => d.Producto).ThenInclude(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
+                .Include(n => n.Detalles)
                 .Include(n => n.Factura).ThenInclude(f => f.Detalles)
                 .FirstOrDefaultAsync(n => n.Id == dto.Id);
 
@@ -608,9 +608,8 @@ namespace FacturasSRI.Infrastructure.Services
 
             nc.RazonModificacion = dto.RazonModificacion;
 
-            // Remove old items and recalculate totals
-            _context.NotaDeCreditoDetalles.RemoveRange(nc.Detalles);
-            nc.Detalles.Clear();
+            var oldDetails = nc.Detalles.ToList();
+            var newDetails = new List<NotaDeCreditoDetalle>();
 
             decimal subtotalAccum = 0;
             decimal ivaAccum = 0;
@@ -622,7 +621,6 @@ namespace FacturasSRI.Infrastructure.Services
                 var detalleFactura = nc.Factura.Detalles.FirstOrDefault(d => d.ProductoId == itemDto.ProductoId);
                 if (detalleFactura == null) throw new Exception($"Producto ID {itemDto.ProductoId} inválido.");
                 
-                // We reference the original invoice detail's returned quantity here
                 if (itemDto.CantidadDevolucion > (detalleFactura.Cantidad - detalleFactura.CantidadDevuelta)) throw new Exception($"La cantidad a devolver para el producto excede la cantidad disponible en la factura original.");
 
                 decimal precioUnit = detalleFactura.PrecioVentaUnitario;
@@ -635,7 +633,6 @@ namespace FacturasSRI.Infrastructure.Services
 
                 var detalleNc = new NotaDeCreditoDetalle
                 {
-                    Id = Guid.NewGuid(),
                     NotaDeCreditoId = nc.Id,
                     ProductoId = itemDto.ProductoId,
                     Cantidad = itemDto.CantidadDevolucion,
@@ -643,11 +640,14 @@ namespace FacturasSRI.Infrastructure.Services
                     Subtotal = subtotalItem,
                     ValorIVA = valorIvaItem
                 };
-                nc.Detalles.Add(detalleNc);
+                newDetails.Add(detalleNc);
 
                 subtotalAccum += subtotalItem;
                 ivaAccum += valorIvaItem;
             }
+
+            _context.NotaDeCreditoDetalles.RemoveRange(oldDetails);
+            nc.Detalles = newDetails;
 
             nc.SubtotalSinImpuestos = subtotalAccum;
             nc.TotalIVA = ivaAccum;
@@ -663,7 +663,7 @@ namespace FacturasSRI.Infrastructure.Services
             }
 
             var resultDto = await GetCreditNoteDetailByIdAsync(nc.Id);
-            return new CreditNoteDto { Id = resultDto.Id, NumeroNotaCredito = resultDto.NumeroNotaCredito }; // Simplified return
+            return new CreditNoteDto { Id = resultDto.Id, NumeroNotaCredito = resultDto.NumeroNotaCredito };
         }
     }
 }
