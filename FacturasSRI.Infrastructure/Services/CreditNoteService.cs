@@ -195,7 +195,7 @@ namespace FacturasSRI.Infrastructure.Services
 
                     var detalleFactura = factura.Detalles.FirstOrDefault(d => d.ProductoId == itemDto.ProductoId);
                     if (detalleFactura == null) throw new Exception($"Producto ID {itemDto.ProductoId} inválido.");
-                    if (itemDto.CantidadDevolucion > detalleFactura.Cantidad) throw new Exception($"Cantidad excedida para {detalleFactura.Producto.Nombre}.");
+                    if (itemDto.CantidadDevolucion > (detalleFactura.Cantidad - detalleFactura.CantidadDevuelta)) throw new Exception($"La cantidad a devolver para '{detalleFactura.Producto.Nombre}' excede la cantidad disponible ({detalleFactura.Cantidad - detalleFactura.CantidadDevuelta}).");
 
                     decimal precioUnit = detalleFactura.PrecioVentaUnitario;
                     decimal subtotalItem = itemDto.CantidadDevolucion * precioUnit;
@@ -294,6 +294,7 @@ namespace FacturasSRI.Infrastructure.Services
                     if (nc.Estado != EstadoNotaDeCredito.Autorizada)
                     {
                         await RestaurarStockAsync(_context, nc);
+                        await ActualizarCantidadesDevueltasAsync(_context, nc);
                     }
 
                     nc.Estado = EstadoNotaDeCredito.Autorizada;
@@ -351,6 +352,22 @@ namespace FacturasSRI.Infrastructure.Services
             _logger.LogInformation($"Stock restaurado para Nota de Crédito {nc.NumeroNotaCredito}");
         }
 
+        private async Task ActualizarCantidadesDevueltasAsync(FacturasSRIDbContext context, NotaDeCredito nc)
+        {
+            foreach (var detalleNc in nc.Detalles)
+            {
+                var facturaDetalle = await context.FacturaDetalles
+                    .FirstOrDefaultAsync(fd => fd.FacturaId == nc.FacturaId && fd.ProductoId == detalleNc.ProductoId);
+
+                if (facturaDetalle != null)
+                {
+                    facturaDetalle.CantidadDevuelta += detalleNc.Cantidad;
+                }
+            }
+            await context.SaveChangesAsync();
+            _logger.LogInformation($"Cantidades devueltas actualizadas en la factura original para Nota de Crédito {nc.NumeroNotaCredito}");
+        }
+
         // 6. PROCESO DE FONDO
         private async Task EnviarNcAlSriEnFondoAsync(Guid ncId, byte[] xmlFirmadoBytes)
         {
@@ -400,6 +417,7 @@ namespace FacturasSRI.Infrastructure.Services
                             {
                                 // === DEVOLVER STOCK (BACKGROUND) ===
                                 await RestaurarStockAsync(scopedContext, nc);
+                                await ActualizarCantidadesDevueltasAsync(scopedContext, nc);
 
                                 nc.Estado = EstadoNotaDeCredito.Autorizada;
                                 ncSri.NumeroAutorizacion = autObj.NumeroAutorizacion;

@@ -16,6 +16,7 @@ namespace FacturasSRI.Domain.Entities
         public decimal Subtotal { get; set; }
         public decimal ValorIVA { get; set; }
         public decimal CostoTotal { get; set; }
+        public int CantidadDevuelta { get; set; }
         public virtual ICollection<FacturaDetalleConsumoLote> ConsumosDeLote { get; set; } = new List<FacturaDetalleConsumoLote>();
     }
 }
