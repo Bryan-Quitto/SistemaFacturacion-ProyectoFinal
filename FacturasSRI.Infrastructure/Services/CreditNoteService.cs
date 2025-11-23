@@ -380,7 +380,7 @@ namespace FacturasSRI.Infrastructure.Services
         }
 
         // 6. PROCESO DE FONDO
-        private async Task EnviarNcAlSriEnFondoAsync(Guid ncId, byte[] xmlFirmadoBytes)
+       private async Task EnviarNcAlSriEnFondoAsync(Guid ncId, byte[] xmlFirmadoBytes)
         {
             using (var scope = _serviceScopeFactory.CreateScope())
             {
@@ -397,17 +397,21 @@ namespace FacturasSRI.Infrastructure.Services
                     string respuestaRecepcionXml = await scopedSriClient.EnviarRecepcionAsync(xmlFirmadoBytes);
                     var respuestaRecepcion = scopedParser.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
-                    // Recuperar con relaciones necesarias para stock y PDF
+                    // Recuperar con relaciones necesarias para stock y PDF usando el contexto SCOPED
                     var nc = await scopedContext.NotasDeCredito
                         .Include(n => n.Cliente)
                         .Include(n => n.Factura)
+                        .Include(n => n.InformacionSRI) // Importante incluir esto
                         .Include(n => n.Detalles)
                             .ThenInclude(d => d.Producto)
                             .ThenInclude(p => p.ProductoImpuestos)
                             .ThenInclude(pi => pi.Impuesto)
                         .FirstOrDefaultAsync(n => n.Id == ncId);
                     
-                    var ncSri = await scopedContext.NotasDeCreditoSRI.FirstOrDefaultAsync(x => x.NotaDeCreditoId == ncId);
+                    // Obtenemos la entidad SRI ligada a este contexto
+                    var ncSri = nc.InformacionSRI; 
+                    // O si no vino en el include (aunque debería), la buscamos:
+                    if (ncSri == null) ncSri = await scopedContext.NotasDeCreditoSRI.FirstOrDefaultAsync(x => x.NotaDeCreditoId == ncId);
 
                     if (respuestaRecepcion.Estado == "DEVUELTA")
                     {
@@ -438,19 +442,53 @@ namespace FacturasSRI.Infrastructure.Services
                                 // 3. ENVIAR CORREO
                                 try
                                 {
-                                    // REUTILIZAR LA LÓGICA EXISTENTE PARA OBTENER EL DTO COMPLETO
-                                    var ncDto = await GetCreditNoteDetailByIdAsync(ncId);
-                                    if (ncDto == null)
-                                    {
-                                        scopedLogger.LogError("[BG-NC] No se pudo obtener el DTO de la Nota de Crédito para generar el PDF y enviar el correo.");
-                                        return;
-                                    }
+                                    // CORRECCIÓN: Construimos el DTO manualmente usando 'nc' y 'scopedContext'
+                                    // No podemos llamar a GetCreditNoteDetailByIdAsync porque usa '_context' (disposed)
+                                    
+                                    var itemsDto = nc.Detalles.Select(d => new CreditNoteItemDetailDto { 
+                                        ProductName = d.Producto.Nombre, 
+                                        Cantidad = d.Cantidad, 
+                                        PrecioVentaUnitario = d.PrecioVentaUnitario, 
+                                        Subtotal = d.Subtotal 
+                                    }).ToList();
+                                    
+                                    var taxSummaries = nc.Detalles
+                                        .SelectMany(d => d.Producto.ProductoImpuestos.Select(pi => new 
+                                        { d.Subtotal, TaxName = pi.Impuesto.Nombre, TaxRate = pi.Impuesto.Porcentaje }))
+                                        .GroupBy(x => new { x.TaxName, x.TaxRate })
+                                        .Select(g => new TaxSummary { TaxName = g.Key.TaxName, TaxRate = g.Key.TaxRate, Amount = g.Sum(x => x.Subtotal * (x.TaxRate / 100m)) })
+                                        .Where(x => x.Amount > 0 || x.TaxRate == 0).ToList();
 
+                                    var ncDto = new CreditNoteDetailViewDto
+                                    {
+                                        Id = nc.Id,
+                                        NumeroNotaCredito = nc.NumeroNotaCredito,
+                                        FechaEmision = nc.FechaEmision,
+                                        ClienteNombre = nc.Cliente.RazonSocial,
+                                        ClienteIdentificacion = nc.Cliente.NumeroIdentificacion,
+                                        ClienteDireccion = nc.Cliente.Direccion,
+                                        ClienteEmail = nc.Cliente.Email,
+                                        NumeroFacturaModificada = nc.Factura.NumeroFactura,
+                                        FechaEmisionFacturaModificada = nc.Factura.FechaEmision,
+                                        RazonModificacion = nc.RazonModificacion,
+                                        SubtotalSinImpuestos = nc.SubtotalSinImpuestos,
+                                        TotalIVA = nc.TotalIVA,
+                                        Total = nc.Total,
+                                        ClaveAcceso = ncSri.ClaveAcceso,
+                                        NumeroAutorizacion = ncSri.NumeroAutorizacion,
+                                        Items = itemsDto,
+                                        TaxSummaries = taxSummaries
+                                    };
+                                    
                                     byte[] pdfBytes = scopedPdf.GenerarNotaCreditoPdf(ncDto);
                                     string xmlSigned = ncSri.XmlFirmado;
+                                    
                                     await scopedEmail.SendCreditNoteEmailAsync(nc.Cliente.Email, nc.Cliente.RazonSocial, nc.NumeroNotaCredito, nc.Id, pdfBytes, xmlSigned);
+                                    scopedLogger.LogInformation("[BG-NC] Correo enviado correctamente.");
                                 }
-                                catch(Exception exEmail) { scopedLogger.LogError(exEmail, "[BG-NC] Error correo"); }
+                                catch(Exception exEmail) { 
+                                    scopedLogger.LogError(exEmail, "[BG-NC] Error enviando correo."); 
+                                }
                             }
                             else if (autObj.Estado == "NO AUTORIZADO")
                             {
@@ -459,7 +497,6 @@ namespace FacturasSRI.Infrastructure.Services
                             }
                             else 
                             {
-                                // Si sigue en proceso o hay errores temporales, dejamos como ENVIADA
                                 ncSri.RespuestaSRI = JsonSerializer.Serialize(autObj.Errores);
                             }
                         }
