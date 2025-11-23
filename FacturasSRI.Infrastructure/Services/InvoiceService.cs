@@ -764,6 +764,7 @@ namespace FacturasSRI.Infrastructure.Services
                 ProductoId = d.ProductoId,
                 ProductName = d.Producto.Nombre,
                 Cantidad = d.Cantidad,
+                CantidadDevuelta = d.CantidadDevuelta,
                 PrecioVentaUnitario = d.PrecioVentaUnitario,
                 Subtotal = d.Subtotal,
                 Taxes = d.Producto.ProductoImpuestos.Select(pi => new TaxDto

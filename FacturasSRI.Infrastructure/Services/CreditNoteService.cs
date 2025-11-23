@@ -368,11 +368,15 @@ namespace FacturasSRI.Infrastructure.Services
             foreach (var detalleNc in nc.Detalles)
             {
                 var facturaDetalle = await context.FacturaDetalles
+                    .AsNoTracking()
                     .FirstOrDefaultAsync(fd => fd.FacturaId == nc.FacturaId && fd.ProductoId == detalleNc.ProductoId);
 
                 if (facturaDetalle != null)
                 {
-                    facturaDetalle.CantidadDevuelta += detalleNc.Cantidad;
+                    var newReturnedQuantity = facturaDetalle.CantidadDevuelta + detalleNc.Cantidad;
+                    var detailToUpdate = new FacturaDetalle { Id = facturaDetalle.Id, CantidadDevuelta = newReturnedQuantity };
+                    context.FacturaDetalles.Attach(detailToUpdate);
+                    context.Entry(detailToUpdate).Property(x => x.CantidadDevuelta).IsModified = true;
                 }
             }
             await context.SaveChangesAsync();
