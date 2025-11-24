@@ -9,8 +9,6 @@ namespace FacturasSRI.Core.Services
 {
     public class SriResponseParserService
     {
-        private static XNamespace ns2 = "http://ec.gob.sri.ws.recepcion";
-        private static XNamespace ns2_auth = "http://ec.gob.sri.ws.autorizacion";
         private readonly ILogger<SriResponseParserService> _logger;
 
         public SriResponseParserService(ILogger<SriResponseParserService> logger)
@@ -20,33 +18,34 @@ namespace FacturasSRI.Core.Services
 
         public RespuestaRecepcion ParsearRespuestaRecepcion(string soapResponse)
         {
-            _logger.LogWarning("--- INICIO RESPUESTA SRI (RECEPCIÓN) ---\n{Xml}\n--- FIN RESPUESTA SRI (RECEPCIÓN) ---", soapResponse);
-
+            _logger.LogInformation("Parsing Respuesta Recepción...");
             var respuesta = new RespuestaRecepcion();
             var xmlDoc = XDocument.Parse(soapResponse);
 
-            var respuestaNode = xmlDoc.Descendants(ns2 + "validarComprobanteResponse").FirstOrDefault();
+            // Buscamos el nodo validarComprobanteResponse sin importar el namespace
+            var respuestaNode = xmlDoc.Descendants().FirstOrDefault(d => d.Name.LocalName == "validarComprobanteResponse");
+            
             if (respuestaNode == null)
             {
                 var faultString = xmlDoc.Descendants("faultstring").FirstOrDefault()?.Value;
                 if (!string.IsNullOrEmpty(faultString))
                 {
-                    throw new Exception($"El servicio del SRI devolvió un error (SOAP Fault): {faultString}");
+                    throw new Exception($"Error SRI (SOAP Fault): {faultString}");
                 }
-                throw new Exception("No se encontró 'validarComprobanteResponse' en la respuesta SOAP.");
+                throw new Exception("No se encontró 'validarComprobanteResponse' en la respuesta.");
             }
 
-            respuesta.Estado = respuestaNode.Descendants("estado").FirstOrDefault()?.Value ?? "ERROR";
+            respuesta.Estado = respuestaNode.Descendants().FirstOrDefault(d => d.Name.LocalName == "estado")?.Value ?? "ERROR";
 
             if (respuesta.Estado == "DEVUELTA")
             {
-                respuesta.Errores = xmlDoc.Descendants("mensaje")
+                respuesta.Errores = xmlDoc.Descendants().Where(d => d.Name.LocalName == "mensaje")
                     .Select(m => new SriError
                     {
-                        Identificador = m.Descendants("identificador").FirstOrDefault()?.Value ?? "",
-                        Mensaje = m.Descendants("mensaje").FirstOrDefault()?.Value ?? "",
-                        InformacionAdicional = m.Descendants("informacionAdicional").FirstOrDefault()?.Value ?? "",
-                        Tipo = m.Descendants("tipo").FirstOrDefault()?.Value ?? ""
+                        Identificador = m.Descendants().FirstOrDefault(d => d.Name.LocalName == "identificador")?.Value ?? "",
+                        Mensaje = m.Descendants().FirstOrDefault(d => d.Name.LocalName == "mensaje")?.Value ?? "",
+                        InformacionAdicional = m.Descendants().FirstOrDefault(d => d.Name.LocalName == "informacionAdicional")?.Value ?? "",
+                        Tipo = m.Descendants().FirstOrDefault(d => d.Name.LocalName == "tipo")?.Value ?? ""
                     })
                     .ToList();
             }
@@ -59,7 +58,6 @@ namespace FacturasSRI.Core.Services
             var respuesta = new RespuestaAutorizacion();
             var xmlDoc = XDocument.Parse(soapResponse);
 
-            // El nodo puede estar en un namespace, o no. Buscamos de forma más flexible.
             var autorizacionNode = xmlDoc.Descendants().FirstOrDefault(d => d.Name.LocalName == "autorizacion");
             
             if (autorizacionNode == null)
@@ -69,13 +67,11 @@ namespace FacturasSRI.Core.Services
                 {
                     respuesta.Estado = "ERROR";
                     respuesta.Errores.Add(new SriError { Identificador = "SOAP", Mensaje = faultString });
-                    _logger.LogWarning("Respuesta SRI (Autorización) es un SOAP Fault: {Fault}", faultString);
                     return respuesta;
                 }
                 
-                // Si no hay nodo de autorización ni fault, es porque sigue en procesamiento.
+                // Si no hay nodo, es procesando
                 respuesta.Estado = "PROCESANDO";
-                _logger.LogInformation("Respuesta SRI (Autorización) no contiene nodo 'autorizacion', se asume PROCESANDO.");
                 return respuesta;
             }
 
@@ -84,13 +80,8 @@ namespace FacturasSRI.Core.Services
             if (respuesta.Estado == "AUTORIZADO")
             {
                 respuesta.NumeroAutorizacion = autorizacionNode.Descendants().FirstOrDefault(d => d.Name.LocalName == "numeroAutorizacion")?.Value ?? "";
-                
                 var fechaStr = autorizacionNode.Descendants().FirstOrDefault(d => d.Name.LocalName == "fechaAutorizacion")?.Value;
-                if (DateTime.TryParse(fechaStr, out DateTime fecha))
-                {
-                    respuesta.FechaAutorizacion = fecha.ToUniversalTime(); 
-                }
-                _logger.LogInformation("Factura AUTORIZADA. Número: {Numero}", respuesta.NumeroAutorizacion);
+                if (DateTime.TryParse(fechaStr, out DateTime fecha)) respuesta.FechaAutorizacion = fecha.ToUniversalTime(); 
             }
             else if (respuesta.Estado == "NO AUTORIZADO")
             {
@@ -103,7 +94,6 @@ namespace FacturasSRI.Core.Services
                         Tipo = m.Descendants().FirstOrDefault(d => d.Name.LocalName == "tipo")?.Value ?? ""
                     })
                     .ToList();
-                _logger.LogWarning("Factura NO AUTORIZADA. Errores: {ErrorCount}", respuesta.Errores.Count);
             }
 
             return respuesta;

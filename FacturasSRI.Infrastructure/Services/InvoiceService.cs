@@ -34,7 +34,6 @@ namespace FacturasSRI.Infrastructure.Services
         private readonly PdfGeneratorService _pdfGenerator;
         private readonly IServiceScopeFactory _serviceScopeFactory;
         
-        // Diccionario para evitar que el CheckStatus procese la misma factura simultáneamente
         private static readonly ConcurrentDictionary<Guid, byte> _processingInvoices = new ConcurrentDictionary<Guid, byte>();
 
         public InvoiceService(
@@ -101,7 +100,6 @@ namespace FacturasSRI.Infrastructure.Services
                     _ = Task.Run(() => EnviarAlSriEnFondoAsync(factura.Id, xmlFirmadoBytes, claveAcceso));
                 }
                 
-                // Retornamos usando el método que ahora usa AsNoTracking para asegurar datos frescos
                 return (await GetInvoiceByIdAsync(factura.Id))!;
             }
             catch (Exception ex) { _logger.LogError(ex, "Error CRÍTICO en CreateInvoiceAsync."); throw; }
@@ -118,6 +116,7 @@ namespace FacturasSRI.Infrastructure.Services
 
             try
             {
+                // 1. INTENTO DE RECEPCIÓN
                 string respuestaRecepcionXml = await scopedSriClient.EnviarRecepcionAsync(xmlFirmadoBytes);
                 var respuestaRecepcion = scopedParser.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
@@ -136,6 +135,7 @@ namespace FacturasSRI.Infrastructure.Services
                 } 
                 else 
                 {
+                     // SI FUE RECIBIDA, ACTUALIZAMOS ESTADO
                      var invoice = await scopedContext.Facturas.FindAsync(facturaId);
                      if(invoice != null && invoice.Estado == EstadoFactura.Pendiente) {
                          invoice.Estado = EstadoFactura.EnviadaSRI;
@@ -143,7 +143,7 @@ namespace FacturasSRI.Infrastructure.Services
                      }
                 }
                 
-                // Intentos de autorización
+                // 2. INTENTO DE AUTORIZACIÓN (Bucle de espera)
                 RespuestaAutorizacion? respuestaAutorizacion = null;
                 for (int i = 0; i < 4; i++)
                 {
@@ -151,7 +151,6 @@ namespace FacturasSRI.Infrastructure.Services
                     string respuestaAutorizacionXml = await scopedSriClient.ConsultarAutorizacionAsync(claveAcceso);
                     respuestaAutorizacion = scopedParser.ParsearRespuestaAutorizacion(respuestaAutorizacionXml);
                     
-                    // Si no está procesando, salimos del bucle (ya sea autorizado, rechazado o error)
                     if (respuestaAutorizacion.Estado != "PROCESANDO") break;
                 }
                 
@@ -168,7 +167,7 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDetailViewDto?> CheckSriStatusAsync(Guid invoiceId)
         {
-            // 1. Verificar estado actual en BD (Sin Tracking para ver cambios de Background)
+            // Usamos AsNoTracking para ver cambios realizados por el Background
             var invoiceState = await _context.Facturas
                 .AsNoTracking()
                 .Include(f => f.InformacionSRI)
@@ -176,7 +175,6 @@ namespace FacturasSRI.Infrastructure.Services
 
             if (invoiceState == null || invoiceState.InformacionSRI == null) return null;
 
-            // Si ya está en estado final, no consultamos al SRI
             if (invoiceState.Estado == EstadoFactura.Autorizada || 
                 invoiceState.Estado == EstadoFactura.RechazadaSRI || 
                 invoiceState.Estado == EstadoFactura.Cancelada)
@@ -184,40 +182,68 @@ namespace FacturasSRI.Infrastructure.Services
                 return await GetInvoiceDetailByIdAsync(invoiceId);
             }
 
-            // Si llegamos aquí, consultamos al SRI
             try
             {
-                // Recepción si sigue pendiente
-                if (invoiceState.Estado == EstadoFactura.Pendiente)
+                // LÓGICA MEJORADA:
+                // Si está pendiente -> Enviar Recepción
+                // Si está EnviadaSRI -> Consultar Autorización
+                // PERO si consultamos autorización y devuelve "0 comprobantes" (PROCESANDO indefinido), 
+                // asumimos que la recepción falló silenciosamente y reintentamos recepción.
+
+                bool forzarRecepcion = invoiceState.Estado == EstadoFactura.Pendiente;
+
+                if (!forzarRecepcion)
+                {
+                    // Consultamos primero autorización
+                    string authXml = await _sriApiClientService.ConsultarAutorizacionAsync(invoiceState.InformacionSRI.ClaveAcceso);
+                    var respAuth = _sriResponseParserService.ParsearRespuestaAutorizacion(authXml);
+
+                    if (respAuth.Estado != "PROCESANDO")
+                    {
+                        await FinalizeAuthorizationAsync(invoiceId, respAuth);
+                        return await GetInvoiceDetailByIdAsync(invoiceId);
+                    }
+                    else
+                    {
+                        // Sigue procesando... ¿Pero será que nunca se envió?
+                        // Si la respuesta fue "PROCESANDO" porque no encontró comprobantes, y ya pasó tiempo, reintentamos recepción.
+                        // (Aquí simplificamos: si el usuario le da clic manual, intentamos todo el flujo para asegurar).
+                        _logger.LogWarning("CheckStatus devolvió PROCESANDO. Intentando reenviar recepción por si acaso.");
+                        forzarRecepcion = true; 
+                    }
+                }
+
+                if (forzarRecepcion)
                 {
                     byte[] xmlBytes = Encoding.UTF8.GetBytes(invoiceState.InformacionSRI.XmlFirmado);
                     string recepXml = await _sriApiClientService.EnviarRecepcionAsync(xmlBytes);
                     var respRecep = _sriResponseParserService.ParsearRespuestaRecepcion(recepXml);
                     
                     if(respRecep.Estado == "DEVUELTA") {
-                         // Necesitamos un contexto con tracking para guardar
                          var invoiceToUpdate = await _context.Facturas.Include(f => f.InformacionSRI).FirstAsync(f => f.Id == invoiceId);
                          invoiceToUpdate.Estado = EstadoFactura.RechazadaSRI;
                          invoiceToUpdate.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respRecep.Errores);
                          await _context.SaveChangesAsync();
                          return await GetInvoiceDetailByIdAsync(invoiceId);
                     }
-                }
-
-                // Consulta de Autorización
-                string authXml = await _sriApiClientService.ConsultarAutorizacionAsync(invoiceState.InformacionSRI.ClaveAcceso);
-                var respAuth = _sriResponseParserService.ParsearRespuestaAutorizacion(authXml);
-                
-                if(respAuth.Estado != "PROCESANDO")
-                {
-                    await FinalizeAuthorizationAsync(invoiceId, respAuth);
-                }
-                else
-                {
-                    // Solo actualizamos el mensaje si sigue procesando
-                    var invoiceToUpdate = await _context.Facturas.Include(f => f.InformacionSRI).FirstAsync(f => f.Id == invoiceId);
-                    invoiceToUpdate.InformacionSRI.RespuestaSRI = "El SRI todavía está procesando la autorización.";
-                    await _context.SaveChangesAsync();
+                    
+                    // Si fue RECIBIDA, actualizamos a EnviadaSRI y consultamos Auth de nuevo
+                    if(invoiceState.Estado != EstadoFactura.EnviadaSRI)
+                    {
+                        var invoiceToUpdate = await _context.Facturas.FirstAsync(f => f.Id == invoiceId);
+                        invoiceToUpdate.Estado = EstadoFactura.EnviadaSRI;
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                    await Task.Delay(2000); // Espera técnica del SRI
+                    
+                    string authXml = await _sriApiClientService.ConsultarAutorizacionAsync(invoiceState.InformacionSRI.ClaveAcceso);
+                    var respAuth = _sriResponseParserService.ParsearRespuestaAutorizacion(authXml);
+                    
+                    if(respAuth.Estado != "PROCESANDO")
+                    {
+                        await FinalizeAuthorizationAsync(invoiceId, respAuth);
+                    }
                 }
             }
             catch (Exception ex)
@@ -230,7 +256,6 @@ namespace FacturasSRI.Infrastructure.Services
 
         private async Task FinalizeAuthorizationAsync(Guid invoiceId, RespuestaAutorizacion respuesta)
         {
-            // Evitar concurrencia si el Background y el CheckStatus manual corren a la vez
             if (!_processingInvoices.TryAdd(invoiceId, 0)) return;
 
             try
@@ -257,7 +282,6 @@ namespace FacturasSRI.Infrastructure.Services
                         await CrearCxCScoped(context, invoice);
                         await context.SaveChangesAsync();
                         
-                        // Enviar correo
                         try
                         {
                             var items = invoice.Detalles.Select(d => new InvoiceItemDetailDto
@@ -380,6 +404,7 @@ namespace FacturasSRI.Infrastructure.Services
                     secuencial.UltimoSecuencialFactura++;
                     var numeroSecuencial = secuencial.UltimoSecuencialFactura.ToString("D9");
 
+                    // CORRECCIÓN: Estado inicial es PENDIENTE para asegurar el flujo correcto
                     var invoice = new Factura
                     {
                         Id = Guid.NewGuid(),
@@ -585,7 +610,6 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDto?> GetInvoiceByIdAsync(Guid id)
         {
-             // AsNoTracking VITAL aquí para leer estado fresco
              var invoice = await _context.Facturas
                 .AsNoTracking()
                 .Include(i => i.Cliente) 
@@ -624,7 +648,6 @@ namespace FacturasSRI.Infrastructure.Services
 
         public Task<List<InvoiceDto>> GetInvoicesAsync()
         {
-            // AsNoTracking para listados es buena práctica siempre
             return (from invoice in _context.Facturas.AsNoTracking()
                         join cpc in _context.CuentasPorCobrar on invoice.Id equals cpc.FacturaId into cpcJoin
                         from cpc in cpcJoin.DefaultIfEmpty()
@@ -653,7 +676,6 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDetailViewDto?> GetInvoiceDetailByIdAsync(Guid id)
         {
-            // AsNoTracking VITAL aquí
             var invoice = await _context.Facturas
                 .AsNoTracking()
                 .Include(i => i.Cliente)
@@ -743,7 +765,6 @@ namespace FacturasSRI.Infrastructure.Services
         {
             Task.Run(async () =>
             {
-                // Usamos scope factory para evitar usar el contexto disposed
                 using var scope = _serviceScopeFactory.CreateScope();
                 var scopedService = scope.ServiceProvider.GetRequiredService<IInvoiceService>();
                 var scopedEmail = scope.ServiceProvider.GetRequiredService<IEmailService>();
@@ -769,7 +790,7 @@ namespace FacturasSRI.Infrastructure.Services
                         xmlFirmado
                     );
                 } catch (Exception ex) {
-                    // Logger needed here technically, but context is limited
+                    // Log or ignore
                 }
             });
             return Task.CompletedTask;
@@ -828,6 +849,7 @@ namespace FacturasSRI.Infrastructure.Services
             facturaSri.XmlGenerado = xmlGenerado;
             facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
 
+            // CORRECCIÓN: Regresamos a Pendiente para forzar recepción
             invoice.Estado = EstadoFactura.Pendiente;
             await _context.SaveChangesAsync();
 
@@ -944,7 +966,6 @@ namespace FacturasSRI.Infrastructure.Services
             return await GetInvoiceByIdAsync(invoice.Id);
         }
         
-        // Nuevo método: Enviar recordatorio
         public Task SendPaymentReminderEmailAsync(Guid invoiceId)
         {
             Task.Run(async () =>

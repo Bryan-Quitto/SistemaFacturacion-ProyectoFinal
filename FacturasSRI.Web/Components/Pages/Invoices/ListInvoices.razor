@@ -342,6 +342,7 @@ else
             var (badgeClass, iconClass, text) = estado switch
             {
                 EstadoFactura.Autorizada => ("bg-success", "bi-check-circle-fill", "Autorizada"),
+                EstadoFactura.EnviadaSRI => ("bg-info text-dark", "bi-send", "Enviada SRI"),
                 EstadoFactura.Borrador => ("bg-warning text-dark", "bi-pencil-square", "Borrador"),
                 EstadoFactura.Cancelada => ("bg-secondary", "bi-x-octagon-fill", "Cancelada"),
                 _ => ("bg-danger", "bi-x-circle-fill", estado.ToString())
