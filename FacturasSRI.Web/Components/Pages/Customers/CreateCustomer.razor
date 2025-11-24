@@ -80,6 +80,16 @@
 
     private async Task HandleAddCustomer()
     {
+        // 1. VALIDACIÓN NUEVA: IMPEDIR "CONSUMIDOR FINAL"
+        if (!string.IsNullOrWhiteSpace(newCustomer.RazonSocial) && 
+            string.Equals(newCustomer.RazonSocial.Trim(), "CONSUMIDOR FINAL", StringComparison.OrdinalIgnoreCase))
+        {
+            isSuccess = false;
+            statusMessage = "Error: No puede crear un cliente manualmente con la Razón Social 'CONSUMIDOR FINAL'. Este es un registro reservado del sistema.";
+            StateHasChanged();
+            return;
+        }
+
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
         var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);

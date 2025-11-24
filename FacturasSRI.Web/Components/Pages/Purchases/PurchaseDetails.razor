@@ -113,12 +113,12 @@ else
                             </button>
                         }
                         
-                        @if (userIsAdmin && purchase.Estado == EstadoCompra.Vencida)
-                        {
-                             <button class="btn btn-danger" @onclick="GoToAnnulPage">
-                                <i class="bi bi-x-circle"></i> Anular Compra
-                            </button>
-                        }
+                        @if (userIsAdmin && (purchase.Estado == EstadoCompra.Pendiente || purchase.Estado == EstadoCompra.Vencida))
+    {
+            <button class="btn btn-danger" @onclick="GoToAnnulPage">
+            <i class="bi bi-x-circle"></i> Anular Compra
+        </button>
+    }
                     </div>
                 </div>
             </div>

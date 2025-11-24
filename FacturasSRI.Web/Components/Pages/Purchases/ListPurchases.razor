@@ -83,7 +83,8 @@ else if (FilteredPurchases.Any())
                         <td>
                             @if(purchase.FechaVencimiento.HasValue)
                             {
-                                <span class="@(purchase.FechaVencimiento.Value < DateTime.Now && purchase.Estado == EstadoCompra.Pendiente ? "text-danger fw-bold" : "")">
+                                @* AQUI ESTÁ EL CAMBIO: Se marca rojo si faltan 5 días o menos (o si ya pasó) *@
+                                <span class="@(purchase.FechaVencimiento.Value <= DateTime.Now.AddDays(5) && purchase.Estado == EstadoCompra.Pendiente ? "text-danger fw-bold" : "")">
                                     @purchase.FechaVencimiento.Value.ToShortDateString()
                                 </span>
                             }

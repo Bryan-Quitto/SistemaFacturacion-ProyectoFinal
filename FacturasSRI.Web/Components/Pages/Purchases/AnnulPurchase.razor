@@ -35,7 +35,7 @@
                     else
                     {
                         <div class="alert alert-warning">
-                            <strong>Atención:</strong> Estás a punto de anular una compra VENCIDA.
+                            <strong>Atención:</strong> Estás a punto de anular esta compra.
                             <ul class="mb-0 mt-2">
                                 <li>Se cambiará el estado de la compra a <strong>Cancelada</strong>.</li>
                                 <li>Se realizará un ajuste de inventario tipo "Anulación Compra" restando <strong>@purchase.Cantidad unidades</strong> del producto <strong>@purchase.ProductName</strong>.</li>
@@ -116,10 +116,10 @@
             purchase = await PurchaseService.GetPurchaseByIdAsync(PurchaseId);
             
             // Validaciones de seguridad adicionales
-            if (purchase != null && purchase.Estado != EstadoCompra.Vencida)
+            if (purchase != null && purchase.Estado != EstadoCompra.Pendiente && purchase.Estado != EstadoCompra.Vencida)
             {
-                statusMessage = "Solo se pueden anular compras en estado Vencida.";
-                purchase = null; // Ocultar formulario
+                statusMessage = "Solo se pueden anular compras Pendientes o Vencidas.";
+                purchase = null; 
             }
         }
         catch (Exception ex)

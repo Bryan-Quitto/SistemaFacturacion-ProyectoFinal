@@ -201,8 +201,9 @@ else
                     @if(!string.IsNullOrEmpty(creditNote.RespuestaSRI))
                     {
                         <div class="mb-3">
-                            <label class="form-label small text-muted">Respuesta SRI</label>
-                            <div class="p-2 bg-light border rounded small" style="max-height: 150px; overflow-y: auto;">
+                            <label class="form-label small text-muted">Respuesta SRI / Errores</label>
+                            <!-- Usamos alert-danger para que resalte si hay error -->
+                            <div class="p-2 bg-light border rounded small text-danger" style="max-height: 200px; overflow-y: auto; font-family: monospace;">
                                 @creditNote.RespuestaSRI
                             </div>
                         </div>
@@ -225,15 +226,15 @@ else
                             <button class="btn btn-primary" @onclick="HandleCheckSriStatus" disabled="@isCheckingStatus">
                                 @if (isCheckingStatus)
                                 {
-                                    <span class="spinner-border spinner-border-sm me-2"></span> <span>Consultando...</span>
+                                    <span class="spinner-border spinner-border-sm me-2"></span> <span>Procesando...</span>
                                 }
                                 else
                                 {
-                                    <i class="bi bi-arrow-clockwise me-2"></i> <span>Actualizar Estado SRI</span>
+                                    <i class="bi bi-arrow-clockwise me-2"></i> <span>Actualizar / Reintentar</span>
                                 }
                             </button>
                             <small class="text-muted text-center" style="font-size: 0.7rem;">
-                                Si la NC se quedó "Pendiente" o "Enviada", use este botón para consultar su estado real en el SRI.
+                                Use este botón para consultar el estado o reintentar el envío si hubo error de conexión.
                             </small>
                         }
                     </div>
@@ -376,10 +377,9 @@ else
         sriCheckMessage = null;
         try
         {
-            // El método GetCreditNoteDetailByIdAsync del servicio YA incluye la lógica de CheckSriStatusAsync internamente
-            // Así que solo recargamos la data.
+            // Al recargar, el servicio ejecuta la lógica de reintento si es necesario
             await LoadData();
-            sriCheckMessage = "Consulta realizada. Estado actualizado.";
+            sriCheckMessage = "Consulta / Reintento realizado.";
         }
         catch (Exception ex)
         {
@@ -399,11 +399,25 @@ else
         {
             var (badgeClass, iconClass, text) = estado switch
             {
+                // Verde para éxito
                 EstadoNotaDeCredito.Autorizada => ("bg-success", "bi-check-circle-fill", "Autorizada"),
+                
+                // Amarillo para procesos en espera (Pendiente y Borrador)
                 EstadoNotaDeCredito.Pendiente => ("bg-warning text-dark", "bi-hourglass-split", "Pendiente"),
+                EstadoNotaDeCredito.Borrador => ("bg-warning text-dark", "bi-pencil-square", "Borrador"), 
+                
+                // Azul para enviado
                 EstadoNotaDeCredito.EnviadaSRI => ("bg-info text-dark", "bi-send", "Enviada SRI"),
+                
+                // Rojo para errores
+                EstadoNotaDeCredito.RechazadaSRI => ("bg-danger", "bi-x-circle-fill", "Rechazada"),
+                
+                // Gris para anulados
+                EstadoNotaDeCredito.Cancelada => ("bg-secondary", "bi-trash", "Anulada"),
+                
                 _ => ("bg-secondary", "bi-question-circle", estado.ToString())
             };
+            
             builder.OpenElement(0, "span");
             builder.AddAttribute(1, "class", $"badge {badgeClass} fs-6");
             builder.OpenElement(2, "i");

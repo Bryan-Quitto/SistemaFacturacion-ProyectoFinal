@@ -126,8 +126,11 @@ namespace FacturasSRI.Infrastructure.Services
         .FirstOrDefaultAsync(c => c.Id == compraId);
 
     if (compra == null) throw new InvalidOperationException("La compra no existe.");
-    if (compra.Estado != EstadoCompra.Vencida) throw new InvalidOperationException("Solo se pueden anular compras vencidas.");
-    if (compra.Producto == null) throw new InvalidOperationException("El producto asociado es inválido.");
+if (compra.Estado != EstadoCompra.Pendiente && compra.Estado != EstadoCompra.Vencida) 
+    {
+        throw new InvalidOperationException("Solo se pueden anular compras que estén Pendientes o Vencidas (No Pagadas).");
+    }
+        if (compra.Producto == null) throw new InvalidOperationException("El producto asociado es inválido.");
 
     // --- LÓGICA DE VALIDACIÓN DE STOCK ---
 

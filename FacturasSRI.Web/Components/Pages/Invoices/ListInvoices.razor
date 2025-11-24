@@ -7,7 +7,6 @@
 @inject IInvoiceService InvoiceService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Facturas Emitidas</PageTitle>
 
@@ -87,11 +86,12 @@ else
                         <td class="fw-bold">@invoice.NumeroFactura</td>
                         <td>@invoice.ClienteNombre</td>
                         <td>@invoice.FechaEmision.ToShortDateString()</td>
-                                                    <td>
-                                                        <span class="badge @(invoice.FormaDePago == FormaDePago.Credito ? "bg-info text-dark" : "bg-light text-dark border")">
-                                                            @invoice.FormaDePago
-                                                        </span>
-                                                    </td>                        <td>
+                        <td>
+                            <span class="badge @(invoice.FormaDePago == FormaDePago.Credito ? "bg-info text-dark" : "bg-light text-dark border")">
+                                @invoice.FormaDePago
+                            </span>
+                        </td>                        
+                        <td>
                             @GetStatusBadge(invoice.Estado)
                         </td>
                         <td>
@@ -162,7 +162,8 @@ else
                                             </a>
                                         }
                                         
-                                        @if (invoice.Estado == EstadoFactura.Autorizada)
+                                        @* CORRECCIÓN AQUÍ: OCULTAR NC SI ES CONSUMIDOR FINAL *@
+                                        @if (invoice.Estado == EstadoFactura.Autorizada && invoice.ClienteNombre != "CONSUMIDOR FINAL")
                                         {
                                              <a href="@($"credit-notes/create/{invoice.Id}")" class="btn btn-sm btn-outline-warning" title="Emitir Nota de Crédito">
                                                 <i class="bi bi-arrow-return-left"></i>
@@ -183,28 +184,29 @@ else
     </div>
 }
                         
-                        @if (showCancelModal)
-                        {
-                            <div class="modal fade show d-block" tabindex="-1" role="dialog">
-                                <div class="modal-dialog modal-dialog-centered" role="document">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Confirmar Cancelación</h5>
-                                            <button type="button" class="btn-close" @onclick="CloseCancelModal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <p>¿Está seguro de que desea cancelar este borrador?</p>
-                                            <p class="text-muted small">Esta acción no se puede deshacer directamente, pero un administrador podrá reactivar la factura si es necesario.</p>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" @onclick="CloseCancelModal">Cerrar</button>
-                                            <button type="button" class="btn btn-danger" @onclick="ConfirmCancelInvoice">Sí, Cancelar</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="modal-backdrop fade show"></div>
-                        }
+@if (showCancelModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmar Cancelación</h5>
+                    <button type="button" class="btn-close" @onclick="CloseCancelModal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Está seguro de que desea cancelar este borrador?</p>
+                    <p class="text-muted small">Esta acción no se puede deshacer directamente, pero un administrador podrá reactivar la factura si es necesario.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseCancelModal">Cerrar</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmCancelInvoice">Sí, Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
 @code {
     private List<InvoiceDto>? allInvoices;
     private string? errorMessage;

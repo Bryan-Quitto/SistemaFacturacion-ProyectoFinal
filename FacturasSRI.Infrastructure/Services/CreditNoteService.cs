@@ -193,11 +193,13 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 var factura = await _context.Facturas
                     .Include(f => f.Cliente)
-                    // Carga profunda: Factura -> Detalles -> Producto -> Impuestos -> Impuesto
                     .Include(f => f.Detalles).ThenInclude(d => d.Producto).ThenInclude(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
                     .FirstOrDefaultAsync(f => f.Id == dto.FacturaId);
 
                 if (factura == null) throw new InvalidOperationException("La factura original no existe.");
+
+                // Evitamos error de Stale Data
+                await _context.Entry(factura).ReloadAsync();
 
                 if (factura.Estado != EstadoFactura.Autorizada) throw new InvalidOperationException("Solo se pueden emitir Notas de Crédito a facturas AUTORIZADAS.");
 
@@ -226,6 +228,9 @@ namespace FacturasSRI.Infrastructure.Services
                     ClienteId = factura.ClienteId.Value,
                     FechaEmision = DateTime.UtcNow,
                     NumeroNotaCredito = numeroSecuencialStr,
+                    // === CORRECCIÓN DE ESTADO INICIAL ===
+                    // Se crea como PENDIENTE, igual que una Factura.
+                    // Si el envío falla por red, se queda aquí y permite reintentar.
                     Estado = dto.EsBorrador ? EstadoNotaDeCredito.Borrador : EstadoNotaDeCredito.Pendiente,
                     RazonModificacion = dto.RazonModificacion,
                     UsuarioIdCreador = dto.UsuarioIdCreador,
@@ -254,7 +259,6 @@ namespace FacturasSRI.Infrastructure.Services
                         Id = Guid.NewGuid(),
                         NotaDeCreditoId = nc.Id,
                         ProductoId = itemDto.ProductoId,
-                        // === CORRECCIÓN 1: ASIGNAR EL PRODUCTO CARGADO PARA QUE TENGA IMPUESTOS ===
                         Producto = detalleFactura.Producto, 
                         Cantidad = itemDto.CantidadDevolucion,
                         PrecioVentaUnitario = precioUnit,
@@ -289,13 +293,13 @@ namespace FacturasSRI.Infrastructure.Services
                 {
                     if (factura.Cliente == null) throw new InvalidOperationException("Cliente es nulo en la factura original.");
 
-                    // Aquí el objeto 'nc' ahora sí tiene Detalles[i].Producto.ProductoImpuestos poblado
                     var (xmlGenerado, xmlFirmadoBytes) = _xmlGeneratorService.GenerarYFirmarNotaCredito(claveAcceso, nc, factura.Cliente, factura, certPath, certPass);
 
                     ncSri.XmlGenerado = xmlGenerado;
                     ncSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
             
-                    nc.Estado = EstadoNotaDeCredito.EnviadaSRI;
+                    // NO cambiamos el estado aquí. Se queda en Pendiente.
+                    // El Background Task se encargará de moverlo a EnviadaSRI si tiene éxito.
 
                     await _context.SaveChangesAsync();
                     _ = Task.Run(() => EnviarNcAlSriEnFondoAsync(nc.Id, xmlFirmadoBytes));
@@ -345,6 +349,15 @@ namespace FacturasSRI.Infrastructure.Services
                     await scopedContext.SaveChangesAsync();
                     return;
                 }
+                else 
+                {
+                    // Si se recibió correctamente (o era repetida), cambiamos a EnviadaSRI
+                    if(nc.Estado == EstadoNotaDeCredito.Pendiente)
+                    {
+                        nc.Estado = EstadoNotaDeCredito.EnviadaSRI;
+                        await scopedContext.SaveChangesAsync();
+                    }
+                }
                 
                 RespuestaAutorizacion? respuestaAutorizacion = null;
                 for (int i = 0; i < 4; i++)
@@ -365,40 +378,133 @@ namespace FacturasSRI.Infrastructure.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[BG-NC] Error crítico en EnviarNcAlSriEnFondoAsync para NC {NcId}", ncId);
+                
+                // === LÓGICA DE FALLO POR RED ===
+                // Si falla la conexión, nos aseguramos de que el estado sea PENDIENTE.
+                // Así, 'CheckSriStatusAsync' lo detectará y reintentará.
+                // También guardamos el error en RespuestaSRI para que el usuario sepa qué pasó.
+                try 
+                {
+                    // Recargamos por si el contexto anterior murió
+                    var ncError = await scopedContext.NotasDeCredito.Include(n => n.InformacionSRI).FirstOrDefaultAsync(n => n.Id == ncId);
+                    if(ncError != null)
+                    {
+                        ncError.Estado = EstadoNotaDeCredito.Pendiente;
+                        if(ncError.InformacionSRI != null) 
+                        {
+                            ncError.InformacionSRI.RespuestaSRI = $"Error de red (Reintentando...): {ex.Message}";
+                        }
+                        await scopedContext.SaveChangesAsync();
+                    }
+                }
+                catch(Exception dbEx)
+                {
+                     _logger.LogError(dbEx, "Error guardando estado de fallo de red en BD");
+                }
             }
         }
 
         public async Task CheckSriStatusAsync(Guid ncId)
         {
-            var nc = await _context.NotasDeCredito.Include(n => n.InformacionSRI).FirstOrDefaultAsync(n => n.Id == ncId);
-            if (nc == null || nc.InformacionSRI == null || nc.Estado == EstadoNotaDeCredito.Autorizada || nc.Estado == EstadoNotaDeCredito.Cancelada)
-                return;
+            var nc = await _context.NotasDeCredito.Include(n => n.InformacionSRI).AsNoTracking().FirstOrDefaultAsync(n => n.Id == ncId);
+            
+            if (nc == null || nc.InformacionSRI == null) return;
+            
+            if (nc.Estado == EstadoNotaDeCredito.Autorizada || nc.Estado == EstadoNotaDeCredito.Cancelada) return;
             
             try
             {
-                if (string.IsNullOrEmpty(nc.InformacionSRI.ClaveAcceso)) return;
+                // Si está PENDIENTE, forzamos el envío (Recepción) porque significa que falló antes.
+                bool forzarRecepcion = nc.Estado == EstadoNotaDeCredito.Pendiente;
 
-                string authXml = await _sriApiClientService.ConsultarAutorizacionAsync(nc.InformacionSRI.ClaveAcceso);
-                var respAuth = _sriResponseParserService.ParsearRespuestaAutorizacion(authXml);
-
-                if (respAuth.Estado != "PROCESANDO")
+                if (!forzarRecepcion)
                 {
-                    await FinalizeAuthorizationAsync(ncId, respAuth);
+                    if (string.IsNullOrEmpty(nc.InformacionSRI.ClaveAcceso)) return;
+                    
+                    string authXml = await _sriApiClientService.ConsultarAutorizacionAsync(nc.InformacionSRI.ClaveAcceso);
+                    var respAuth = _sriResponseParserService.ParsearRespuestaAutorizacion(authXml);
+
+                    if (respAuth.Estado != "PROCESANDO")
+                    {
+                        await FinalizeAuthorizationAsync(ncId, respAuth);
+                        return;
+                    }
+                    else
+                    {
+                        // Si sigue procesando (o no existe en SRI), intentamos re-enviar por si acaso
+                        forzarRecepcion = true;
+                    }
                 }
-                else
+
+                if (forzarRecepcion)
                 {
-                    nc.InformacionSRI.RespuestaSRI = "El SRI todavía está procesando la autorización.";
-                    await _context.SaveChangesAsync();
+                    if (string.IsNullOrEmpty(nc.InformacionSRI.XmlFirmado)) return;
+
+                    byte[] xmlBytes = Encoding.UTF8.GetBytes(nc.InformacionSRI.XmlFirmado);
+                    string recepXml = await _sriApiClientService.EnviarRecepcionAsync(xmlBytes);
+                    var respRecep = _sriResponseParserService.ParsearRespuestaRecepcion(recepXml);
+                    
+                    if(respRecep.Estado == "DEVUELTA") 
+                    {
+                         bool esErrorDuplicado = respRecep.Errores.Any(e => e.Identificador == "43");
+
+                         if (!esErrorDuplicado) 
+                         {
+                             var ncToUpdate = await _context.NotasDeCredito.Include(n => n.InformacionSRI).FirstOrDefaultAsync(n => n.Id == ncId);
+                             if(ncToUpdate != null)
+                             {
+                                 ncToUpdate.Estado = EstadoNotaDeCredito.RechazadaSRI;
+                                 if (ncToUpdate.InformacionSRI != null) 
+                                 {
+                                    ncToUpdate.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respRecep.Errores);
+                                 }
+                                 await _context.SaveChangesAsync();
+                             }
+                             return;
+                         }
+                         else 
+                         {
+                             // Ya recibida, avanzar a EnviadaSRI
+                             if(nc.Estado != EstadoNotaDeCredito.EnviadaSRI)
+                             {
+                                var ncUpdate = await _context.NotasDeCredito.FindAsync(ncId);
+                                if(ncUpdate != null) {
+                                    ncUpdate.Estado = EstadoNotaDeCredito.EnviadaSRI;
+                                    await _context.SaveChangesAsync();
+                                }
+                             }
+                         }
+                    }
+                    else
+                    {
+                         // Recibida OK
+                         if(nc.Estado != EstadoNotaDeCredito.EnviadaSRI)
+                         {
+                            var ncUpdate = await _context.NotasDeCredito.FindAsync(ncId);
+                            if(ncUpdate != null) {
+                                ncUpdate.Estado = EstadoNotaDeCredito.EnviadaSRI;
+                                await _context.SaveChangesAsync();
+                            }
+                         }
+                    }
+                    
+                    await Task.Delay(2000);
+                    
+                    if (!string.IsNullOrEmpty(nc.InformacionSRI.ClaveAcceso))
+                    {
+                        string authXml = await _sriApiClientService.ConsultarAutorizacionAsync(nc.InformacionSRI.ClaveAcceso);
+                        var respAuth = _sriResponseParserService.ParsearRespuestaAutorizacion(authXml);
+                        
+                        if(respAuth.Estado != "PROCESANDO")
+                        {
+                            await FinalizeAuthorizationAsync(ncId, respAuth);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error en CheckSriStatusAsync para NC {NcId}", ncId);
-                if (nc.InformacionSRI != null)
-                {
-                    nc.InformacionSRI.RespuestaSRI = $"Error consultando al SRI: {ex.Message}";
-                    await _context.SaveChangesAsync();
-                }
             }
         }
 
@@ -640,7 +746,10 @@ namespace FacturasSRI.Infrastructure.Services
 
             nc.InformacionSRI.XmlGenerado = xmlGenerado;
             nc.InformacionSRI.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
-            nc.Estado = EstadoNotaDeCredito.EnviadaSRI;
+            
+            // Se queda como PENDIENTE para que el background intente enviar
+            // y si falla, CheckStatus pueda reintentar.
+            nc.Estado = EstadoNotaDeCredito.Pendiente;
 
             await _context.SaveChangesAsync();
 
