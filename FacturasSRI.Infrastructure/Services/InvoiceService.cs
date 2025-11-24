@@ -131,14 +131,26 @@ namespace FacturasSRI.Infrastructure.Services
 
                     var respuestaRecepcion = scopedParser.ParsearRespuestaRecepcion(respuestaRecepcionXml);
 
-                    if (respuestaRecepcion.Estado == "DEVUELTA")
+                    // --- INICIO DE LA CORRECCIÓN ---
+                    // Verifica si el estado es DEVUELTA y si la razón es "CLAVE ACCESO REGISTRADA"
+                    bool esClaveRepetida = respuestaRecepcion.Estado == "DEVUELTA" &&
+                                           respuestaRecepcion.Errores.Any(e => e.Identificador == "43");
+
+                    if (respuestaRecepcion.Estado == "DEVUELTA" && !esClaveRepetida)
                     {
+                        // Si es DEVUELTA por cualquier otra razón, se considera rechazada.
                         invoice.Estado = EstadoFactura.RechazadaSRI;
                         facturaSri.RespuestaSRI = JsonSerializer.Serialize(respuestaRecepcion.Errores);
-                        scopedLogger.LogWarning("[BG] Factura DEVUELTA por SRI.");
+                        scopedLogger.LogWarning("[BG] Factura DEVUELTA por SRI (Razón: {Razon})", facturaSri.RespuestaSRI);
                     }
                     else
                     {
+                        // Si fue RECIBIDA o si fue DEVUELTA por clave repetida, procedemos a autorizar.
+                        if (esClaveRepetida)
+                        {
+                            scopedLogger.LogInformation("[BG] Clave de acceso ya registrada para {FacturaId}. Procediendo a consultar autorización.", facturaId);
+                        }
+
                         try 
                         {
                             await Task.Delay(2500); 
@@ -195,6 +207,7 @@ namespace FacturasSRI.Infrastructure.Services
                             invoice.Estado = EstadoFactura.EnviadaSRI;
                         }
                     }
+                    // --- FIN DE LA CORRECCIÓN ---
 
                     await scopedContext.SaveChangesAsync();
                 }
@@ -247,12 +260,18 @@ namespace FacturasSRI.Infrastructure.Services
                     byte[] xmlBytes = Encoding.UTF8.GetBytes(invoice.InformacionSRI.XmlFirmado);
                     string recepXml = await _sriApiClientService.EnviarRecepcionAsync(xmlBytes);
                     var respRecep = _sriResponseParserService.ParsearRespuestaRecepcion(recepXml);
-                    if(respRecep.Estado == "DEVUELTA") {
+                    
+                    bool esClaveRepetida = respRecep.Estado == "DEVUELTA" && 
+                                           respRecep.Errores.Any(e => e.Identificador == "43");
+
+                    if(respRecep.Estado == "DEVUELTA" && !esClaveRepetida) {
                         invoice.Estado = EstadoFactura.RechazadaSRI;
                         invoice.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respRecep.Errores);
                         await _context.SaveChangesAsync();
                         return await GetInvoiceDetailByIdAsync(invoiceId);
                     }
+                    
+                    // Si fue RECIBIDA o DEVUELTA con clave repetida, marcamos como Enviada y continuamos a autorizar.
                     invoice.Estado = EstadoFactura.EnviadaSRI;
                     await _context.SaveChangesAsync();
                     await Task.Delay(2000);
