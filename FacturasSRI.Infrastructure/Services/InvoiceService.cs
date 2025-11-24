@@ -210,14 +210,30 @@ namespace FacturasSRI.Infrastructure.Services
                     var respRecep = _sriResponseParserService.ParsearRespuestaRecepcion(recepXml);
                     
                     if(respRecep.Estado == "DEVUELTA") {
-                         var invoiceToUpdate = await _context.Facturas.Include(f => f.InformacionSRI).FirstAsync(f => f.Id == invoiceId);
-                         invoiceToUpdate.Estado = EstadoFactura.RechazadaSRI;
-                         if (invoiceToUpdate.InformacionSRI != null) 
-                         {
-                            invoiceToUpdate.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respRecep.Errores);
-                         }
-                         await _context.SaveChangesAsync();
-                         return await GetInvoiceDetailByIdAsync(invoiceId);
+                         bool esErrorDuplicado = respRecep.Errores.Any(e => e.Identificador == "43");
+
+             if (!esErrorDuplicado) // Solo si NO es duplicado, marcamos como rechazada
+             {
+                 var invoiceToUpdate = await _context.Facturas.Include(f => f.InformacionSRI).FirstAsync(f => f.Id == invoiceId);
+                 invoiceToUpdate.Estado = EstadoFactura.RechazadaSRI;
+                 if (invoiceToUpdate.InformacionSRI != null) 
+                 {
+                    invoiceToUpdate.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respRecep.Errores);
+                 }
+                 await _context.SaveChangesAsync();
+                 return await GetInvoiceDetailByIdAsync(invoiceId);
+             }
+             else 
+             {
+                 // Si es error 43, significa que YA se envió (probablemente por el background task).
+                 // Asumimos que está enviada y continuamos el flujo para consultar autorización.
+                 if(invoiceState.Estado != EstadoFactura.EnviadaSRI)
+                 {
+                    var invoiceToUpdate = await _context.Facturas.FirstAsync(f => f.Id == invoiceId);
+                    invoiceToUpdate.Estado = EstadoFactura.EnviadaSRI;
+                    await _context.SaveChangesAsync();
+                 }
+             }
                     }
                     
                     if(invoiceState.Estado != EstadoFactura.EnviadaSRI)
@@ -245,6 +261,18 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 _logger.LogError(ex, "Error en CheckSriStatusAsync para factura {InvoiceId}", invoiceId);
             }
+            try 
+        {
+            // Si el contexto ya fue eliminado (usuario cambió de página durante el Delay),
+            // esta línea lanzaba la excepción ObjectDisposedException.
+            return await GetInvoiceDetailByIdAsync(invoiceId);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Si el contexto murió, no hacemos nada. El usuario ya no está viendo la página.
+            _logger.LogWarning("Intento de leer factura {Id} con contexto eliminado (usuario navegó).", invoiceId);
+            return null; 
+        }
 
             return await GetInvoiceDetailByIdAsync(invoiceId);
         }

@@ -58,7 +58,6 @@ builder.Services.AddScoped<ICobroService, CobroService>();
 
 builder.Services.AddScoped<FacturasSRI.Core.Services.FirmaDigitalService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.XmlGeneratorService>();
-builder.Services.AddScoped<FacturasSRI.Core.Services.SriApiClientService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.SriResponseParserService>();
 builder.Services.AddScoped<ICreditNoteService, CreditNoteService>();
 
@@ -68,10 +67,16 @@ builder.Services.AddScoped<AuthenticationStateProvider, CookieAuthenticationStat
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddHttpClient("", client => 
+builder.Services.AddHttpClient<FacturasSRI.Core.Services.SriApiClientService>(client => 
 {
-    var baseUrl = builder.Configuration["App:BaseUrl"] ?? "http://localhost:5000";
-    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(60);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("FacturasSRI-Client/1.0");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    // Esto mueve la lógica insegura de certificados al registro del servicio
+    ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true,
+    SslProtocols = System.Security.Authentication.SslProtocols.Tls12
 });
 
 builder.Services.AddAuthentication("Cookies")

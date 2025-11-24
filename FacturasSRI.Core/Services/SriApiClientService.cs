@@ -8,27 +8,17 @@ namespace FacturasSRI.Core.Services
 {
     public class SriApiClientService
     {
-        // URLs EXCLUSIVAS DE PRUEBAS
         private const string URL_RECEPCION_PRUEBAS = "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline";
         private const string URL_AUTORIZACION_PRUEBAS = "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline";
 
-        // Declaración de variables de clase (Aquí estaba el error de _httpClient)
         private readonly HttpClient _httpClient;
         private readonly ILogger<SriApiClientService> _logger;
 
-        public SriApiClientService(ILogger<SriApiClientService> logger)
+        // Inyectamos HttpClient directamente. Ya vendrá configurado desde Program.cs
+        public SriApiClientService(HttpClient httpClient, ILogger<SriApiClientService> logger)
         {
+            _httpClient = httpClient;
             _logger = logger;
-
-            // Configuración para ignorar errores de SSL (común en el servidor de pruebas de SRI 'celcer')
-            // y forzar TLS 1.2
-            var handler = new HttpClientHandler();
-            handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
-            handler.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
-
-            _httpClient = new HttpClient(handler);
-            _httpClient.Timeout = TimeSpan.FromSeconds(60); 
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("FacturasSRI-Client/1.0");
         }
 
         public async Task<string> EnviarRecepcionAsync(byte[] xmlFirmadoBytes)
