@@ -50,7 +50,7 @@ else
 
                 @if (invoice.Estado == EstadoFactura.Autorizada)
                 {
-                    <button class="btn btn-success" @onclick="ResendEmail" disabled="@sendingEmail">
+                    <button class="btn btn-success me-2" @onclick="ResendEmail" disabled="@sendingEmail">
                         @if (sendingEmail)
                         {
                             <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
@@ -66,7 +66,7 @@ else
 
                 @if (invoice.FormaDePago == FormaDePago.Credito && invoice.SaldoPendiente > 0 && invoice.FechaVencimiento.HasValue && (invoice.FechaVencimiento.Value - DateTime.Today).Days <= 5)
                 {
-                    <button class="btn btn-warning" @onclick="SendPaymentReminder" disabled="@sendingEmail">
+                    <button class="btn btn-warning me-2" @onclick="SendPaymentReminder" disabled="@sendingEmail">
                         @if (sendingEmail)
                         {
                             <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>

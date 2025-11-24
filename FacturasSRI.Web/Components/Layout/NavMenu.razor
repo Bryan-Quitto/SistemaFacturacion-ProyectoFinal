@@ -38,10 +38,12 @@
                     <ul class="nav-submenu">
                         <AuthorizeView Roles="Administrador, Vendedor" Context="innerContext">
                             <li><NavLink href="invoices/create"><i class="bi bi-file-earmark-plus submenu-icon"></i><span>Crear Factura</span></NavLink></li>
+                        </AuthorizeView>
+                        <li><NavLink href="invoices" Match="NavLinkMatch.All"><i class="bi bi-card-list submenu-icon"></i><span>Listar Facturas</span></NavLink></li>
+                        <AuthorizeView Roles="Administrador, Vendedor" Context="innerContext">
                             <li><NavLink href="credit-notes" Match="NavLinkMatch.All"><i class="bi bi-arrow-return-left submenu-icon"></i><span>Notas de Crédito</span></NavLink></li>
                             <li><NavLink href="payments" Match="NavLinkMatch.All"><i class="bi bi-credit-card submenu-icon"></i><span>Historial de Pagos</span></NavLink></li>
                         </AuthorizeView>
-                        <li><NavLink href="invoices" Match="NavLinkMatch.All"><i class="bi bi-card-list submenu-icon"></i><span>Listar Facturas</span></NavLink></li>
                     </ul>
                 }
             </div>
