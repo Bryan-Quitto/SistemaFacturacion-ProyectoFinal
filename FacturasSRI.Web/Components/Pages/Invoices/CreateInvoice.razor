@@ -11,6 +11,7 @@
 @inject IProductService ProductService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject HttpClient Http
 
 <PageTitle>@(isEditMode ? "Editar Borrador" : "Nueva Factura")</PageTitle>
 
@@ -362,17 +363,23 @@
     {
         try
         {
+            var baseUri = Navigation.ToAbsoluteUri(Navigation.BaseUri);
+            var customersTask = Http.GetFromJsonAsync<List<CustomerDto>>(new Uri(baseUri, "cache/customers.json"));
+            var productsTask = Http.GetFromJsonAsync<List<ProductDto>>(new Uri(baseUri, "cache/products.json"));
+
+            await Task.WhenAll(customersTask, productsTask);
+
+            allCustomers = customersTask.Result ?? new List<CustomerDto>();
+            allProducts = productsTask.Result ?? new List<ProductDto>();
+
             if (isEditMode)
             {
                 await LoadInvoiceForEdit();
             }
-            
-            allCustomers = await CustomerService.GetActiveCustomersAsync();
-            allProducts = await ProductService.GetProductsAsync();
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error cargando datos: {ex.Message}";
+            errorMessage = $"Error cargando datos: No se pudo cargar la información de base. Por favor, intente recargar la página o contacte a soporte si el problema persiste. Detalles: {ex.Message}";
         }
     }
 

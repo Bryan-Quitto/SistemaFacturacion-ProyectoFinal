@@ -1,0 +1,3 @@
+Hola Gemini, puedes hacer que en la pagina de createinvoice, y createcreditnote, la barra de búsqueda tanto para productos como para clientes sea mucho mas eficiente de lo que es ahora, porque por ejemplo si tuviésemos 1000 clientes, el hacer que cuando escriba una letra, otra letra, otra letra, y me muestra todos los que tienen traídos desde la BD todo el rato es muy ineficiente (o esto dice el ingeniero)
+
+Nos recomendó hacer la búsqueda por algo llamado categorías, que igual permite ver ni bien vamos ingresando datos, pero es mucho mas eficiente, y dijo algo de que se van creando jsons en un hilo, o algo asi. Sabes a lo que se refiere? Primero confírmame que me entendiste. Y si me entendiste, puedes decirme que piensas hacer, y yo te acepto o niego esa idea

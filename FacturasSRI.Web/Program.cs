@@ -104,6 +104,7 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddHostedService<VencimientoComprasService>();
+builder.Services.AddHostedService<DataCacheService>();
 
 var app = builder.Build();
 
