@@ -55,7 +55,7 @@ namespace FacturasSRI.Infrastructure.Services
             _emailService = emailService;
             _pdfGenerator = pdfGenerator;
         }
-        
+
         public Task ResendCreditNoteEmailAsync(Guid creditNoteId)
         {
             Task.Run(async () =>
@@ -187,134 +187,137 @@ namespace FacturasSRI.Infrastructure.Services
         }
 
         public async Task<NotaDeCredito> CreateCreditNoteAsync(CreateCreditNoteDto dto)
-{
-    await _ncSemaphore.WaitAsync();
-    try
-    {
-        var factura = await _context.Facturas
-            .AsNoTracking()
-            .Include(f => f.Cliente)
-            .Include(f => f.Detalles).ThenInclude(d => d.Producto).ThenInclude(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
-            .FirstOrDefaultAsync(f => f.Id == dto.FacturaId);
-
-        if (factura == null) throw new InvalidOperationException("La factura original no existe.");
-
-        if (factura.Estado != EstadoFactura.Autorizada) throw new InvalidOperationException("Solo se pueden emitir Notas de Crédito a facturas AUTORIZADAS.");
-
-        var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:EstablishmentCode'");
-        var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:EmissionPointCode'");
-        var rucEmisor = _configuration["CompanyInfo:Ruc"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:Ruc'");
-        var environmentType = _configuration["CompanyInfo:EnvironmentType"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:EnvironmentType'");
-        var certPath = _configuration["CompanyInfo:CertificatePath"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:CertificatePath'");
-        var certPass = _configuration["CompanyInfo:CertificatePassword"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:CertificatePassword'");
-
-        var secuencialEntity = await _context.Secuenciales.FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
-        if (secuencialEntity == null)
         {
-            secuencialEntity = new Secuencial { Id = Guid.NewGuid(), Establecimiento = establishmentCode, PuntoEmision = emissionPointCode, UltimoSecuencialFactura = 0, UltimoSecuencialNotaCredito = 0 };
-            _context.Secuenciales.Add(secuencialEntity);
-        }
-        secuencialEntity.UltimoSecuencialNotaCredito++;
-        string numeroSecuencialStr = secuencialEntity.UltimoSecuencialNotaCredito.ToString("D9");
-
-        if (factura.ClienteId == null) throw new InvalidOperationException("La factura no tiene un cliente asignado.");
-
-        var nc = new NotaDeCredito
-        {
-            Id = Guid.NewGuid(),
-            FacturaId = factura.Id,
-            ClienteId = factura.ClienteId.Value,
-            FechaEmision = DateTime.UtcNow,
-            NumeroNotaCredito = numeroSecuencialStr,
-            Estado = dto.EsBorrador ? EstadoNotaDeCredito.Borrador : EstadoNotaDeCredito.Pendiente,
-            RazonModificacion = dto.RazonModificacion,
-            UsuarioIdCreador = dto.UsuarioIdCreador,
-            FechaCreacion = DateTime.UtcNow
-        };
-
-        decimal subtotalAccum = 0;
-        decimal ivaAccum = 0;
-
-        foreach (var itemDto in dto.Items)
-        {
-            if (itemDto.CantidadDevolucion <= 0) continue;
-
-            var detalleFactura = factura.Detalles.FirstOrDefault(d => d.ProductoId == itemDto.ProductoId);
-            if (detalleFactura == null || detalleFactura.Producto == null) throw new Exception($"Producto ID {itemDto.ProductoId} inválido.");
-            if (itemDto.CantidadDevolucion > (detalleFactura.Cantidad - detalleFactura.CantidadDevuelta)) throw new Exception($"La cantidad a devolver para '{detalleFactura.Producto.Nombre}' excede la cantidad disponible ({detalleFactura.Cantidad - detalleFactura.CantidadDevuelta}).");
-
-            decimal precioUnit = detalleFactura.PrecioVentaUnitario;
-            decimal subtotalItem = itemDto.CantidadDevolucion * precioUnit;
-            decimal valorIvaItem = 0;
-            var impuestoIva = detalleFactura.Producto.ProductoImpuestos.FirstOrDefault(pi => pi.Impuesto != null && pi.Impuesto.Porcentaje > 0);
-            if (impuestoIva != null && impuestoIva.Impuesto != null) valorIvaItem = subtotalItem * (impuestoIva.Impuesto.Porcentaje / 100);
-
-            var detalleNc = new NotaDeCreditoDetalle
+            await _ncSemaphore.WaitAsync();
+            try
             {
-                Id = Guid.NewGuid(),
-                NotaDeCreditoId = nc.Id,
-                ProductoId = itemDto.ProductoId,
-                Producto = null!,
-                Cantidad = itemDto.CantidadDevolucion,
-                PrecioVentaUnitario = precioUnit,
-                DescuentoAplicado = 0,
-                Subtotal = subtotalItem,
-                ValorIVA = valorIvaItem
-            };
+                var factura = await _context.Facturas
+                    .AsNoTracking()
+                    .Include(f => f.Cliente)
+                    // Carga profunda: Factura -> Detalles -> Producto -> Impuestos -> Impuesto
+                    .Include(f => f.Detalles).ThenInclude(d => d.Producto).ThenInclude(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
+                    .FirstOrDefaultAsync(f => f.Id == dto.FacturaId);
+
+                if (factura == null) throw new InvalidOperationException("La factura original no existe.");
+
+                if (factura.Estado != EstadoFactura.Autorizada) throw new InvalidOperationException("Solo se pueden emitir Notas de Crédito a facturas AUTORIZADAS.");
+
+                var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:EstablishmentCode'");
+                var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:EmissionPointCode'");
+                var rucEmisor = _configuration["CompanyInfo:Ruc"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:Ruc'");
+                var environmentType = _configuration["CompanyInfo:EnvironmentType"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:EnvironmentType'");
+                var certPath = _configuration["CompanyInfo:CertificatePath"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:CertificatePath'");
+                var certPass = _configuration["CompanyInfo:CertificatePassword"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:CertificatePassword'");
+
+                var secuencialEntity = await _context.Secuenciales.FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
+                if (secuencialEntity == null)
+                {
+                    secuencialEntity = new Secuencial { Id = Guid.NewGuid(), Establecimiento = establishmentCode, PuntoEmision = emissionPointCode, UltimoSecuencialFactura = 0, UltimoSecuencialNotaCredito = 0 };
+                    _context.Secuenciales.Add(secuencialEntity);
+                }
+                secuencialEntity.UltimoSecuencialNotaCredito++;
+                string numeroSecuencialStr = secuencialEntity.UltimoSecuencialNotaCredito.ToString("D9");
+
+                if (factura.ClienteId == null) throw new InvalidOperationException("La factura no tiene un cliente asignado.");
+
+                var nc = new NotaDeCredito
+                {
+                    Id = Guid.NewGuid(),
+                    FacturaId = factura.Id,
+                    ClienteId = factura.ClienteId.Value,
+                    FechaEmision = DateTime.UtcNow,
+                    NumeroNotaCredito = numeroSecuencialStr,
+                    Estado = dto.EsBorrador ? EstadoNotaDeCredito.Borrador : EstadoNotaDeCredito.Pendiente,
+                    RazonModificacion = dto.RazonModificacion,
+                    UsuarioIdCreador = dto.UsuarioIdCreador,
+                    FechaCreacion = DateTime.UtcNow
+                };
+
+                decimal subtotalAccum = 0;
+                decimal ivaAccum = 0;
+
+                foreach (var itemDto in dto.Items)
+                {
+                    if (itemDto.CantidadDevolucion <= 0) continue;
+
+                    var detalleFactura = factura.Detalles.FirstOrDefault(d => d.ProductoId == itemDto.ProductoId);
+                    if (detalleFactura == null || detalleFactura.Producto == null) throw new Exception($"Producto ID {itemDto.ProductoId} inválido.");
+                    if (itemDto.CantidadDevolucion > (detalleFactura.Cantidad - detalleFactura.CantidadDevuelta)) throw new Exception($"La cantidad a devolver para '{detalleFactura.Producto.Nombre}' excede la cantidad disponible ({detalleFactura.Cantidad - detalleFactura.CantidadDevuelta}).");
+
+                    decimal precioUnit = detalleFactura.PrecioVentaUnitario;
+                    decimal subtotalItem = itemDto.CantidadDevolucion * precioUnit;
+                    decimal valorIvaItem = 0;
+                    var impuestoIva = detalleFactura.Producto.ProductoImpuestos.FirstOrDefault(pi => pi.Impuesto != null && pi.Impuesto.Porcentaje > 0);
+                    if (impuestoIva != null && impuestoIva.Impuesto != null) valorIvaItem = subtotalItem * (impuestoIva.Impuesto.Porcentaje / 100);
+
+                    var detalleNc = new NotaDeCreditoDetalle
+                    {
+                        Id = Guid.NewGuid(),
+                        NotaDeCreditoId = nc.Id,
+                        ProductoId = itemDto.ProductoId,
+                        // === CORRECCIÓN 1: ASIGNAR EL PRODUCTO CARGADO PARA QUE TENGA IMPUESTOS ===
+                        Producto = detalleFactura.Producto, 
+                        Cantidad = itemDto.CantidadDevolucion,
+                        PrecioVentaUnitario = precioUnit,
+                        DescuentoAplicado = 0,
+                        Subtotal = subtotalItem,
+                        ValorIVA = valorIvaItem
+                    };
             
-            nc.Detalles.Add(detalleNc);
+                    nc.Detalles.Add(detalleNc);
 
-            subtotalAccum += subtotalItem;
-            ivaAccum += valorIvaItem;
-        }
+                    subtotalAccum += subtotalItem;
+                    ivaAccum += valorIvaItem;
+                }
 
-        nc.SubtotalSinImpuestos = subtotalAccum;
-        nc.TotalIVA = ivaAccum;
-        nc.Total = subtotalAccum + ivaAccum;
+                nc.SubtotalSinImpuestos = subtotalAccum;
+                nc.TotalIVA = ivaAccum;
+                nc.Total = subtotalAccum + ivaAccum;
 
-        _context.NotasDeCredito.Add(nc);
+                _context.NotasDeCredito.Add(nc);
 
-        var fechaEcuador = GetEcuadorTime(nc.FechaEmision);
-        string claveAcceso = GenerarClaveAcceso(fechaEcuador, "04", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencialStr, environmentType);
+                var fechaEcuador = GetEcuadorTime(nc.FechaEmision);
+                string claveAcceso = GenerarClaveAcceso(fechaEcuador, "04", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencialStr, environmentType);
 
-        var ncSri = new NotaDeCreditoSRI
-        {
-            NotaDeCreditoId = nc.Id,
-            ClaveAcceso = claveAcceso
-        };
-        _context.NotasDeCreditoSRI.Add(ncSri);
+                var ncSri = new NotaDeCreditoSRI
+                {
+                    NotaDeCreditoId = nc.Id,
+                    ClaveAcceso = claveAcceso
+                };
+                _context.NotasDeCreditoSRI.Add(ncSri);
 
-        if (!dto.EsBorrador)
-        {
-            if (factura.Cliente == null) throw new InvalidOperationException("Cliente es nulo en la factura original.");
+                if (!dto.EsBorrador)
+                {
+                    if (factura.Cliente == null) throw new InvalidOperationException("Cliente es nulo en la factura original.");
 
-            var (xmlGenerado, xmlFirmadoBytes) = _xmlGeneratorService.GenerarYFirmarNotaCredito(claveAcceso, nc, factura.Cliente, factura, certPath, certPass);
+                    // Aquí el objeto 'nc' ahora sí tiene Detalles[i].Producto.ProductoImpuestos poblado
+                    var (xmlGenerado, xmlFirmadoBytes) = _xmlGeneratorService.GenerarYFirmarNotaCredito(claveAcceso, nc, factura.Cliente, factura, certPath, certPass);
 
-            ncSri.XmlGenerado = xmlGenerado;
-            ncSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
+                    ncSri.XmlGenerado = xmlGenerado;
+                    ncSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
             
-            nc.Estado = EstadoNotaDeCredito.EnviadaSRI;
+                    nc.Estado = EstadoNotaDeCredito.EnviadaSRI;
 
-            await _context.SaveChangesAsync();
-            _ = Task.Run(() => EnviarNcAlSriEnFondoAsync(nc.Id, xmlFirmadoBytes));
-        }
-        else
-        {
-            await _context.SaveChangesAsync();
-        }
+                    await _context.SaveChangesAsync();
+                    _ = Task.Run(() => EnviarNcAlSriEnFondoAsync(nc.Id, xmlFirmadoBytes));
+                }
+                else
+                {
+                    await _context.SaveChangesAsync();
+                }
 
-        return nc;
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error creando Nota de Crédito");
-        throw;
-    }
-    finally
-    {
-        _ncSemaphore.Release();
-    }
-}
+                return nc;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creando Nota de Crédito");
+                throw;
+            }
+            finally
+            {
+                _ncSemaphore.Release();
+            }
+        }
 
         private async Task EnviarNcAlSriEnFondoAsync(Guid ncId, byte[] xmlFirmadoBytes)
         {
@@ -617,7 +620,11 @@ namespace FacturasSRI.Infrastructure.Services
                 .Include(n => n.Cliente)
                 .Include(n => n.Factura)
                 .Include(n => n.InformacionSRI)
-                .Include(n => n.Detalles).ThenInclude(d => d.Producto)
+                // === CORRECCIÓN 2: CARGA PROFUNDA PARA IMPUESTOS EN BORRADORES ===
+                .Include(n => n.Detalles)
+                    .ThenInclude(d => d.Producto)
+                        .ThenInclude(p => p.ProductoImpuestos)
+                            .ThenInclude(pi => pi.Impuesto)
                 .FirstOrDefaultAsync(n => n.Id == creditNoteId);
 
             if (nc == null) throw new InvalidOperationException("La nota de crédito no existe.");
@@ -682,6 +689,8 @@ namespace FacturasSRI.Infrastructure.Services
                 {
                     NotaDeCreditoId = nc.Id,
                     ProductoId = itemDto.ProductoId,
+                    // === CORRECCIÓN 3: ASIGNAR EL PRODUCTO MANUALMENTE AL ACTUALIZAR ===
+                    Producto = producto,
                     Cantidad = itemDto.CantidadDevolucion,
                     PrecioVentaUnitario = precioUnit,
                     Subtotal = subtotalItem,

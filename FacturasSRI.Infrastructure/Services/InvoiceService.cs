@@ -862,7 +862,12 @@ namespace FacturasSRI.Infrastructure.Services
         public async Task<InvoiceDetailViewDto?> IssueDraftInvoiceAsync(Guid invoiceId)
 {
     var invoice = await _context.Facturas
-        .Include(i => i.Detalles).ThenInclude(d => d.Producto)
+        // --- CORRECCIÓN DE CARGA PROFUNDA ---
+        .Include(i => i.Detalles)
+            .ThenInclude(d => d.Producto)
+                .ThenInclude(p => p.ProductoImpuestos)
+                    .ThenInclude(pi => pi.Impuesto)
+        // ------------------------------------
         .Include(i => i.Cliente)
         .FirstOrDefaultAsync(i => i.Id == invoiceId);
 
@@ -884,7 +889,6 @@ namespace FacturasSRI.Infrastructure.Services
             }
             else
             {
-                // AÑADIDO AWAIT AQUÍ (Línea corregida)
                 await DescontarStockGeneral(detalle.Producto, detalle.Cantidad);
             }
         }

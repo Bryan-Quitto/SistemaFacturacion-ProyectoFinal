@@ -13,6 +13,8 @@ namespace FacturasSRI.Application.Interfaces
         Task<PurchaseListItemDto?> GetPurchaseByIdAsync(Guid id);
         Task<bool> RegisterPaymentAsync(RegisterPaymentDto paymentDto, Stream fileStream, string fileName);
         Task MarcarComprasVencidasAsync();
-        Task AnularCompraAsync(Guid compraId, Guid usuarioId);
+        
+        // MODIFICADO: Ahora requiere el archivo de la Nota de Crédito
+        Task AnularCompraAsync(Guid compraId, Guid usuarioId, Stream notaCreditoStream, string notaCreditoFileName);
     }
 }

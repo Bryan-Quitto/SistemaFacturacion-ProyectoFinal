@@ -16,7 +16,10 @@ namespace FacturasSRI.Application.Dtos
         public DateTime? FechaPago { get; set; }
         public string? FacturaCompraPath { get; set; }
         public string? ComprobantePagoPath { get; set; }
-        public string CreadoPor { get; set; } = string.Empty;
+        
+        // NUEVO CAMPO AGREGADO
+        public string? NotaCreditoPath { get; set; }
+        
         public FormaDePago FormaDePago { get; set; }
     }
 }

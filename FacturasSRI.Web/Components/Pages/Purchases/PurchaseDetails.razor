@@ -6,7 +6,6 @@
 @using FacturasSRI.Domain.Enums
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
-@using FacturasSRI.Web.Components.Shared
 
 @inject IPurchaseService PurchaseService
 @inject NavigationManager Navigation
@@ -17,7 +16,7 @@
 
 @if (purchase == null && !isLoading)
 {
-    <div class="alert alert-danger">No se encontró la compra solicitada.</div>
+    <div class="alert alert-danger">No se encontró la compra solicitada o ocurrió un error al cargarla.</div>
 }
 else if (isLoading)
 {
@@ -40,7 +39,8 @@ else
 
     @if (!string.IsNullOrEmpty(statusMessage))
     {
-        <div class="alert @(isSuccess ? "alert-success" : "alert-danger")" role="alert">
+        <!-- CORRECCIÓN 1: Quitamos la lógica de isSuccess y dejamos fijo el estilo de error -->
+        <div class="alert alert-danger" role="alert">
             @statusMessage
         </div>
     }
@@ -76,7 +76,7 @@ else
                         <p><span class="badge fs-6 @GetBadgeClass(purchase.Estado)">@purchase.Estado.ToString()</span></p>
                     </div>
                     
-                    @if(purchase.Estado != EstadoCompra.Pagada)
+                    @if(purchase.Estado != EstadoCompra.Pagada && purchase.Estado != EstadoCompra.Cancelada)
                     {
                         <div class="mb-3">
                             <label class="form-label">Fecha de Vencimiento:</label>
@@ -105,11 +105,17 @@ else
                                 <i class="bi bi-file-earmark-arrow-down"></i> Ver Comprobante de Pago
                             </button>
                         }
+
+                        @if (!string.IsNullOrEmpty(purchase.NotaCreditoPath))
+                        {
+                            <button class="btn btn-outline-info" @onclick="@(() => DownloadFile(purchase.Id, "credit-note"))">
+                                <i class="bi bi-file-earmark-diff"></i> Ver Nota de Crédito
+                            </button>
+                        }
                         
                         @if (userIsAdmin && purchase.Estado == EstadoCompra.Vencida)
                         {
-                             <!-- El botón ahora llama al método que MUESTRA el modal -->
-                             <button class="btn btn-danger" @onclick="ShowAnnulmentConfirmation">
+                             <button class="btn btn-danger" @onclick="GoToAnnulPage">
                                 <i class="bi bi-x-circle"></i> Anular Compra
                             </button>
                         }
@@ -120,16 +126,6 @@ else
     </div>
 }
 
-<!-- AÑADIMOS EL COMPONENTE DEL MODAL AL FINAL DE LA PÁGINA -->
-<ConfirmationModal 
-    IsVisible="isConfirmModalVisible"
-    Title="Confirmar Anulación"
-    Message="Se anulará la compra y se revertirá el inventario asociado. ¿Estás seguro de que deseas continuar?"
-    OnConfirm="HandleAnnulmentConfirmed"
-    OnCancel="CancelAnnulment"
-/>
-
-
 @code {
     [Parameter]
     public Guid PurchaseId { get; set; }
@@ -138,9 +134,9 @@ else
     private bool isLoading = true;
     private bool userIsAdmin;
     private string? statusMessage;
-    private bool isSuccess;
-
-    private bool isConfirmModalVisible = false;
+    
+    // CORRECCIÓN 2: Variable eliminada porque ya no se usa
+    // private bool isSuccess; 
 
     protected override async Task OnInitializedAsync()
     {
@@ -155,59 +151,20 @@ else
 
             purchase = await PurchaseService.GetPurchaseByIdAsync(PurchaseId);
         }
+        // CORRECCIÓN 3: Agregamos el catch para que statusMessage sirva de algo
+        catch (Exception ex)
+        {
+            statusMessage = $"Error al cargar los detalles: {ex.Message}";
+        }
         finally
         {
             isLoading = false;
         }
     }
 
-    private void ShowAnnulmentConfirmation()
+    private void GoToAnnulPage()
     {
-        isConfirmModalVisible = true;
-        StateHasChanged();
-    }
-    
-    private void CancelAnnulment()
-    {
-        isConfirmModalVisible = false;
-        StateHasChanged();
-    }
-
-    private async Task HandleAnnulmentConfirmed()
-    {
-        isConfirmModalVisible = false;
-
-        try
-        {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (string.IsNullOrEmpty(userId))
-            {
-                statusMessage = "No se pudo identificar al usuario para la autorización.";
-                isSuccess = false;
-                return;
-            }
-
-            await PurchaseService.AnularCompraAsync(PurchaseId, Guid.Parse(userId));
-            
-            statusMessage = "La compra ha sido anulada y el inventario ha sido ajustado correctamente.";
-            isSuccess = true;
-            await OnInitializedAsync();
-        }
-        catch (InvalidOperationException ex)
-        {
-            statusMessage = ex.Message;
-            isSuccess = false;
-        }
-        catch (Exception)
-        {
-            statusMessage = "Ocurrió un error al anular la compra. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico.";
-            isSuccess = false;
-        }
-        
-        StateHasChanged();
+        Navigation.NavigateTo($"/purchases/annul/{PurchaseId}");
     }
 
     private void GoBack()

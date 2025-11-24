@@ -45,13 +45,17 @@ namespace FacturasSRI.Web.Endpoints
                     return Results.NotFound("El registro de compra no fue encontrado.");
                 }
 
-                string? filePath = (type?.ToLower() == "payment")
-                    ? cuentaPorPagar.ComprobantePagoPath
-                    : cuentaPorPagar.FacturaCompraPath;
+                // LÓGICA MODIFICADA: Usamos un switch para soportar "credit-note"
+                string? filePath = type?.ToLower() switch
+                {
+                    "payment" => cuentaPorPagar.ComprobantePagoPath,
+                    "credit-note" => cuentaPorPagar.NotaCreditoPath,
+                    "invoice" or _ => cuentaPorPagar.FacturaCompraPath // Por defecto devuelve la factura
+                };
 
                 if (string.IsNullOrEmpty(filePath))
                 {
-                    return Results.NotFound("El archivo solicitado no fue encontrado.");
+                    return Results.NotFound("El archivo solicitado no fue encontrado o no ha sido cargado.");
                 }
 
                 var user = httpContext.User;

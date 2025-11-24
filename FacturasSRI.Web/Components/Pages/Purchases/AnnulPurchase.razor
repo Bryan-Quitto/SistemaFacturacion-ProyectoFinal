@@ -1,0 +1,206 @@
+@page "/purchases/annul/{PurchaseId:guid}"
+@attribute [Authorize(Roles = "Administrador")]
+
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Domain.Enums
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Forms
+@inject IPurchaseService PurchaseService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Anular Compra</PageTitle>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Anular Compra y Revertir Inventario</h4>
+                </div>
+                <div class="card-body">
+                    @if (isLoading)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-danger" role="status"></div>
+                            <p class="mt-2">Cargando información...</p>
+                        </div>
+                    }
+                    else if (purchase == null)
+                    {
+                        <div class="alert alert-warning">No se encontró la compra o no tienes permisos para verla.</div>
+                        <button class="btn btn-secondary" @onclick="GoBack">Volver</button>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <strong>Atención:</strong> Estás a punto de anular una compra VENCIDA.
+                            <ul class="mb-0 mt-2">
+                                <li>Se cambiará el estado de la compra a <strong>Cancelada</strong>.</li>
+                                <li>Se realizará un ajuste de inventario tipo "Anulación Compra" restando <strong>@purchase.Cantidad unidades</strong> del producto <strong>@purchase.ProductName</strong>.</li>
+                                <li>Esta acción requiere obligatoriamente adjuntar la <strong>Nota de Crédito</strong> emitida por el proveedor.</li>
+                            </ul>
+                        </div>
+
+                        <div class="mb-4 p-3 bg-light rounded border">
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <label class="text-muted small">Proveedor</label>
+                                    <div class="fw-bold">@purchase.NombreProveedor</div>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="text-muted small">Monto Original</label>
+                                    <div class="fw-bold text-danger">@purchase.MontoTotal.ToString("C")</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <EditForm Model="@this" OnValidSubmit="HandleAnnulment">
+                            <div class="mb-4">
+                                <label for="notaCredito" class="form-label fw-bold">Adjuntar Nota de Crédito (PDF) <span class="text-danger">*</span></label>
+                                <InputFile id="notaCredito" class="form-control" OnChange="@OnInputFileChange" accept=".pdf" />
+                                @if (!string.IsNullOrEmpty(fileValidationMessage))
+                                {
+                                    <div class="text-danger small mt-1">@fileValidationMessage</div>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(statusMessage))
+                            {
+                                <div class="alert @(isSuccess ? "alert-success" : "alert-danger") mb-3">
+                                    @statusMessage
+                                </div>
+                            }
+
+                            <div class="d-flex justify-content-between pt-3 border-top">
+                                <button type="button" class="btn btn-outline-secondary" @onclick="GoBack" disabled="@isSubmitting">
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="btn btn-danger" disabled="@(isSubmitting || notaCreditoFile == null)">
+                                    @if (isSubmitting)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span><span>Procesando...</span>
+                                    }
+                                    else
+                                    {
+                                        <span><i class="bi bi-trash3-fill me-2"></i>Confirmar Anulación</span>
+                                    }
+                                </button>
+                            </div>
+                        </EditForm>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Guid PurchaseId { get; set; }
+
+    private PurchaseListItemDto? purchase;
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string? statusMessage;
+    private bool isSuccess;
+    
+    private IBrowserFile? notaCreditoFile;
+    private string? fileValidationMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            purchase = await PurchaseService.GetPurchaseByIdAsync(PurchaseId);
+            
+            // Validaciones de seguridad adicionales
+            if (purchase != null && purchase.Estado != EstadoCompra.Vencida)
+            {
+                statusMessage = "Solo se pueden anular compras en estado Vencida.";
+                purchase = null; // Ocultar formulario
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error al cargar la compra: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        fileValidationMessage = null;
+        statusMessage = null;
+        
+        var file = e.GetMultipleFiles(1).FirstOrDefault();
+        if (file != null)
+        {
+            if (file.ContentType != "application/pdf")
+            {
+                fileValidationMessage = "El archivo debe ser un PDF.";
+                notaCreditoFile = null;
+                return;
+            }
+            if (file.Size > 5 * 1024 * 1024) // 5MB
+            {
+                fileValidationMessage = "El archivo no debe superar los 5MB.";
+                notaCreditoFile = null;
+                return;
+            }
+            notaCreditoFile = file;
+        }
+    }
+
+    private async Task HandleAnnulment()
+    {
+        if (notaCreditoFile == null)
+        {
+            fileValidationMessage = "Debe subir la Nota de Crédito obligatoriamente.";
+            return;
+        }
+
+        isSubmitting = true;
+        statusMessage = null;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(userId)) throw new Exception("Usuario no autenticado.");
+
+            // Abrir el stream del archivo
+            // Límite de 5MB
+            await using var stream = notaCreditoFile.OpenReadStream(5 * 1024 * 1024);
+            
+            // Llamar al servicio actualizado
+            await PurchaseService.AnularCompraAsync(PurchaseId, Guid.Parse(userId), stream, notaCreditoFile.Name);
+
+            isSuccess = true;
+            statusMessage = "Compra anulada correctamente. Redirigiendo...";
+            
+            await Task.Delay(2000); // Pequeña espera para leer el mensaje
+            Navigation.NavigateTo($"/purchases/details/{PurchaseId}");
+        }
+        catch (Exception ex)
+        {
+            isSuccess = false;
+            statusMessage = $"Error al anular: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo($"/purchases/details/{PurchaseId}");
+    }
+}
