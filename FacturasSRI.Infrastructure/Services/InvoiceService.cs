@@ -273,8 +273,6 @@ namespace FacturasSRI.Infrastructure.Services
             _logger.LogWarning("Intento de leer factura {Id} con contexto eliminado (usuario navegó).", invoiceId);
             return null; 
         }
-
-            return await GetInvoiceDetailByIdAsync(invoiceId);
         }
 
         private async Task FinalizeAuthorizationAsync(Guid invoiceId, RespuestaAutorizacion respuesta)
