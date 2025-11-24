@@ -192,7 +192,6 @@ namespace FacturasSRI.Infrastructure.Services
             try
             {
                 var factura = await _context.Facturas
-                    .AsNoTracking()
                     .Include(f => f.Cliente)
                     // Carga profunda: Factura -> Detalles -> Producto -> Impuestos -> Impuesto
                     .Include(f => f.Detalles).ThenInclude(d => d.Producto).ThenInclude(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
