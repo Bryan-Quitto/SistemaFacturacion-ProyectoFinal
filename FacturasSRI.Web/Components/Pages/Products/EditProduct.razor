@@ -66,13 +66,13 @@ else
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label">Categoría</label>
-                            <InputText class="form-control" list="categorias-list" @bind-Value="selectedCategoriaNombre" />
-                            <datalist id="categorias-list">
+                            <InputSelect class="form-select" @bind-Value="product.CategoriaId">
+                                <option value="@Guid.Empty">Seleccione una categoría</option>
                                 @foreach (var categoria in todasLasCategorias)
                                 {
-                                    <option value="@categoria.Nombre"></option>
+                                    <option value="@categoria.Id">@categoria.Nombre</option>
                                 }
-                            </datalist>
+                            </InputSelect>
                             <ValidationMessage For="@(() => product.CategoriaId)" />
                         </div>
                         <div class="mb-3 form-check">
@@ -106,7 +106,6 @@ else
     private ProductDto? product;
     private string? errorMessage;
     private List<CategoriaDto> todasLasCategorias = new();
-    private string selectedCategoriaNombre = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -120,7 +119,6 @@ else
             }
 
             todasLasCategorias = await ProductService.GetAllCategoriasAsync();
-            selectedCategoriaNombre = product.CategoriaNombre;
         }
         catch (Exception ex)
         {
@@ -132,14 +130,6 @@ else
     {
         if (product != null)
         {
-            var selectedCategoria = todasLasCategorias.FirstOrDefault(c =>
-                c.Nombre.Trim().Equals(selectedCategoriaNombre.Trim(), StringComparison.CurrentCultureIgnoreCase));
-
-            if (selectedCategoria != null)
-            {
-                product.CategoriaId = selectedCategoria.Id;
-            }
-
             try
             {
                 await ProductService.UpdateProductAsync(product);
@@ -148,7 +138,6 @@ else
             catch (Exception ex)
             {
                 errorMessage = $"Ocurrió un error al guardar los cambios del producto. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
-                // Force a re-render to display the error message
                 StateHasChanged();
             }
         }
