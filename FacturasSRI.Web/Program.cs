@@ -25,7 +25,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddControllers();
 
-builder.Services.AddDbContext<FacturasSRIDbContext>(options =>
+builder.Services.AddPooledDbContextFactory<FacturasSRIDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddSendGrid(options => {
@@ -108,11 +108,10 @@ builder.Services.AddHostedService<DataCacheService>();
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
-}
+app.UseExceptionHandler("/Error", createScopeForErrors: true);
+
+// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+app.UseHsts();
 
 app.UseHttpsRedirection();
 

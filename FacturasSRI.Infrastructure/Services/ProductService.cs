@@ -12,20 +12,21 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class ProductService : IProductService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
 
-        public ProductService(FacturasSRIDbContext context)
+        public ProductService(IDbContextFactory<FacturasSRIDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<ProductDto> CreateProductAsync(ProductDto productDto)
         {
-            if (await _context.Productos.AnyAsync(p => p.Nombre.ToLower() == productDto.Nombre.ToLower()))
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            if (await context.Productos.AnyAsync(p => p.Nombre.ToLower() == productDto.Nombre.ToLower()))
             {
                 throw new InvalidOperationException("Ya existe un producto con el mismo nombre.");
             }
-            if (await _context.Productos.AnyAsync(p => p.CodigoPrincipal.ToLower() == productDto.CodigoPrincipal.ToLower()))
+            if (await context.Productos.AnyAsync(p => p.CodigoPrincipal.ToLower() == productDto.CodigoPrincipal.ToLower()))
             {
                 throw new InvalidOperationException("Ya existe un producto con el mismo código principal.");
             }
@@ -52,22 +53,23 @@ namespace FacturasSRI.Infrastructure.Services
                     ProductoId = product.Id,
                     ImpuestoId = globalTax.Id
                 };
-                _context.ProductoImpuestos.Add(newProductTax);
+                context.ProductoImpuestos.Add(newProductTax);
             }
 
-            _context.Productos.Add(product);
-            await _context.SaveChangesAsync();
+            context.Productos.Add(product);
+            await context.SaveChangesAsync();
             productDto.Id = product.Id;
             return productDto;
         }
 
         public async Task<ProductDto?> GetProductByIdAsync(Guid id)
         {
-            return await (from product in _context.Productos
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await (from product in context.Productos
                           where product.Id == id
-                          join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
+                          join usuario in context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
-                          join categoria in _context.Categorias on product.CategoriaId equals categoria.Id
+                          join categoria in context.Categorias on product.CategoriaId equals categoria.Id
                           select new ProductDto
                           {
                               Id = product.Id,
@@ -90,10 +92,11 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<ProductDto>> GetProductsAsync()
         {
-            return await (from product in _context.Productos
-                          join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await (from product in context.Productos
+                          join usuario in context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
-                          join categoria in _context.Categorias on product.CategoriaId equals categoria.Id
+                          join categoria in context.Categorias on product.CategoriaId equals categoria.Id
 
                           select new ProductDto
                           {
@@ -115,10 +118,11 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<ProductDto>> GetActiveProductsAsync()
         {
-            return await (from product in _context.Productos
-                          join usuario in _context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await (from product in context.Productos
+                          join usuario in context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
-                          join categoria in _context.Categorias on product.CategoriaId equals categoria.Id
+                          join categoria in context.Categorias on product.CategoriaId equals categoria.Id
                           where product.EstaActivo == true // Filter for active products
                           select new ProductDto
                           {
@@ -140,14 +144,15 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task UpdateProductAsync(ProductDto productDto)
         {
-            var product = await _context.Productos.FindAsync(productDto.Id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var product = await context.Productos.FindAsync(productDto.Id);
             if (product != null)
             {
-                if (await _context.Productos.AnyAsync(p => p.Id != productDto.Id && p.Nombre.ToLower() == productDto.Nombre.ToLower()))
+                if (await context.Productos.AnyAsync(p => p.Id != productDto.Id && p.Nombre.ToLower() == productDto.Nombre.ToLower()))
                 {
                     throw new InvalidOperationException("Ya existe otro producto con el mismo nombre.");
                 }
-                if (await _context.Productos.AnyAsync(p => p.Id != productDto.Id && p.CodigoPrincipal.ToLower() == productDto.CodigoPrincipal.ToLower()))
+                if (await context.Productos.AnyAsync(p => p.Id != productDto.Id && p.CodigoPrincipal.ToLower() == productDto.CodigoPrincipal.ToLower()))
                 {
                     throw new InvalidOperationException("Ya existe otro producto con el mismo código principal.");
                 }
@@ -160,23 +165,25 @@ namespace FacturasSRI.Infrastructure.Services
                 product.EstaActivo = productDto.IsActive;
                 product.Marca = productDto.Marca;
                 product.CategoriaId = productDto.CategoriaId;
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
 
         public async Task DeleteProductAsync(Guid id)
         {
-            var product = await _context.Productos.FindAsync(id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var product = await context.Productos.FindAsync(id);
             if (product != null)
             {
                 product.EstaActivo = !product.EstaActivo; // Toggle the active status
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
 
         public async Task<ProductStockDto?> GetProductStockDetailsAsync(Guid productId)
         {
-            var product = await _context.Productos
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var product = await context.Productos
                 .Include(p => p.Lotes)
                 .FirstOrDefaultAsync(p => p.Id == productId);
 
@@ -214,36 +221,31 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task ApplyTaxToAllProductsAsync(Guid taxId)
         {
-            // This is a destructive operation, so be careful.
-            // It removes all existing tax assignments and applies the new one.
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var allProductTaxes = await context.ProductoImpuestos.ToListAsync();
+            context.ProductoImpuestos.RemoveRange(allProductTaxes);
 
-            // 1. Remove all existing product-tax relationships
-            var allProductTaxes = await _context.ProductoImpuestos.ToListAsync();
-            _context.ProductoImpuestos.RemoveRange(allProductTaxes);
+            var allProductIds = await context.Productos.Select(p => p.Id).ToListAsync();
 
-            // 2. Get all product IDs
-            var allProductIds = await _context.Productos.Select(p => p.Id).ToListAsync();
-
-            // 3. Create new assignments
             var newAssignments = allProductIds.Select(productId => new ProductoImpuesto
             {
                 ProductoId = productId,
                 ImpuestoId = taxId
             });
 
-            await _context.ProductoImpuestos.AddRangeAsync(newAssignments);
+            await context.ProductoImpuestos.AddRangeAsync(newAssignments);
 
-            // 4. Save changes
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         public async Task<TaxDto?> GetCurrentGlobalTaxAsync()
         {
-            var firstProductTax = await _context.ProductoImpuestos
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var firstProductTax = await context.ProductoImpuestos
                 .Include(pi => pi.Impuesto)
                 .FirstOrDefaultAsync();
 
-            if (firstProductTax == null)
+            if (firstProductTax == null || firstProductTax.Impuesto == null)
             {
                 return null;
             }
@@ -260,7 +262,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<ProductDetailDto?> GetProductDetailsByIdAsync(Guid id)
         {
-            var product = await _context.Productos
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var product = await context.Productos
                 .Where(p => p.Id == id)
                 .Select(p => new ProductDetailDto
                 {
@@ -288,10 +291,10 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<CategoriaDto>> GetAllCategoriasAsync()
         {
-
+            await using var context = await _contextFactory.CreateDbContextAsync();
             try
             {
-                var categoriasDesdeDb = await _context.Categorias
+                var categoriasDesdeDb = await context.Categorias
                     .OrderBy(c => c.Nombre)
                     .Select(c => new CategoriaDto
                     {
@@ -308,9 +311,10 @@ namespace FacturasSRI.Infrastructure.Services
         }
         public async Task<List<string>> GetAllMarcasAsync()
         {
+            await using var context = await _contextFactory.CreateDbContextAsync();
             try
             {
-                var marcasDesdeDb = await _context.Productos
+                var marcasDesdeDb = await context.Productos
                     .Select(p => p.Marca)
                     .Where(m => !string.IsNullOrEmpty(m))
                     .Distinct()

@@ -12,15 +12,16 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class RoleService : IRoleService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
 
-        public RoleService(FacturasSRIDbContext context)
+        public RoleService(IDbContextFactory<FacturasSRIDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<RoleDto> CreateRoleAsync(RoleDto roleDto)
         {
+            await using var context = await _contextFactory.CreateDbContextAsync();
             var role = new Rol
             {
                 Id = Guid.NewGuid(),
@@ -28,25 +29,27 @@ namespace FacturasSRI.Infrastructure.Services
                 Descripcion = roleDto.Descripcion,
                 EstaActivo = roleDto.EstaActivo
             };
-            _context.Roles.Add(role);
-            await _context.SaveChangesAsync();
+            context.Roles.Add(role);
+            await context.SaveChangesAsync();
             roleDto.Id = role.Id;
             return roleDto;
         }
 
         public async Task DeleteRoleAsync(Guid id)
         {
-            var role = await _context.Roles.FindAsync(id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var role = await context.Roles.FindAsync(id);
             if (role != null)
             {
                 role.EstaActivo = false;
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
 
         public async Task<RoleDto?> GetRoleByIdAsync(Guid id)
         {
-            var role = await _context.Roles.FindAsync(id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var role = await context.Roles.FindAsync(id);
             if (role == null || !role.EstaActivo)
             {
                 return null;
@@ -62,7 +65,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<RoleDto>> GetRolesAsync()
         {
-            return await _context.Roles.Where(r => r.EstaActivo).Select(role => new RoleDto
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Roles.Where(r => r.EstaActivo).Select(role => new RoleDto
             {
                 Id = role.Id,
                 Nombre = role.Nombre,
@@ -73,13 +77,14 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task UpdateRoleAsync(RoleDto roleDto)
         {
-            var role = await _context.Roles.FindAsync(roleDto.Id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var role = await context.Roles.FindAsync(roleDto.Id);
             if (role != null)
             {
                 role.Nombre = roleDto.Nombre;
                 role.Descripcion = roleDto.Descripcion;
                 role.EstaActivo = roleDto.EstaActivo;
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
     }

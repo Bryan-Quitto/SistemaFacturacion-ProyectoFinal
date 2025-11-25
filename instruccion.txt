@@ -1,3 +1,12 @@
-Hola Gemini, puedes hacer que en la pagina de createinvoice, y createcreditnote, la barra de búsqueda tanto para productos como para clientes sea mucho mas eficiente de lo que es ahora, porque por ejemplo si tuviésemos 1000 clientes, el hacer que cuando escriba una letra, otra letra, otra letra, y me muestra todos los que tienen traídos desde la BD todo el rato es muy ineficiente (o esto dice el ingeniero)
+Muchas gracias!
 
-Nos recomendó hacer la búsqueda por algo llamado categorías, que igual permite ver ni bien vamos ingresando datos, pero es mucho mas eficiente, y dijo algo de que se van creando jsons en un hilo, o algo asi. Sabes a lo que se refiere? Primero confírmame que me entendiste. Y si me entendiste, puedes decirme que piensas hacer, y yo te acepto o niego esa idea
+Vale ya no me asoma el mensaje largo, pero cuando pierdo la conexion me dice:
+
+Error al cargar datos: Host desconocido.
+
+Me gustaria algo mas amigable, como:
+
+<h4>Ha ocurrido un error inesperado.</h4>
+                            <p>Un problema ha impedido que la página se cargue correctamente. Por favor, inténtelo de nuevo, o revise su conexión a internet. Si el problema persiste, contacte a soporte técnico.</p>
+
+O directamente llevar a Error.razor (pero estaba pensando, creo que no se podria porque para llevarle a error.razor, se necesita internet cierto?) Que podemos hacer, alguna idea?

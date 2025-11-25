@@ -15,23 +15,24 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class CobroService : ICobroService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private readonly Client _supabase;
         private readonly ILogger<CobroService> _logger;
 
-        public CobroService(FacturasSRIDbContext context, Client supabase, ILogger<CobroService> logger)
+        public CobroService(IDbContextFactory<FacturasSRIDbContext> contextFactory, Client supabase, ILogger<CobroService> logger)
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _supabase = supabase;
             _logger = logger;
         }
 
         public async Task<List<CobroDto>> GetAllCobrosAsync()
         {
-            return await _context.Cobros
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Cobros
                 .Include(c => c.Factura)
                     .ThenInclude(f => f.Cliente)
-                .Include(c => c.UsuarioCreador) // Use Include for the creator
+                .Include(c => c.UsuarioCreador)
                 .OrderByDescending(c => c.FechaCobro)
                 .Select(c => new CobroDto
                 {
@@ -51,11 +52,12 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<CobroDto>> GetCobrosByFacturaIdAsync(Guid facturaId)
         {
-            return await _context.Cobros
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Cobros
                 .Where(c => c.FacturaId == facturaId)
                 .Include(c => c.Factura)
                     .ThenInclude(f => f.Cliente)
-                .Include(c => c.UsuarioCreador) // Use Include for the creator
+                .Include(c => c.UsuarioCreador)
                 .OrderByDescending(c => c.FechaCobro)
                 .Select(c => new CobroDto
                 {
@@ -75,10 +77,11 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<CobroDto> RegistrarCobroAsync(RegistrarCobroDto cobroDto, Stream fileStream, string fileName)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var transaction = await context.Database.BeginTransactionAsync();
             try
             {
-                var cuentaPorCobrar = await _context.CuentasPorCobrar
+                var cuentaPorCobrar = await context.CuentasPorCobrar
                     .Include(cpc => cpc.Factura)
                     .ThenInclude(f => f.Cliente)
                     .FirstOrDefaultAsync(cpc => cpc.FacturaId == cobroDto.FacturaId);
@@ -103,7 +106,6 @@ namespace FacturasSRI.Infrastructure.Services
                     throw new ArgumentException($"El monto del cobro (${cobroDto.Monto}) no puede ser mayor al saldo pendiente (${cuentaPorCobrar.SaldoPendiente}).", nameof(cobroDto.Monto));
                 }
 
-                // 1. Upload file to Supabase
                 var fileExtension = Path.GetExtension(fileName);
                 var newFileName = $"{Guid.NewGuid()}{fileExtension}";
                 var bucketPath = $"{cobroDto.UsuarioIdCreador}/{newFileName}";
@@ -113,7 +115,6 @@ namespace FacturasSRI.Infrastructure.Services
                 
                 await _supabase.Storage.From("comprobantes-facturas-emitidas").Upload(memoryStream.ToArray(), bucketPath);
 
-                // 2. Create Cobro entity
                 var cobro = new Cobro
                 {
                     Id = Guid.NewGuid(),
@@ -127,21 +128,19 @@ namespace FacturasSRI.Infrastructure.Services
                     FechaCreacion = DateTime.UtcNow
                 };
 
-                _context.Cobros.Add(cobro);
+                context.Cobros.Add(cobro);
 
-                // 3. Update CuentaPorCobrar
                 cuentaPorCobrar.SaldoPendiente -= cobroDto.Monto;
-                if (cuentaPorCobrar.SaldoPendiente <= 0.009m) // Use a small tolerance for floating point issues
+                if (cuentaPorCobrar.SaldoPendiente <= 0.009m)
                 {
                     cuentaPorCobrar.SaldoPendiente = 0;
                     cuentaPorCobrar.Pagada = true;
                 }
 
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                // 4. Return DTO
-                var creador = await _context.Usuarios.FindAsync(cobro.UsuarioIdCreador);
+                var creador = await context.Usuarios.FindAsync(cobro.UsuarioIdCreador);
                 return new CobroDto
                 {
                     Id = cobro.Id,
@@ -166,12 +165,13 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<FacturasConPagosDto>> GetFacturasConPagosAsync()
         {
-            var facturasConPagos = await (from f in _context.Facturas
-                                        join c in _context.Clientes on f.ClienteId equals c.Id into clienteJoin
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var facturasConPagos = await (from f in context.Facturas
+                                        join c in context.Clientes on f.ClienteId equals c.Id into clienteJoin
                                         from cliente in clienteJoin.DefaultIfEmpty()
-                                        join cpc in _context.CuentasPorCobrar on f.Id equals cpc.FacturaId into cpcJoin
+                                        join cpc in context.CuentasPorCobrar on f.Id equals cpc.FacturaId into cpcJoin
                                         from cuentaPorCobrar in cpcJoin.DefaultIfEmpty()
-                                        where f.Cobros.Any() // Only include invoices that have at least one payment
+                                        where f.Cobros.Any()
                                         select new FacturasConPagosDto
                                         {
                                             FacturaId = f.Id,

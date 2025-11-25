@@ -22,7 +22,7 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class CreditNoteService : ICreditNoteService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private readonly ILogger<CreditNoteService> _logger;
         private readonly IConfiguration _configuration;
         private readonly XmlGeneratorService _xmlGeneratorService;
@@ -35,7 +35,7 @@ namespace FacturasSRI.Infrastructure.Services
         private static readonly ConcurrentDictionary<Guid, byte> _processingCreditNotes = new ConcurrentDictionary<Guid, byte>();
 
         public CreditNoteService(
-            FacturasSRIDbContext context,
+            IDbContextFactory<FacturasSRIDbContext> contextFactory,
             ILogger<CreditNoteService> logger,
             IConfiguration configuration,
             XmlGeneratorService xmlGeneratorService,
@@ -45,7 +45,7 @@ namespace FacturasSRI.Infrastructure.Services
             IEmailService emailService,
             PdfGeneratorService pdfGenerator)
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _logger = logger;
             _configuration = configuration;
             _xmlGeneratorService = xmlGeneratorService;
@@ -61,7 +61,7 @@ namespace FacturasSRI.Infrastructure.Services
             Task.Run(async () =>
             {
                 using var scope = _serviceScopeFactory.CreateScope();
-                var scopedContext = scope.ServiceProvider.GetRequiredService<FacturasSRIDbContext>();
+                await using var scopedContext = await scope.ServiceProvider.GetRequiredService<IDbContextFactory<FacturasSRIDbContext>>().CreateDbContextAsync();
                 var scopedEmail = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 var scopedPdf = scope.ServiceProvider.GetRequiredService<PdfGeneratorService>();
                 var scopedService = scope.ServiceProvider.GetRequiredService<ICreditNoteService>();
@@ -99,7 +99,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<CreditNoteDto>> GetCreditNotesAsync()
         {
-            return await _context.NotasDeCredito
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.NotasDeCredito
                 .AsNoTracking()
                 .Include(nc => nc.Cliente)
                 .Include(nc => nc.Factura)
@@ -122,7 +123,8 @@ namespace FacturasSRI.Infrastructure.Services
         {
             await CheckSriStatusAsync(id);
 
-            var nc = await _context.NotasDeCredito
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var nc = await context.NotasDeCredito
                 .Include(n => n.Cliente)
                 .Include(n => n.Factura)
                 .Include(n => n.InformacionSRI)
@@ -191,15 +193,15 @@ namespace FacturasSRI.Infrastructure.Services
             await _ncSemaphore.WaitAsync();
             try
             {
-                var factura = await _context.Facturas
+                await using var context = await _contextFactory.CreateDbContextAsync();
+                var factura = await context.Facturas
                     .Include(f => f.Cliente)
                     .Include(f => f.Detalles).ThenInclude(d => d.Producto).ThenInclude(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
                     .FirstOrDefaultAsync(f => f.Id == dto.FacturaId);
 
                 if (factura == null) throw new InvalidOperationException("La factura original no existe.");
 
-                // Evitamos error de Stale Data
-                await _context.Entry(factura).ReloadAsync();
+                await context.Entry(factura).ReloadAsync();
 
                 if (factura.Estado != EstadoFactura.Autorizada) throw new InvalidOperationException("Solo se pueden emitir Notas de Crédito a facturas AUTORIZADAS.");
 
@@ -210,11 +212,11 @@ namespace FacturasSRI.Infrastructure.Services
                 var certPath = _configuration["CompanyInfo:CertificatePath"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:CertificatePath'");
                 var certPass = _configuration["CompanyInfo:CertificatePassword"] ?? throw new InvalidOperationException("Falta 'CompanyInfo:CertificatePassword'");
 
-                var secuencialEntity = await _context.Secuenciales.FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
+                var secuencialEntity = await context.Secuenciales.FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
                 if (secuencialEntity == null)
                 {
                     secuencialEntity = new Secuencial { Id = Guid.NewGuid(), Establecimiento = establishmentCode, PuntoEmision = emissionPointCode, UltimoSecuencialFactura = 0, UltimoSecuencialNotaCredito = 0 };
-                    _context.Secuenciales.Add(secuencialEntity);
+                    context.Secuenciales.Add(secuencialEntity);
                 }
                 secuencialEntity.UltimoSecuencialNotaCredito++;
                 string numeroSecuencialStr = secuencialEntity.UltimoSecuencialNotaCredito.ToString("D9");
@@ -228,9 +230,6 @@ namespace FacturasSRI.Infrastructure.Services
                     ClienteId = factura.ClienteId.Value,
                     FechaEmision = DateTime.UtcNow,
                     NumeroNotaCredito = numeroSecuencialStr,
-                    // === CORRECCIÓN DE ESTADO INICIAL ===
-                    // Se crea como PENDIENTE, igual que una Factura.
-                    // Si el envío falla por red, se queda aquí y permite reintentar.
                     Estado = dto.EsBorrador ? EstadoNotaDeCredito.Borrador : EstadoNotaDeCredito.Pendiente,
                     RazonModificacion = dto.RazonModificacion,
                     UsuarioIdCreador = dto.UsuarioIdCreador,
@@ -277,7 +276,7 @@ namespace FacturasSRI.Infrastructure.Services
                 nc.TotalIVA = ivaAccum;
                 nc.Total = subtotalAccum + ivaAccum;
 
-                _context.NotasDeCredito.Add(nc);
+                context.NotasDeCredito.Add(nc);
 
                 var fechaEcuador = GetEcuadorTime(nc.FechaEmision);
                 string claveAcceso = GenerarClaveAcceso(fechaEcuador, "04", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencialStr, environmentType);
@@ -287,7 +286,7 @@ namespace FacturasSRI.Infrastructure.Services
                     NotaDeCreditoId = nc.Id,
                     ClaveAcceso = claveAcceso
                 };
-                _context.NotasDeCreditoSRI.Add(ncSri);
+                context.NotasDeCreditoSRI.Add(ncSri);
 
                 if (!dto.EsBorrador)
                 {
@@ -298,15 +297,12 @@ namespace FacturasSRI.Infrastructure.Services
                     ncSri.XmlGenerado = xmlGenerado;
                     ncSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
             
-                    // NO cambiamos el estado aquí. Se queda en Pendiente.
-                    // El Background Task se encargará de moverlo a EnviadaSRI si tiene éxito.
-
-                    await _context.SaveChangesAsync();
+                    await context.SaveChangesAsync();
                     _ = Task.Run(() => EnviarNcAlSriEnFondoAsync(nc.Id, xmlFirmadoBytes));
                 }
                 else
                 {
-                    await _context.SaveChangesAsync();
+                    await context.SaveChangesAsync();
                 }
 
                 return nc;
@@ -327,7 +323,7 @@ namespace FacturasSRI.Infrastructure.Services
             using var scope = _serviceScopeFactory.CreateScope();
             var scopedSriClient = scope.ServiceProvider.GetRequiredService<SriApiClientService>();
             var scopedParser = scope.ServiceProvider.GetRequiredService<SriResponseParserService>();
-            var scopedContext = scope.ServiceProvider.GetRequiredService<FacturasSRIDbContext>();
+            await using var scopedContext = await scope.ServiceProvider.GetRequiredService<IDbContextFactory<FacturasSRIDbContext>>().CreateDbContextAsync();
 
             try
             {
@@ -351,7 +347,6 @@ namespace FacturasSRI.Infrastructure.Services
                 }
                 else 
                 {
-                    // Si se recibió correctamente (o era repetida), cambiamos a EnviadaSRI
                     if(nc.Estado == EstadoNotaDeCredito.Pendiente)
                     {
                         nc.Estado = EstadoNotaDeCredito.EnviadaSRI;
@@ -379,14 +374,10 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 _logger.LogError(ex, "[BG-NC] Error crítico en EnviarNcAlSriEnFondoAsync para NC {NcId}", ncId);
                 
-                // === LÓGICA DE FALLO POR RED ===
-                // Si falla la conexión, nos aseguramos de que el estado sea PENDIENTE.
-                // Así, 'CheckSriStatusAsync' lo detectará y reintentará.
-                // También guardamos el error en RespuestaSRI para que el usuario sepa qué pasó.
                 try 
                 {
-                    // Recargamos por si el contexto anterior murió
-                    var ncError = await scopedContext.NotasDeCredito.Include(n => n.InformacionSRI).FirstOrDefaultAsync(n => n.Id == ncId);
+                    await using var errorContext = await _contextFactory.CreateDbContextAsync();
+                    var ncError = await errorContext.NotasDeCredito.Include(n => n.InformacionSRI).FirstOrDefaultAsync(n => n.Id == ncId);
                     if(ncError != null)
                     {
                         ncError.Estado = EstadoNotaDeCredito.Pendiente;
@@ -394,7 +385,7 @@ namespace FacturasSRI.Infrastructure.Services
                         {
                             ncError.InformacionSRI.RespuestaSRI = $"Error de red (Reintentando...): {ex.Message}";
                         }
-                        await scopedContext.SaveChangesAsync();
+                        await errorContext.SaveChangesAsync();
                     }
                 }
                 catch(Exception dbEx)
@@ -406,7 +397,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task CheckSriStatusAsync(Guid ncId)
         {
-            var nc = await _context.NotasDeCredito.Include(n => n.InformacionSRI).AsNoTracking().FirstOrDefaultAsync(n => n.Id == ncId);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var nc = await context.NotasDeCredito.Include(n => n.InformacionSRI).AsNoTracking().FirstOrDefaultAsync(n => n.Id == ncId);
             
             if (nc == null || nc.InformacionSRI == null) return;
             
@@ -414,7 +406,6 @@ namespace FacturasSRI.Infrastructure.Services
             
             try
             {
-                // Si está PENDIENTE, forzamos el envío (Recepción) porque significa que falló antes.
                 bool forzarRecepcion = nc.Estado == EstadoNotaDeCredito.Pendiente;
 
                 if (!forzarRecepcion)
@@ -431,7 +422,6 @@ namespace FacturasSRI.Infrastructure.Services
                     }
                     else
                     {
-                        // Si sigue procesando (o no existe en SRI), intentamos re-enviar por si acaso
                         forzarRecepcion = true;
                     }
                 }
@@ -450,7 +440,7 @@ namespace FacturasSRI.Infrastructure.Services
 
                          if (!esErrorDuplicado) 
                          {
-                             var ncToUpdate = await _context.NotasDeCredito.Include(n => n.InformacionSRI).FirstOrDefaultAsync(n => n.Id == ncId);
+                             var ncToUpdate = await context.NotasDeCredito.Include(n => n.InformacionSRI).FirstOrDefaultAsync(n => n.Id == ncId);
                              if(ncToUpdate != null)
                              {
                                  ncToUpdate.Estado = EstadoNotaDeCredito.RechazadaSRI;
@@ -458,32 +448,30 @@ namespace FacturasSRI.Infrastructure.Services
                                  {
                                     ncToUpdate.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respRecep.Errores);
                                  }
-                                 await _context.SaveChangesAsync();
+                                 await context.SaveChangesAsync();
                              }
                              return;
                          }
                          else 
                          {
-                             // Ya recibida, avanzar a EnviadaSRI
                              if(nc.Estado != EstadoNotaDeCredito.EnviadaSRI)
                              {
-                                var ncUpdate = await _context.NotasDeCredito.FindAsync(ncId);
+                                var ncUpdate = await context.NotasDeCredito.FindAsync(ncId);
                                 if(ncUpdate != null) {
                                     ncUpdate.Estado = EstadoNotaDeCredito.EnviadaSRI;
-                                    await _context.SaveChangesAsync();
+                                    await context.SaveChangesAsync();
                                 }
                              }
                          }
                     }
                     else
                     {
-                         // Recibida OK
                          if(nc.Estado != EstadoNotaDeCredito.EnviadaSRI)
                          {
-                            var ncUpdate = await _context.NotasDeCredito.FindAsync(ncId);
+                            var ncUpdate = await context.NotasDeCredito.FindAsync(ncId);
                             if(ncUpdate != null) {
                                 ncUpdate.Estado = EstadoNotaDeCredito.EnviadaSRI;
-                                await _context.SaveChangesAsync();
+                                await context.SaveChangesAsync();
                             }
                          }
                     }
@@ -518,7 +506,7 @@ namespace FacturasSRI.Infrastructure.Services
             try
             {
                 using var scope = _serviceScopeFactory.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<FacturasSRIDbContext>();
+                await using var context = await scope.ServiceProvider.GetRequiredService<IDbContextFactory<FacturasSRIDbContext>>().CreateDbContextAsync();
 
                 var nc = await context.NotasDeCredito
                     .Include(n => n.InformacionSRI)
@@ -691,7 +679,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task CancelCreditNoteAsync(Guid creditNoteId)
         {
-            var nc = await _context.NotasDeCredito.FindAsync(creditNoteId);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var nc = await context.NotasDeCredito.FindAsync(creditNoteId);
             if (nc == null)
             {
                 throw new InvalidOperationException("La nota de crédito no existe.");
@@ -701,12 +690,13 @@ namespace FacturasSRI.Infrastructure.Services
                 throw new InvalidOperationException("Solo se pueden cancelar notas de crédito en estado Borrador.");
             }
             nc.Estado = EstadoNotaDeCredito.Cancelada;
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         public async Task ReactivateCancelledCreditNoteAsync(Guid creditNoteId)
         {
-            var nc = await _context.NotasDeCredito.FindAsync(creditNoteId);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var nc = await context.NotasDeCredito.FindAsync(creditNoteId);
             if (nc == null)
             {
                 throw new InvalidOperationException("La nota de crédito no existe.");
@@ -716,16 +706,16 @@ namespace FacturasSRI.Infrastructure.Services
                 throw new InvalidOperationException("Solo se pueden reactivar notas de crédito en estado Cancelada.");
             }
             nc.Estado = EstadoNotaDeCredito.Borrador;
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         public async Task<CreditNoteDetailViewDto?> IssueDraftCreditNoteAsync(Guid creditNoteId)
         {
-            var nc = await _context.NotasDeCredito
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var nc = await context.NotasDeCredito
                 .Include(n => n.Cliente)
                 .Include(n => n.Factura)
                 .Include(n => n.InformacionSRI)
-                // === CORRECCIÓN 2: CARGA PROFUNDA PARA IMPUESTOS EN BORRADORES ===
                 .Include(n => n.Detalles)
                     .ThenInclude(d => d.Producto)
                         .ThenInclude(p => p.ProductoImpuestos)
@@ -747,11 +737,9 @@ namespace FacturasSRI.Infrastructure.Services
             nc.InformacionSRI.XmlGenerado = xmlGenerado;
             nc.InformacionSRI.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
             
-            // Se queda como PENDIENTE para que el background intente enviar
-            // y si falla, CheckStatus pueda reintentar.
             nc.Estado = EstadoNotaDeCredito.Pendiente;
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
 
             _ = Task.Run(() => EnviarNcAlSriEnFondoAsync(nc.Id, xmlFirmadoBytes));
             
@@ -760,7 +748,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<CreditNoteDto?> UpdateCreditNoteAsync(UpdateCreditNoteDto dto)
         {
-            var nc = await _context.NotasDeCredito
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var nc = await context.NotasDeCredito
                 .Include(n => n.Detalles)
                 .Include(n => n.Factura).ThenInclude(f => f.Detalles)
                 .FirstOrDefaultAsync(n => n.Id == dto.Id);
@@ -789,7 +778,7 @@ namespace FacturasSRI.Infrastructure.Services
                 decimal subtotalItem = itemDto.CantidadDevolucion * precioUnit;
                 decimal valorIvaItem = 0;
                 
-                var producto = await _context.Productos.Include(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto).FirstAsync(p => p.Id == itemDto.ProductoId);
+                var producto = await context.Productos.Include(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto).FirstAsync(p => p.Id == itemDto.ProductoId);
                 var impuestoIva = producto.ProductoImpuestos.FirstOrDefault(pi => pi.Impuesto != null && pi.Impuesto.Porcentaje > 0);
                 if (impuestoIva != null && impuestoIva.Impuesto != null) valorIvaItem = subtotalItem * (impuestoIva.Impuesto.Porcentaje / 100);
 
@@ -797,7 +786,6 @@ namespace FacturasSRI.Infrastructure.Services
                 {
                     NotaDeCreditoId = nc.Id,
                     ProductoId = itemDto.ProductoId,
-                    // === CORRECCIÓN 3: ASIGNAR EL PRODUCTO MANUALMENTE AL ACTUALIZAR ===
                     Producto = producto,
                     Cantidad = itemDto.CantidadDevolucion,
                     PrecioVentaUnitario = precioUnit,
@@ -810,14 +798,14 @@ namespace FacturasSRI.Infrastructure.Services
                 ivaAccum += valorIvaItem;
             }
 
-            _context.NotaDeCreditoDetalles.RemoveRange(oldDetails);
+            context.NotaDeCreditoDetalles.RemoveRange(oldDetails);
             nc.Detalles = newDetails;
 
             nc.SubtotalSinImpuestos = subtotalAccum;
             nc.TotalIVA = ivaAccum;
             nc.Total = subtotalAccum + ivaAccum;
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
 
             if (dto.EmitirTrasGuardar)
             {

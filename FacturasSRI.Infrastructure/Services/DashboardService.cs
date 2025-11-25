@@ -11,37 +11,39 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class DashboardService : IDashboardService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
 
-        public DashboardService(FacturasSRIDbContext context)
+        public DashboardService(IDbContextFactory<FacturasSRIDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<DashboardStatsDto> GetDashboardStatsAsync()
         {
-            var totalFacturas = await _context.Facturas
+            using var context = await _contextFactory.CreateDbContextAsync();
+            
+            var totalFacturas = await context.Facturas
                 .CountAsync(f => f.Estado == EstadoFactura.Autorizada);
 
-            var totalClientes = await _context.Clientes
+            var totalClientes = await context.Clientes
                 .CountAsync(c => c.EstaActivo);
 
             var hoy = DateTime.UtcNow;
             var primerDiaDelMes = new DateTime(hoy.Year, hoy.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             var primerDiaDelSiguienteMes = primerDiaDelMes.AddMonths(1);
 
-            var ingresosFacturas = await _context.Facturas
+            var ingresosFacturas = await context.Facturas
                 .Where(f => f.Estado == EstadoFactura.Autorizada && 
                             f.FechaEmision >= primerDiaDelMes && 
                             f.FechaEmision < primerDiaDelSiguienteMes)
-                .Join(_context.CuentasPorCobrar, 
+                .Join(context.CuentasPorCobrar, 
                       f => f.Id, 
                       c => c.FacturaId, 
                       (f, c) => new { f.Total, c.Pagada })
                 .Where(x => x.Pagada)
                 .SumAsync(x => x.Total);
 
-            var devolucionesNotasCredito = await _context.NotasDeCredito
+            var devolucionesNotasCredito = await context.NotasDeCredito
                 .Where(nc => nc.Estado == EstadoNotaDeCredito.Autorizada &&
                              nc.FechaEmision >= primerDiaDelMes &&
                              nc.FechaEmision < primerDiaDelSiguienteMes)
@@ -49,7 +51,7 @@ namespace FacturasSRI.Infrastructure.Services
 
             var ingresosNetos = ingresosFacturas - devolucionesNotasCredito;
 
-            var recentInvoices = await _context.Facturas
+            var recentInvoices = await context.Facturas
                 .Include(f => f.Cliente)
                 .Where(f => f.Estado == EstadoFactura.Autorizada)
                 .OrderByDescending(f => f.FechaEmision)
@@ -65,7 +67,7 @@ namespace FacturasSRI.Infrastructure.Services
                 })
                 .ToListAsync();
 
-            var recentCreditNotes = await _context.NotasDeCredito
+            var recentCreditNotes = await context.NotasDeCredito
                 .Include(nc => nc.Cliente)
                 .Where(nc => nc.Estado == EstadoNotaDeCredito.Autorizada)
                 .OrderByDescending(nc => nc.FechaEmision)
@@ -81,7 +83,7 @@ namespace FacturasSRI.Infrastructure.Services
                 })
                 .ToListAsync();
 
-            var topProducts = await _context.FacturaDetalles
+            var topProducts = await context.FacturaDetalles
                 .Include(d => d.Factura)
                 .Include(d => d.Producto)
                 .Where(d => d.Factura.Estado == EstadoFactura.Autorizada)

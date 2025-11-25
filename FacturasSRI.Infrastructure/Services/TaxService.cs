@@ -12,16 +12,17 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class TaxService : ITaxService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
 
-        public TaxService(FacturasSRIDbContext context)
+        public TaxService(IDbContextFactory<FacturasSRIDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<TaxDto> CreateTaxAsync(TaxDto taxDto)
         {
-            if (await _context.Impuestos.AnyAsync(t => t.Nombre == taxDto.Nombre || t.CodigoSRI == taxDto.CodigoSRI))
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            if (await context.Impuestos.AnyAsync(t => t.Nombre == taxDto.Nombre || t.CodigoSRI == taxDto.CodigoSRI))
             {
                 throw new InvalidOperationException("Ya existe un impuesto con el mismo nombre o código SRI.");
             }
@@ -33,25 +34,27 @@ namespace FacturasSRI.Infrastructure.Services
                 Porcentaje = taxDto.Porcentaje,
                 EstaActivo = taxDto.EstaActivo
             };
-            _context.Impuestos.Add(tax);
-            await _context.SaveChangesAsync();
+            context.Impuestos.Add(tax);
+            await context.SaveChangesAsync();
             taxDto.Id = tax.Id;
             return taxDto;
         }
 
         public async Task DeleteTaxAsync(Guid id)
         {
-            var tax = await _context.Impuestos.FindAsync(id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var tax = await context.Impuestos.FindAsync(id);
             if (tax != null)
             {
-                tax.EstaActivo = !tax.EstaActivo; // Toggle the active status
-                await _context.SaveChangesAsync();
+                tax.EstaActivo = !tax.EstaActivo;
+                await context.SaveChangesAsync();
             }
         }
 
         public async Task<TaxDto?> GetTaxByIdAsync(Guid id)
         {
-            var tax = await _context.Impuestos.FindAsync(id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var tax = await context.Impuestos.FindAsync(id);
             if (tax == null || !tax.EstaActivo)
             {
                 return null;
@@ -68,7 +71,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<TaxDto>> GetTaxesAsync()
         {
-            return await _context.Impuestos.Select(tax => new TaxDto
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Impuestos.Select(tax => new TaxDto
             {
                 Id = tax.Id,
                 Nombre = tax.Nombre,
@@ -80,7 +84,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<TaxDto>> GetActiveTaxesAsync()
         {
-            return await _context.Impuestos.Where(t => t.EstaActivo).Select(tax => new TaxDto
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Impuestos.Where(t => t.EstaActivo).Select(tax => new TaxDto
             {
                 Id = tax.Id,
                 Nombre = tax.Nombre,
@@ -92,10 +97,11 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task UpdateTaxAsync(TaxDto taxDto)
         {
-            var tax = await _context.Impuestos.FindAsync(taxDto.Id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var tax = await context.Impuestos.FindAsync(taxDto.Id);
             if (tax != null)
             {
-                if (await _context.Impuestos.AnyAsync(t => t.Id != tax.Id && (t.Nombre == taxDto.Nombre || t.CodigoSRI == taxDto.CodigoSRI)))
+                if (await context.Impuestos.AnyAsync(t => t.Id != tax.Id && (t.Nombre == taxDto.Nombre || t.CodigoSRI == taxDto.CodigoSRI)))
                 {
                     throw new InvalidOperationException("Ya existe otro impuesto con el mismo nombre o código SRI.");
                 }
@@ -103,7 +109,7 @@ namespace FacturasSRI.Infrastructure.Services
                 tax.CodigoSRI = taxDto.CodigoSRI;
                 tax.Porcentaje = taxDto.Porcentaje;
                 tax.EstaActivo = taxDto.EstaActivo;
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
     }

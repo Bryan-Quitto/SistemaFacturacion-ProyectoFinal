@@ -14,13 +14,13 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class UserService : IUserService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
 
-        public UserService(FacturasSRIDbContext context, IEmailService emailService, IConfiguration configuration)
+        public UserService(IDbContextFactory<FacturasSRIDbContext> contextFactory, IEmailService emailService, IConfiguration configuration)
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _emailService = emailService;
             _configuration = configuration;
         }
@@ -39,22 +39,20 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<bool> GeneratePasswordResetTokenAsync(string email)
         {
-            var user = await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == email);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var user = await context.Usuarios.FirstOrDefaultAsync(u => u.Email == email);
             if (user == null)
             {
-                // No revelar si el usuario existe o no por seguridad.
                 return true;
             }
 
             var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
             
-            // Guardar el hash del token en la BD, no el token en texto plano.
             user.PasswordResetToken = BCrypt.Net.BCrypt.HashPassword(token);
             user.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(30);
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
 
-            // La URL base de la aplicación debería estar en appsettings.json
             var baseUrl = _configuration["App:BaseUrl"] ?? "https://localhost:7123";
             var resetLink = $"{baseUrl}/reset-password?token={Uri.EscapeDataString(token)}";
 
@@ -65,7 +63,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<bool> ResetPasswordAsync(string token, string newPassword)
         {
-            var users = await _context.Usuarios
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var users = await context.Usuarios
                 .Where(u => u.PasswordResetToken != null && u.PasswordResetTokenExpiry > DateTime.UtcNow)
                 .ToListAsync();
 
@@ -89,13 +88,14 @@ namespace FacturasSRI.Infrastructure.Services
             userToUpdate.PasswordResetTokenExpiry = null;
             userToUpdate.FechaModificacion = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
             return true;
         }
         
         public async Task<UserDto> CreateUserAsync(UserDto userDto)
         {
-            if (await _context.Usuarios.AnyAsync(u => u.Email == userDto.Email))
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            if (await context.Usuarios.AnyAsync(u => u.Email == userDto.Email))
             {
                 throw new InvalidOperationException("Ya existe un usuario con el mismo correo electrónico.");
             }
@@ -118,8 +118,8 @@ namespace FacturasSRI.Infrastructure.Services
                 user.UsuarioRoles.Add(new UsuarioRol { RolId = rolId });
             }
 
-            _context.Usuarios.Add(user);
-            await _context.SaveChangesAsync();
+            context.Usuarios.Add(user);
+            await context.SaveChangesAsync();
 
             await _emailService.SendWelcomeEmailAsync(user.Email, user.PrimerNombre, temporaryPassword);
             
@@ -129,17 +129,19 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task DeleteUserAsync(Guid id)
         {
-            var user = await _context.Usuarios.FindAsync(id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var user = await context.Usuarios.FindAsync(id);
             if (user != null)
             {
-                user.EstaActivo = !user.EstaActivo; // Toggle the active status
-                await _context.SaveChangesAsync();
+                user.EstaActivo = !user.EstaActivo;
+                await context.SaveChangesAsync();
             }
         }
 
         public async Task<UserDto?> GetUserByIdAsync(Guid id)
         {
-            var user = await _context.Usuarios
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var user = await context.Usuarios
                 .AsNoTracking()
                 .Include(u => u.UsuarioRoles)
                     .ThenInclude(ur => ur.Rol)
@@ -166,7 +168,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<UserDto>> GetUsersAsync()
         {
-            return await _context.Usuarios
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Usuarios
                 .AsNoTracking()
                 .Include(u => u.UsuarioRoles)
                     .ThenInclude(ur => ur.Rol)
@@ -186,7 +189,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<UserDto>> GetActiveUsersAsync()
         {
-            return await _context.Usuarios
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Usuarios
                 .Where(u => u.EstaActivo)
                 .AsNoTracking()
                 .Include(u => u.UsuarioRoles)
@@ -207,13 +211,14 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task UpdateUserAsync(UserDto userDto)
         {
-            var user = await _context.Usuarios
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var user = await context.Usuarios
                 .Include(u => u.UsuarioRoles)
                 .FirstOrDefaultAsync(u => u.Id == userDto.Id);
 
             if (user != null)
             {
-                if (await _context.Usuarios.AnyAsync(u => u.Id != user.Id && u.Email == userDto.Email))
+                if (await context.Usuarios.AnyAsync(u => u.Id != user.Id && u.Email == userDto.Email))
                 {
                     throw new InvalidOperationException("Ya existe otro usuario con el mismo correo electrónico.");
                 }
@@ -224,13 +229,13 @@ namespace FacturasSRI.Infrastructure.Services
                 user.Email = userDto.Email;
                 user.EstaActivo = userDto.EstaActivo;
 
-                _context.UsuarioRoles.RemoveRange(user.UsuarioRoles);
+                context.UsuarioRoles.RemoveRange(user.UsuarioRoles);
                 foreach (var rolId in userDto.RolesId)
                 {
                     user.UsuarioRoles.Add(new UsuarioRol { RolId = rolId });
                 }
 
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
 
@@ -249,8 +254,9 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 return;
             }
-
-            var user = await _context.Usuarios.FindAsync(userGuid);
+            
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var user = await context.Usuarios.FindAsync(userGuid);
 
             if (user != null)
             {
@@ -260,7 +266,7 @@ namespace FacturasSRI.Infrastructure.Services
                 user.SegundoApellido = profileDto.SegundoApellido;
                 user.FechaModificacion = DateTime.UtcNow;
 
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
 
@@ -271,7 +277,8 @@ namespace FacturasSRI.Infrastructure.Services
                 return false;
             }
 
-            var user = await _context.Usuarios.FindAsync(userGuid);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var user = await context.Usuarios.FindAsync(userGuid);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(passwordDto.OldPassword, user.PasswordHash))
             {
@@ -281,11 +288,8 @@ namespace FacturasSRI.Infrastructure.Services
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(passwordDto.NewPassword);
             user.FechaModificacion = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
             return true;
         }
     }
 }
-
-
-                

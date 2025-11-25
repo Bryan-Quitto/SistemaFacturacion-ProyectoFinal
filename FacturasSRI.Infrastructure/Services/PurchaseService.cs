@@ -16,14 +16,14 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class PurchaseService : IPurchaseService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private readonly ILogger<PurchaseService> _logger;
         private readonly Client _supabase;
         private readonly IAjusteInventarioService _ajusteInventarioService;
 
-        public PurchaseService(FacturasSRIDbContext context, ILogger<PurchaseService> logger, Client supabase, IAjusteInventarioService ajusteInventarioService)
+        public PurchaseService(IDbContextFactory<FacturasSRIDbContext> contextFactory, ILogger<PurchaseService> logger, Client supabase, IAjusteInventarioService ajusteInventarioService)
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _logger = logger;
             _supabase = supabase;
             _ajusteInventarioService = ajusteInventarioService;
@@ -31,8 +31,9 @@ namespace FacturasSRI.Infrastructure.Services
         
         public async Task MarcarComprasVencidasAsync()
         {
+            await using var context = await _contextFactory.CreateDbContextAsync();
             var ahoraUtc = DateTime.UtcNow;
-            var comprasPendientes = await _context.CuentasPorPagar
+            var comprasPendientes = await context.CuentasPorPagar
                 .Where(c => c.Estado == EstadoCompra.Pendiente && c.FechaVencimiento.HasValue && c.FechaVencimiento.Value < ahoraUtc)
                 .ToListAsync();
 
@@ -42,17 +43,18 @@ namespace FacturasSRI.Infrastructure.Services
                 {
                     compra.Estado = EstadoCompra.Vencida;
                 }
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
                 _logger.LogInformation($"Se marcaron {comprasPendientes.Count} compras como vencidas.");
             }
         }
 
         public async Task<bool> CreatePurchaseAsync(PurchaseDto purchaseDto)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var transaction = await context.Database.BeginTransactionAsync();
             try
             {
-                var producto = await _context.Productos.FindAsync(purchaseDto.ProductoId);
+                var producto = await context.Productos.FindAsync(purchaseDto.ProductoId);
                 if (producto == null) throw new InvalidOperationException("El producto no existe.");
                 if (!producto.ManejaInventario) throw new InvalidOperationException("No se puede registrar una compra para un producto que no maneja inventario.");
 
@@ -96,7 +98,7 @@ namespace FacturasSRI.Infrastructure.Services
                         UsuarioIdCreador = purchaseDto.UsuarioIdCreador,
                         FechaCreacion = DateTime.UtcNow
                     };
-                    _context.Lotes.Add(lote);
+                    context.Lotes.Add(lote);
                     cuenta.LoteId = lote.Id;
                 }
                 else
@@ -104,8 +106,8 @@ namespace FacturasSRI.Infrastructure.Services
                     producto.StockTotal += purchaseDto.Cantidad;
                 }
 
-                _context.CuentasPorPagar.Add(cuenta);
-                await _context.SaveChangesAsync();
+                context.CuentasPorPagar.Add(cuenta);
+                await context.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return true;
             }
@@ -117,94 +119,81 @@ namespace FacturasSRI.Infrastructure.Services
             }
         }
         
-        // MÉTODO ACTUALIZADO: Recibe el archivo, lo sube y luego ajusta el inventario
         public async Task AnularCompraAsync(Guid compraId, Guid usuarioId, Stream notaCreditoStream, string notaCreditoFileName)
-{
-    var compra = await _context.CuentasPorPagar
-        .Include(c => c.Lote)
-        .Include(c => c.Producto) // Necesitamos datos del producto
-        .FirstOrDefaultAsync(c => c.Id == compraId);
-
-    if (compra == null) throw new InvalidOperationException("La compra no existe.");
-if (compra.Estado != EstadoCompra.Pendiente && compra.Estado != EstadoCompra.Vencida) 
-    {
-        throw new InvalidOperationException("Solo se pueden anular compras que estén Pendientes o Vencidas (No Pagadas).");
-    }
-        if (compra.Producto == null) throw new InvalidOperationException("El producto asociado es inválido.");
-
-    // --- LÓGICA DE VALIDACIÓN DE STOCK ---
-
-    // CASO 1: Producto CON LOTES
-    if (compra.Producto.ManejaLotes)
-    {
-        // Validamos si el lote específico tiene todo el stock intacto
-        if (compra.Lote != null && compra.Lote.CantidadDisponible < compra.Lote.CantidadComprada)
         {
-            throw new InvalidOperationException("PROHIBIDO: No se puede anular. El stock de este lote ya ha sido vendido parcial o totalmente. Debe realizar el pago.");
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var compra = await context.CuentasPorPagar
+                .Include(c => c.Lote)
+                .Include(c => c.Producto) 
+                .FirstOrDefaultAsync(c => c.Id == compraId);
+
+            if (compra == null) throw new InvalidOperationException("La compra no existe.");
+            if (compra.Estado != EstadoCompra.Pendiente && compra.Estado != EstadoCompra.Vencida) 
+            {
+                throw new InvalidOperationException("Solo se pueden anular compras que estén Pendientes o Vencidas (No Pagadas).");
+            }
+            if (compra.Producto == null) throw new InvalidOperationException("El producto asociado es inválido.");
+
+            if (compra.Producto.ManejaLotes)
+            {
+                if (compra.Lote != null && compra.Lote.CantidadDisponible < compra.Lote.CantidadComprada)
+                {
+                    throw new InvalidOperationException("PROHIBIDO: No se puede anular. El stock de este lote ya ha sido vendido parcial o totalmente. Debe realizar el pago.");
+                }
+                if (compra.Lote == null)
+                {
+                     throw new InvalidOperationException("Error de datos: La compra es de un producto con lotes pero no tiene lote asignado.");
+                }
+            }
+            else
+            {
+                if (compra.Producto.StockTotal < compra.Cantidad)
+                {
+                    throw new InvalidOperationException($"PROHIBIDO: No hay suficiente stock total ({compra.Producto.StockTotal}) para devolver esta compra ({compra.Cantidad}). Parte de la mercadería ya fue vendida.");
+                }
+            }
+
+            try 
+            {
+                var fileExtension = Path.GetExtension(notaCreditoFileName);
+                var newFileName = $"NC_{Guid.NewGuid()}{fileExtension}";
+                var bucketPath = $"{usuarioId}/{newFileName}";
+
+                await using var memoryStream = new MemoryStream();
+                await notaCreditoStream.CopyToAsync(memoryStream);
+                
+                await _supabase.Storage.From("comprobantes-compra").Upload(memoryStream.ToArray(), bucketPath);
+                
+                compra.NotaCreditoPath = bucketPath;
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError(ex, "Error al subir la nota de crédito a Supabase");
+                throw new Exception("No se pudo subir el archivo de la Nota de Crédito. La anulación no se procesó.");
+            }
+
+            var cantidadAjustar = compra.Producto.ManejaLotes ? compra.Lote!.CantidadDisponible : compra.Cantidad;
+
+            var ajusteDto = new AjusteInventarioDto
+            {
+                ProductoId = compra.ProductoId,
+                LoteId = compra.LoteId, 
+                CantidadAjustada = cantidadAjustar,
+                Tipo = TipoAjusteInventario.AnulacionCompra,
+                Motivo = $"Anulación de compra vencida ID: {compra.Id} con Nota de Crédito.",
+                UsuarioIdAutoriza = usuarioId
+            };
+
+            await _ajusteInventarioService.CreateAdjustmentAsync(ajusteDto);
+
+            compra.Estado = EstadoCompra.Cancelada;
+            await context.SaveChangesAsync();
         }
-        // Si no tiene lote asociado (caso raro de corrupción de datos), no dejamos continuar
-        if (compra.Lote == null)
-        {
-             throw new InvalidOperationException("Error de datos: La compra es de un producto con lotes pero no tiene lote asignado.");
-        }
-    }
-    // CASO 2: Producto SIN LOTES
-    else
-    {
-        // Validamos contra el STOCK TOTAL global del producto
-        if (compra.Producto.StockTotal < compra.Cantidad)
-        {
-            throw new InvalidOperationException($"PROHIBIDO: No hay suficiente stock total ({compra.Producto.StockTotal}) para devolver esta compra ({compra.Cantidad}). Parte de la mercadería ya fue vendida.");
-        }
-    }
-
-    // --- PROCESO DE SUBIDA DE ARCHIVO ---
-    try 
-    {
-        var fileExtension = Path.GetExtension(notaCreditoFileName);
-        var newFileName = $"NC_{Guid.NewGuid()}{fileExtension}";
-        var bucketPath = $"{usuarioId}/{newFileName}";
-
-        await using var memoryStream = new MemoryStream();
-        await notaCreditoStream.CopyToAsync(memoryStream);
-        
-        await _supabase.Storage.From("comprobantes-compra").Upload(memoryStream.ToArray(), bucketPath);
-        
-        compra.NotaCreditoPath = bucketPath;
-    }
-    catch(Exception ex)
-    {
-        _logger.LogError(ex, "Error al subir la nota de crédito a Supabase");
-        throw new Exception("No se pudo subir el archivo de la Nota de Crédito. La anulación no se procesó.");
-    }
-
-    // --- PROCESO DE AJUSTE DE INVENTARIO ---
-    
-    // Preparamos el DTO (Funciona tanto para Lotes como para Sin Lotes)
-    // Nota: Si es SIN lotes, LoteId va null, y el servicio de ajustes sabe manejarlo descontando del StockTotal.
-    var cantidadAjustar = compra.Producto.ManejaLotes ? compra.Lote!.CantidadDisponible : compra.Cantidad;
-
-    var ajusteDto = new AjusteInventarioDto
-    {
-        ProductoId = compra.ProductoId,
-        LoteId = compra.LoteId, // Será null si no maneja lotes
-        CantidadAjustada = cantidadAjustar,
-        Tipo = TipoAjusteInventario.AnulacionCompra,
-        Motivo = $"Anulación de compra vencida ID: {compra.Id} con Nota de Crédito.",
-        UsuarioIdAutoriza = usuarioId
-    };
-
-    // Ejecutamos el ajuste
-    await _ajusteInventarioService.CreateAdjustmentAsync(ajusteDto);
-
-    // --- FINALIZAR ---
-    compra.Estado = EstadoCompra.Cancelada;
-    await _context.SaveChangesAsync();
-}
 
         public async Task<List<PurchaseListItemDto>> GetPurchasesAsync()
         {
-            return await _context.CuentasPorPagar
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.CuentasPorPagar
                 .Include(p => p.Producto)
                 .OrderByDescending(p => p.FechaCreacion)
                 .Select(p => new PurchaseListItemDto
@@ -220,7 +209,7 @@ if (compra.Estado != EstadoCompra.Pendiente && compra.Estado != EstadoCompra.Ven
                     FechaPago = p.FechaPago,
                     FacturaCompraPath = p.FacturaCompraPath,
                     ComprobantePagoPath = p.ComprobantePagoPath,
-                    NotaCreditoPath = p.NotaCreditoPath, // Agregado al mapeo
+                    NotaCreditoPath = p.NotaCreditoPath,
                     FormaDePago = p.FormaDePago
                 })
                 .ToListAsync();
@@ -228,7 +217,8 @@ if (compra.Estado != EstadoCompra.Pendiente && compra.Estado != EstadoCompra.Ven
         
         public async Task<PurchaseListItemDto?> GetPurchaseByIdAsync(Guid id)
         {
-            return await _context.CuentasPorPagar
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.CuentasPorPagar
                 .Where(p => p.Id == id)
                 .Select(p => new PurchaseListItemDto
                 {
@@ -243,7 +233,7 @@ if (compra.Estado != EstadoCompra.Pendiente && compra.Estado != EstadoCompra.Ven
                     FechaPago = p.FechaPago,
                     FacturaCompraPath = p.FacturaCompraPath,
                     ComprobantePagoPath = p.ComprobantePagoPath,
-                    NotaCreditoPath = p.NotaCreditoPath, // Agregado al mapeo
+                    NotaCreditoPath = p.NotaCreditoPath,
                     FormaDePago = p.FormaDePago
                 })
                 .FirstOrDefaultAsync();
@@ -253,7 +243,8 @@ if (compra.Estado != EstadoCompra.Pendiente && compra.Estado != EstadoCompra.Ven
         {
             try
             {
-                var purchase = await _context.CuentasPorPagar.FindAsync(paymentDto.PurchaseId);
+                await using var context = await _contextFactory.CreateDbContextAsync();
+                var purchase = await context.CuentasPorPagar.FindAsync(paymentDto.PurchaseId);
                 if (purchase == null) throw new InvalidOperationException("La compra no existe.");
 
                 if (purchase.Estado != EstadoCompra.Pendiente && purchase.Estado != EstadoCompra.Vencida)
@@ -274,7 +265,7 @@ if (compra.Estado != EstadoCompra.Pendiente && compra.Estado != EstadoCompra.Ven
                 purchase.FechaPago = DateTime.UtcNow;
                 purchase.ComprobantePagoPath = bucketPath;
 
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)

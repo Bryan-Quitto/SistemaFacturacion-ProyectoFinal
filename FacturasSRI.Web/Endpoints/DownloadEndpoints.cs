@@ -32,12 +32,13 @@ namespace FacturasSRI.Web.Endpoints
                 Guid id,
                 [FromQuery] string? type,
                 HttpContext httpContext,
-                FacturasSRIDbContext dbContext,
+                [FromServices] IDbContextFactory<FacturasSRIDbContext> dbContextFactory,
                 Client supabase,
                 ILoggerFactory loggerFactory) =>
             {
                 var logger = loggerFactory.CreateLogger("DownloadEndpoints");
                 
+                await using var dbContext = await dbContextFactory.CreateDbContextAsync();
                 var cuentaPorPagar = await dbContext.CuentasPorPagar.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
 
                 if (cuentaPorPagar == null)
@@ -92,12 +93,13 @@ namespace FacturasSRI.Web.Endpoints
             downloadsGroup.MapGet("/invoice-receipt/{id}", async (
                 Guid id,
                 HttpContext httpContext,
-                FacturasSRIDbContext dbContext,
+                [FromServices] IDbContextFactory<FacturasSRIDbContext> dbContextFactory,
                 Client supabase,
                 ILoggerFactory loggerFactory) =>
             {
                 var logger = loggerFactory.CreateLogger("DownloadEndpoints");
                 
+                await using var dbContext = await dbContextFactory.CreateDbContextAsync();
                 var cobro = await dbContext.Cobros.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
 
                 if (cobro == null)

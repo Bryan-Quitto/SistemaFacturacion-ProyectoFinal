@@ -22,7 +22,7 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class InvoiceService : IInvoiceService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private readonly ILogger<InvoiceService> _logger;
         private readonly IConfiguration _configuration;
         private readonly FirmaDigitalService _firmaDigitalService;
@@ -37,7 +37,7 @@ namespace FacturasSRI.Infrastructure.Services
         private static readonly ConcurrentDictionary<Guid, byte> _processingInvoices = new ConcurrentDictionary<Guid, byte>();
 
         public InvoiceService(
-            FacturasSRIDbContext context,
+            IDbContextFactory<FacturasSRIDbContext> contextFactory,
             ILogger<InvoiceService> logger,
             IConfiguration configuration,
             FirmaDigitalService firmaDigitalService,
@@ -49,7 +49,7 @@ namespace FacturasSRI.Infrastructure.Services
             IServiceScopeFactory serviceScopeFactory
             )
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _logger = logger;
             _configuration = configuration;
             _firmaDigitalService = firmaDigitalService;
@@ -61,15 +61,15 @@ namespace FacturasSRI.Infrastructure.Services
             _serviceScopeFactory = serviceScopeFactory;
         }
 
-        private async Task<Cliente> GetOrCreateConsumidorFinalClientAsync()
+        private async Task<Cliente> GetOrCreateConsumidorFinalClientAsync(FacturasSRIDbContext context)
         {
             var consumidorFinalId = "9999999999999";
-            var consumidorFinalClient = await _context.Clientes.FirstOrDefaultAsync(c => c.NumeroIdentificacion == consumidorFinalId);
+            var consumidorFinalClient = await context.Clientes.FirstOrDefaultAsync(c => c.NumeroIdentificacion == consumidorFinalId);
             if (consumidorFinalClient == null)
             {
                 consumidorFinalClient = new Cliente { Id = Guid.NewGuid(), TipoIdentificacion = default, NumeroIdentificacion = consumidorFinalId, RazonSocial = "CONSUMIDOR FINAL", Direccion = "N/A", Email = "consumidorfinal@example.com", Telefono = "N/A", FechaCreacion = DateTime.UtcNow, EstaActivo = true };
-                _context.Clientes.Add(consumidorFinalClient);
-                await _context.SaveChangesAsync();
+                context.Clientes.Add(consumidorFinalClient);
+                await context.SaveChangesAsync();
             }
             return consumidorFinalClient;
         }
@@ -82,7 +82,8 @@ namespace FacturasSRI.Infrastructure.Services
             await _invoiceCreationSemaphore.WaitAsync();
             try
             {
-                var (factura, cliente) = await CrearFacturaPendienteAsync(invoiceDto);
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var (factura, cliente) = await CrearFacturaPendienteAsync(context, invoiceDto);
 
                 if (invoiceDto.EsBorrador)
                 {
@@ -90,11 +91,11 @@ namespace FacturasSRI.Infrastructure.Services
                 }
                 else
                 {
-                    var (xmlGenerado, xmlFirmadoBytes, claveAcceso) = await GenerarYFirmarXmlAsync(factura, cliente);
-                    var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == factura.Id);
+                    var (xmlGenerado, xmlFirmadoBytes, claveAcceso) = await GenerarYFirmarXmlAsync(context, factura, cliente);
+                    var facturaSri = await context.FacturasSRI.FirstAsync(f => f.FacturaId == factura.Id);
                     facturaSri.XmlGenerado = xmlGenerado;
                     facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
-                    await _context.SaveChangesAsync();
+                    await context.SaveChangesAsync();
 
                     _ = Task.Run(() => EnviarAlSriEnFondoAsync(factura.Id, xmlFirmadoBytes, claveAcceso));
                 }
@@ -108,7 +109,7 @@ namespace FacturasSRI.Infrastructure.Services
         private async Task EnviarAlSriEnFondoAsync(Guid facturaId, byte[] xmlFirmadoBytes, string claveAcceso)
         {
             using var scope = _serviceScopeFactory.CreateScope();
-            var scopedContext = scope.ServiceProvider.GetRequiredService<FacturasSRIDbContext>();
+            await using var scopedContext = await scope.ServiceProvider.GetRequiredService<IDbContextFactory<FacturasSRIDbContext>>().CreateDbContextAsync();
             var scopedSriClient = scope.ServiceProvider.GetRequiredService<SriApiClientService>();
             var scopedParser = scope.ServiceProvider.GetRequiredService<SriResponseParserService>();
             var scopedLogger = scope.ServiceProvider.GetRequiredService<ILogger<InvoiceService>>();
@@ -163,7 +164,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDetailViewDto?> CheckSriStatusAsync(Guid invoiceId)
         {
-            var invoiceState = await _context.Facturas
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var invoiceState = await context.Facturas
                 .AsNoTracking()
                 .Include(f => f.InformacionSRI)
                 .FirstOrDefaultAsync(i => i.Id == invoiceId);
@@ -212,35 +214,33 @@ namespace FacturasSRI.Infrastructure.Services
                     if(respRecep.Estado == "DEVUELTA") {
                          bool esErrorDuplicado = respRecep.Errores.Any(e => e.Identificador == "43");
 
-             if (!esErrorDuplicado) // Solo si NO es duplicado, marcamos como rechazada
-             {
-                 var invoiceToUpdate = await _context.Facturas.Include(f => f.InformacionSRI).FirstAsync(f => f.Id == invoiceId);
-                 invoiceToUpdate.Estado = EstadoFactura.RechazadaSRI;
-                 if (invoiceToUpdate.InformacionSRI != null) 
-                 {
-                    invoiceToUpdate.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respRecep.Errores);
-                 }
-                 await _context.SaveChangesAsync();
-                 return await GetInvoiceDetailByIdAsync(invoiceId);
-             }
-             else 
-             {
-                 // Si es error 43, significa que YA se envió (probablemente por el background task).
-                 // Asumimos que está enviada y continuamos el flujo para consultar autorización.
-                 if(invoiceState.Estado != EstadoFactura.EnviadaSRI)
-                 {
-                    var invoiceToUpdate = await _context.Facturas.FirstAsync(f => f.Id == invoiceId);
-                    invoiceToUpdate.Estado = EstadoFactura.EnviadaSRI;
-                    await _context.SaveChangesAsync();
-                 }
-             }
+                        if (!esErrorDuplicado) // Solo si NO es duplicado, marcamos como rechazada
+                        {
+                            var invoiceToUpdate = await context.Facturas.Include(f => f.InformacionSRI).FirstAsync(f => f.Id == invoiceId);
+                            invoiceToUpdate.Estado = EstadoFactura.RechazadaSRI;
+                            if (invoiceToUpdate.InformacionSRI != null) 
+                            {
+                                invoiceToUpdate.InformacionSRI.RespuestaSRI = JsonSerializer.Serialize(respRecep.Errores);
+                            }
+                            await context.SaveChangesAsync();
+                            return await GetInvoiceDetailByIdAsync(invoiceId);
+                        }
+                        else 
+                        {
+                            if(invoiceState.Estado != EstadoFactura.EnviadaSRI)
+                            {
+                                var invoiceToUpdate = await context.Facturas.FirstAsync(f => f.Id == invoiceId);
+                                invoiceToUpdate.Estado = EstadoFactura.EnviadaSRI;
+                                await context.SaveChangesAsync();
+                            }
+                        }
                     }
                     
                     if(invoiceState.Estado != EstadoFactura.EnviadaSRI)
                     {
-                        var invoiceToUpdate = await _context.Facturas.FirstAsync(f => f.Id == invoiceId);
+                        var invoiceToUpdate = await context.Facturas.FirstAsync(f => f.Id == invoiceId);
                         invoiceToUpdate.Estado = EstadoFactura.EnviadaSRI;
-                        await _context.SaveChangesAsync();
+                        await context.SaveChangesAsync();
                     }
                     
                     await Task.Delay(2000);
@@ -262,17 +262,14 @@ namespace FacturasSRI.Infrastructure.Services
                 _logger.LogError(ex, "Error en CheckSriStatusAsync para factura {InvoiceId}", invoiceId);
             }
             try 
-        {
-            // Si el contexto ya fue eliminado (usuario cambió de página durante el Delay),
-            // esta línea lanzaba la excepción ObjectDisposedException.
-            return await GetInvoiceDetailByIdAsync(invoiceId);
-        }
-        catch (ObjectDisposedException)
-        {
-            // Si el contexto murió, no hacemos nada. El usuario ya no está viendo la página.
-            _logger.LogWarning("Intento de leer factura {Id} con contexto eliminado (usuario navegó).", invoiceId);
-            return null; 
-        }
+            {
+                return await GetInvoiceDetailByIdAsync(invoiceId);
+            }
+            catch (ObjectDisposedException)
+            {
+                _logger.LogWarning("Intento de leer factura {Id} con contexto eliminado (usuario navegó).", invoiceId);
+                return null; 
+            }
         }
 
         private async Task FinalizeAuthorizationAsync(Guid invoiceId, RespuestaAutorizacion respuesta)
@@ -282,7 +279,7 @@ namespace FacturasSRI.Infrastructure.Services
             try
             {
                 using var scope = _serviceScopeFactory.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<FacturasSRIDbContext>();
+                await using var context = await scope.ServiceProvider.GetRequiredService<IDbContextFactory<FacturasSRIDbContext>>().CreateDbContextAsync();
                 
                 var invoice = await context.Facturas
                     .Include(i => i.InformacionSRI)
@@ -400,151 +397,150 @@ namespace FacturasSRI.Infrastructure.Services
             }
         }
 
-        private async Task<(Factura, Cliente)> CrearFacturaPendienteAsync(CreateInvoiceDto invoiceDto)
-{
-    using (var transaction = await _context.Database.BeginTransactionAsync())
-    {
-        try
+        private async Task<(Factura, Cliente)> CrearFacturaPendienteAsync(FacturasSRIDbContext context, CreateInvoiceDto invoiceDto)
         {
-            var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EstablishmentCode'.");
-            var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EmissionPointCode'.");
-
-            Cliente? cliente;
-            if (invoiceDto.EsConsumidorFinal)
+            using (var transaction = await context.Database.BeginTransactionAsync())
             {
-                cliente = await GetOrCreateConsumidorFinalClientAsync();
-            }
-            else if (invoiceDto.ClienteId.HasValue)
-            {
-                cliente = await _context.Clientes.FindAsync(invoiceDto.ClienteId.Value);
-                if (cliente == null) throw new ArgumentException("Cliente no encontrado.");
-            }
-            else
-            {
-                cliente = new Cliente
+                try
                 {
-                    Id = Guid.NewGuid(),
-                    TipoIdentificacion = invoiceDto.TipoIdentificacionComprador ?? throw new ArgumentException("Tipo de identificación del comprador es requerido."),
-                    NumeroIdentificacion = invoiceDto.IdentificacionComprador ?? throw new ArgumentException("Número de identificación del comprador es requerido."),
-                    RazonSocial = invoiceDto.RazonSocialComprador ?? throw new ArgumentException("Razón social del comprador es requerida."),
-                    Direccion = invoiceDto.DireccionComprador ?? "",
-                    Email = invoiceDto.EmailComprador ?? "",
-                    FechaCreacion = DateTime.UtcNow,
-                    EstaActivo = true
-                };
-                _context.Clientes.Add(cliente);
-            }
+                    var establishmentCode = _configuration["CompanyInfo:EstablishmentCode"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EstablishmentCode'.");
+                    var emissionPointCode = _configuration["CompanyInfo:EmissionPointCode"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EmissionPointCode'.");
 
-            var secuencial = await _context.Secuenciales.FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
-            if (secuencial == null)
-            {
-                secuencial = new Secuencial { Id = Guid.NewGuid(), Establecimiento = establishmentCode, PuntoEmision = emissionPointCode, UltimoSecuencialFactura = 0 };
-                _context.Secuenciales.Add(secuencial);
-            }
-
-            secuencial.UltimoSecuencialFactura++;
-            var numeroSecuencial = secuencial.UltimoSecuencialFactura.ToString("D9");
-
-            var invoice = new Factura
-            {
-                Id = Guid.NewGuid(),
-                ClienteId = cliente.Id,
-                FechaEmision = DateTime.UtcNow,
-                NumeroFactura = numeroSecuencial,
-                Estado = invoiceDto.EsBorrador ? EstadoFactura.Borrador : EstadoFactura.Pendiente, 
-                UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
-                FechaCreacion = DateTime.UtcNow
-            };
-            
-            decimal subtotalSinImpuestos = 0;
-            decimal totalIva = 0;
-
-            foreach (var item in invoiceDto.Items)
-            {
-                var producto = await _context.Productos
-                    .Include(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
-                    .SingleAsync(p => p.Id == item.ProductoId);
-
-                decimal valorIvaItem = 0;
-                var impuestoIva = producto.ProductoImpuestos.FirstOrDefault(pi => pi.Impuesto != null && pi.Impuesto.Porcentaje > 0);
-                var subtotalItem = item.Cantidad * producto.PrecioVentaUnitario;
-
-                if (impuestoIva != null && impuestoIva.Impuesto != null)
-                {
-                    valorIvaItem = subtotalItem * (impuestoIva.Impuesto.Porcentaje / 100);
-                }
-
-                var detalle = new FacturaDetalle
-                {
-                    Id = Guid.NewGuid(),
-                    FacturaId = invoice.Id,
-                    ProductoId = item.ProductoId,
-                    Producto = producto,
-                    Cantidad = item.Cantidad,
-                    PrecioVentaUnitario = producto.PrecioVentaUnitario,
-                    Subtotal = subtotalItem,
-                    ValorIVA = valorIvaItem,
-                };
-
-                if (producto.ManejaInventario && !invoiceDto.EsBorrador)
-                {
-                    if (producto.ManejaLotes)
+                    Cliente? cliente;
+                    if (invoiceDto.EsConsumidorFinal)
                     {
-                        await DescontarStockDeLotes(detalle);
+                        cliente = await GetOrCreateConsumidorFinalClientAsync(context);
+                    }
+                    else if (invoiceDto.ClienteId.HasValue)
+                    {
+                        cliente = await context.Clientes.FindAsync(invoiceDto.ClienteId.Value);
+                        if (cliente == null) throw new ArgumentException("Cliente no encontrado.");
                     }
                     else
                     {
-                        // AÑADIDO AWAIT AQUÍ (Línea corregida)
-                        await DescontarStockGeneral(producto, detalle.Cantidad);
+                        cliente = new Cliente
+                        {
+                            Id = Guid.NewGuid(),
+                            TipoIdentificacion = invoiceDto.TipoIdentificacionComprador ?? throw new ArgumentException("Tipo de identificación del comprador es requerido."),
+                            NumeroIdentificacion = invoiceDto.IdentificacionComprador ?? throw new ArgumentException("Número de identificación del comprador es requerido."),
+                            RazonSocial = invoiceDto.RazonSocialComprador ?? throw new ArgumentException("Razón social del comprador es requerida."),
+                            Direccion = invoiceDto.DireccionComprador ?? "",
+                            Email = invoiceDto.EmailComprador ?? "",
+                            FechaCreacion = DateTime.UtcNow,
+                            EstaActivo = true
+                        };
+                        context.Clientes.Add(cliente);
                     }
+
+                    var secuencial = await context.Secuenciales.FirstOrDefaultAsync(s => s.Establecimiento == establishmentCode && s.PuntoEmision == emissionPointCode);
+                    if (secuencial == null)
+                    {
+                        secuencial = new Secuencial { Id = Guid.NewGuid(), Establecimiento = establishmentCode, PuntoEmision = emissionPointCode, UltimoSecuencialFactura = 0 };
+                        context.Secuenciales.Add(secuencial);
+                    }
+
+                    secuencial.UltimoSecuencialFactura++;
+                    var numeroSecuencial = secuencial.UltimoSecuencialFactura.ToString("D9");
+
+                    var invoice = new Factura
+                    {
+                        Id = Guid.NewGuid(),
+                        ClienteId = cliente.Id,
+                        FechaEmision = DateTime.UtcNow,
+                        NumeroFactura = numeroSecuencial,
+                        Estado = invoiceDto.EsBorrador ? EstadoFactura.Borrador : EstadoFactura.Pendiente, 
+                        UsuarioIdCreador = invoiceDto.UsuarioIdCreador,
+                        FechaCreacion = DateTime.UtcNow
+                    };
+                    
+                    decimal subtotalSinImpuestos = 0;
+                    decimal totalIva = 0;
+
+                    foreach (var item in invoiceDto.Items)
+                    {
+                        var producto = await context.Productos
+                            .Include(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
+                            .SingleAsync(p => p.Id == item.ProductoId);
+
+                        decimal valorIvaItem = 0;
+                        var impuestoIva = producto.ProductoImpuestos.FirstOrDefault(pi => pi.Impuesto != null && pi.Impuesto.Porcentaje > 0);
+                        var subtotalItem = item.Cantidad * producto.PrecioVentaUnitario;
+
+                        if (impuestoIva != null && impuestoIva.Impuesto != null)
+                        {
+                            valorIvaItem = subtotalItem * (impuestoIva.Impuesto.Porcentaje / 100);
+                        }
+
+                        var detalle = new FacturaDetalle
+                        {
+                            Id = Guid.NewGuid(),
+                            FacturaId = invoice.Id,
+                            ProductoId = item.ProductoId,
+                            Producto = producto,
+                            Cantidad = item.Cantidad,
+                            PrecioVentaUnitario = producto.PrecioVentaUnitario,
+                            Subtotal = subtotalItem,
+                            ValorIVA = valorIvaItem,
+                        };
+
+                        if (producto.ManejaInventario && !invoiceDto.EsBorrador)
+                        {
+                            if (producto.ManejaLotes)
+                            {
+                                await DescontarStockDeLotes(context, detalle);
+                            }
+                            else
+                            {
+                                await DescontarStockGeneral(producto, detalle.Cantidad);
+                            }
+                        }
+
+                        invoice.Detalles.Add(detalle);
+                        subtotalSinImpuestos += detalle.Subtotal;
+                        totalIva += valorIvaItem;
+                    }
+
+                    invoice.SubtotalSinImpuestos = subtotalSinImpuestos;
+                    invoice.TotalIVA = totalIva;
+                    invoice.Total = subtotalSinImpuestos + totalIva;
+                    
+                    invoice.FormaDePago = invoiceDto.FormaDePago;
+                    invoice.DiasCredito = invoiceDto.DiasCredito;
+                    invoice.MontoAbonoInicial = invoiceDto.MontoAbonoInicial;
+
+                    context.Facturas.Add(invoice);
+
+                    var rucEmisor = _configuration["CompanyInfo:Ruc"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:Ruc'.");
+                    var environmentType = _configuration["CompanyInfo:EnvironmentType"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EnvironmentType'.");
+                    var fechaEcuador = GetEcuadorTime(invoice.FechaEmision);
+                    var claveAcceso = GenerarClaveAcceso(fechaEcuador, "01", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencial, environmentType);
+
+                    var facturaSri = new FacturaSRI
+                    {
+                        FacturaId = invoice.Id,
+                        ClaveAcceso = claveAcceso
+                    };
+                    context.FacturasSRI.Add(facturaSri);
+
+                    await context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    return (invoice, cliente);
                 }
-
-                invoice.Detalles.Add(detalle);
-                subtotalSinImpuestos += detalle.Subtotal;
-                totalIva += valorIvaItem;
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
             }
-
-            invoice.SubtotalSinImpuestos = subtotalSinImpuestos;
-            invoice.TotalIVA = totalIva;
-            invoice.Total = subtotalSinImpuestos + totalIva;
-            
-            invoice.FormaDePago = invoiceDto.FormaDePago;
-            invoice.DiasCredito = invoiceDto.DiasCredito;
-            invoice.MontoAbonoInicial = invoiceDto.MontoAbonoInicial;
-
-            _context.Facturas.Add(invoice);
-
-            var rucEmisor = _configuration["CompanyInfo:Ruc"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:Ruc'.");
-            var environmentType = _configuration["CompanyInfo:EnvironmentType"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:EnvironmentType'.");
-            var fechaEcuador = GetEcuadorTime(invoice.FechaEmision);
-            var claveAcceso = GenerarClaveAcceso(fechaEcuador, "01", rucEmisor, establishmentCode, emissionPointCode, numeroSecuencial, environmentType);
-
-            var facturaSri = new FacturaSRI
-            {
-                FacturaId = invoice.Id,
-                ClaveAcceso = claveAcceso
-            };
-            _context.FacturasSRI.Add(facturaSri);
-
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return (invoice, cliente);
         }
-        catch (Exception)
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-    }
-}
 
-        private async Task<(string XmlGenerado, byte[] XmlFirmadoBytes, string ClaveAcceso)> GenerarYFirmarXmlAsync(Factura factura, Cliente cliente)
+        private async Task<(string XmlGenerado, byte[] XmlFirmadoBytes, string ClaveAcceso)> GenerarYFirmarXmlAsync(FacturasSRIDbContext context, Factura factura, Cliente cliente)
         {
             var certificatePath = _configuration["CompanyInfo:CertificatePath"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:CertificatePath'.");
             var certificatePassword = _configuration["CompanyInfo:CertificatePassword"] ?? throw new InvalidOperationException("Falta configurar 'CompanyInfo:CertificatePassword'.");
 
-            var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == factura.Id);
+            var facturaSri = await context.FacturasSRI.FirstAsync(f => f.FacturaId == factura.Id);
 
             if (string.IsNullOrEmpty(facturaSri.ClaveAcceso))
             {
@@ -566,10 +562,10 @@ namespace FacturasSRI.Infrastructure.Services
             return Task.CompletedTask;
         }
 
-        private async Task DescontarStockDeLotes(FacturaDetalle detalle)
+        private async Task DescontarStockDeLotes(FacturasSRIDbContext context, FacturaDetalle detalle)
         {
             var cantidadADescontar = detalle.Cantidad;
-            var lotesDisponibles = await _context.Lotes
+            var lotesDisponibles = await context.Lotes
                 .Where(l => l.ProductoId == detalle.ProductoId && l.CantidadDisponible > 0)
                 .OrderBy(l => l.FechaCompra)
                 .ToListAsync();
@@ -577,7 +573,7 @@ namespace FacturasSRI.Infrastructure.Services
             var stockTotal = lotesDisponibles.Sum(l => l.CantidadDisponible);
             if (stockTotal < cantidadADescontar)
             {
-                var producto = await _context.Productos.FindAsync(detalle.ProductoId);
+                var producto = await context.Productos.FindAsync(detalle.ProductoId);
                 var nombreProducto = producto?.Nombre ?? $"Producto ID {detalle.ProductoId}";
                 throw new InvalidOperationException($"No hay stock suficiente para '{nombreProducto}'. Stock disponible: {stockTotal}, se requieren: {cantidadADescontar}.");
             }
@@ -598,7 +594,7 @@ namespace FacturasSRI.Infrastructure.Services
                     LoteId = lote.Id,
                     CantidadConsumida = cantidadConsumida
                 };
-                _context.FacturaDetalleConsumoLotes.Add(consumoDeLote);
+                context.FacturaDetalleConsumoLotes.Add(consumoDeLote);
             }
         }
 
@@ -652,7 +648,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDto?> GetInvoiceByIdAsync(Guid id)
         {
-             var invoice = await _context.Facturas
+             await using var context = await _contextFactory.CreateDbContextAsync();
+             var invoice = await context.Facturas
                 .AsNoTracking()
                 .Include(i => i.Cliente) 
                 .Include(i => i.Detalles).ThenInclude(d => d.Producto)
@@ -660,7 +657,7 @@ namespace FacturasSRI.Infrastructure.Services
 
             if (invoice == null) return null;
 
-            var cuentaPorCobrar = await _context.CuentasPorCobrar.AsNoTracking().FirstOrDefaultAsync(c => c.FacturaId == id);
+            var cuentaPorCobrar = await context.CuentasPorCobrar.AsNoTracking().FirstOrDefaultAsync(c => c.FacturaId == id);
 
             return new InvoiceDto
             {
@@ -689,14 +686,15 @@ namespace FacturasSRI.Infrastructure.Services
             };
         }
 
-        public Task<List<InvoiceDto>> GetInvoicesAsync()
+        public async Task<List<InvoiceDto>> GetInvoicesAsync()
         {
-            return (from invoice in _context.Facturas.AsNoTracking()
-                        join cpc in _context.CuentasPorCobrar on invoice.Id equals cpc.FacturaId into cpcJoin
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await (from invoice in context.Facturas.AsNoTracking()
+                        join cpc in context.CuentasPorCobrar on invoice.Id equals cpc.FacturaId into cpcJoin
                         from cpc in cpcJoin.DefaultIfEmpty()
-                        join usuario in _context.Usuarios on invoice.UsuarioIdCreador equals usuario.Id into usuarioJoin
+                        join usuario in context.Usuarios on invoice.UsuarioIdCreador equals usuario.Id into usuarioJoin
                         from usuario in usuarioJoin.DefaultIfEmpty()
-                        join cliente in _context.Clientes on invoice.ClienteId equals cliente.Id into clienteJoin
+                        join cliente in context.Clientes on invoice.ClienteId equals cliente.Id into clienteJoin
                         from cliente in clienteJoin.DefaultIfEmpty()
                         orderby invoice.FechaCreacion descending
                         select new InvoiceDto
@@ -720,7 +718,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<InvoiceDetailViewDto?> GetInvoiceDetailByIdAsync(Guid id)
         {
-            var invoice = await _context.Facturas
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var invoice = await context.Facturas
                 .AsNoTracking()
                 .Include(i => i.Cliente)
                 .Include(i => i.InformacionSRI)
@@ -730,7 +729,7 @@ namespace FacturasSRI.Infrastructure.Services
 
             if (invoice == null) return null;
 
-            var cuentaPorCobrar = await _context.CuentasPorCobrar.AsNoTracking().FirstOrDefaultAsync(c => c.FacturaId == invoice.Id);
+            var cuentaPorCobrar = await context.CuentasPorCobrar.AsNoTracking().FirstOrDefaultAsync(c => c.FacturaId == invoice.Id);
 
             var items = invoice.Detalles.Select(d => new InvoiceItemDetailDto
             {
@@ -815,7 +814,7 @@ namespace FacturasSRI.Infrastructure.Services
                 var scopedService = scope.ServiceProvider.GetRequiredService<IInvoiceService>();
                 var scopedEmail = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 var scopedPdf = scope.ServiceProvider.GetRequiredService<PdfGeneratorService>();
-                var scopedContext = scope.ServiceProvider.GetRequiredService<FacturasSRIDbContext>();
+                await using var scopedContext = await scope.ServiceProvider.GetRequiredService<IDbContextFactory<FacturasSRIDbContext>>().CreateDbContextAsync();
 
                 var invoice = await scopedService.GetInvoiceDetailByIdAsync(invoiceId);
                 var invoiceEntity = await scopedContext.Facturas.Include(i => i.InformacionSRI).AsNoTracking().FirstOrDefaultAsync(i => i.Id == invoiceId);
@@ -844,7 +843,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task CancelInvoiceAsync(Guid invoiceId)
         {
-            var invoice = await _context.Facturas.FindAsync(invoiceId);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var invoice = await context.Facturas.FindAsync(invoiceId);
             if (invoice == null)
             {
                 throw new InvalidOperationException("La factura no existe.");
@@ -856,62 +856,62 @@ namespace FacturasSRI.Infrastructure.Services
             }
 
             invoice.Estado = EstadoFactura.Cancelada;
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         public async Task<InvoiceDetailViewDto?> IssueDraftInvoiceAsync(Guid invoiceId)
-{
-    var invoice = await _context.Facturas
-        // --- CORRECCIÓN DE CARGA PROFUNDA ---
-        .Include(i => i.Detalles)
-            .ThenInclude(d => d.Producto)
-                .ThenInclude(p => p.ProductoImpuestos)
-                    .ThenInclude(pi => pi.Impuesto)
-        // ------------------------------------
-        .Include(i => i.Cliente)
-        .FirstOrDefaultAsync(i => i.Id == invoiceId);
-
-    if (invoice == null)
-        throw new InvalidOperationException("La factura no existe.");
-
-    if (invoice.Estado != EstadoFactura.Borrador)
-        throw new InvalidOperationException("Solo se pueden emitir facturas que están en estado Borrador.");
-
-    _logger.LogInformation("Iniciando emisión de factura borrador ID: {Id}", invoiceId);
-
-    foreach (var detalle in invoice.Detalles)
-    {
-        if (detalle.Producto.ManejaInventario)
         {
-            if (detalle.Producto.ManejaLotes)
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var invoice = await context.Facturas
+                .Include(i => i.Detalles)
+                    .ThenInclude(d => d.Producto)
+                        .ThenInclude(p => p.ProductoImpuestos)
+                            .ThenInclude(pi => pi.Impuesto)
+                .Include(i => i.Cliente)
+                .FirstOrDefaultAsync(i => i.Id == invoiceId);
+
+            if (invoice == null)
+                throw new InvalidOperationException("La factura no existe.");
+
+            if (invoice.Estado != EstadoFactura.Borrador)
+                throw new InvalidOperationException("Solo se pueden emitir facturas que están en estado Borrador.");
+
+            _logger.LogInformation("Iniciando emisión de factura borrador ID: {Id}", invoiceId);
+
+            foreach (var detalle in invoice.Detalles)
             {
-                await DescontarStockDeLotes(detalle);
+                if (detalle.Producto.ManejaInventario)
+                {
+                    if (detalle.Producto.ManejaLotes)
+                    {
+                        await DescontarStockDeLotes(context, detalle);
+                    }
+                    else
+                    {
+                        await DescontarStockGeneral(detalle.Producto, detalle.Cantidad);
+                    }
+                }
             }
-            else
-            {
-                await DescontarStockGeneral(detalle.Producto, detalle.Cantidad);
-            }
+
+            var (xmlGenerado, xmlFirmadoBytes, claveAcceso) = await GenerarYFirmarXmlAsync(context, invoice, invoice.Cliente!);
+
+            var facturaSri = await context.FacturasSRI.FirstAsync(f => f.FacturaId == invoice.Id);
+            facturaSri.XmlGenerado = xmlGenerado;
+            facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
+
+            invoice.Estado = EstadoFactura.Pendiente;
+            await context.SaveChangesAsync();
+
+            _logger.LogInformation("Factura borrador actualizada a Pendiente. Iniciando envío background para {Numero}", invoice.NumeroFactura);
+            _ = Task.Run(() => EnviarAlSriEnFondoAsync(invoice.Id, xmlFirmadoBytes, claveAcceso));
+
+            return await GetInvoiceDetailByIdAsync(invoiceId);
         }
-    }
-
-    var (xmlGenerado, xmlFirmadoBytes, claveAcceso) = await GenerarYFirmarXmlAsync(invoice, invoice.Cliente!);
-
-    var facturaSri = await _context.FacturasSRI.FirstAsync(f => f.FacturaId == invoice.Id);
-    facturaSri.XmlGenerado = xmlGenerado;
-    facturaSri.XmlFirmado = Encoding.UTF8.GetString(xmlFirmadoBytes);
-
-    invoice.Estado = EstadoFactura.Pendiente;
-    await _context.SaveChangesAsync();
-
-    _logger.LogInformation("Factura borrador actualizada a Pendiente. Iniciando envío background para {Numero}", invoice.NumeroFactura);
-    _ = Task.Run(() => EnviarAlSriEnFondoAsync(invoice.Id, xmlFirmadoBytes, claveAcceso));
-
-    return await GetInvoiceDetailByIdAsync(invoiceId);
-}
 
         public async Task ReactivateCancelledInvoiceAsync(Guid invoiceId)
         {
-            var invoice = await _context.Facturas.FindAsync(invoiceId);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var invoice = await context.Facturas.FindAsync(invoiceId);
             if (invoice == null)
             {
                 throw new InvalidOperationException("La factura no existe.");
@@ -923,7 +923,7 @@ namespace FacturasSRI.Infrastructure.Services
             }
 
             invoice.Estado = EstadoFactura.Borrador;
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         public async Task<InvoiceDto?> UpdateInvoiceAsync(UpdateInvoiceDto invoiceDto)
@@ -933,7 +933,8 @@ namespace FacturasSRI.Infrastructure.Services
                 throw new InvalidOperationException("Las facturas para Consumidor Final solo pueden ser de Contado.");
             }
 
-            var invoice = await _context.Facturas
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var invoice = await context.Facturas
                 .Include(f => f.Detalles)
                 .FirstOrDefaultAsync(f => f.Id == invoiceDto.Id);
 
@@ -948,7 +949,7 @@ namespace FacturasSRI.Infrastructure.Services
 
             if (invoiceDto.EsConsumidorFinal)
             {
-                invoice.ClienteId = (await GetOrCreateConsumidorFinalClientAsync()).Id;
+                invoice.ClienteId = (await GetOrCreateConsumidorFinalClientAsync(context)).Id;
             }
             else if (invoiceDto.ClienteId.HasValue)
             {
@@ -963,7 +964,7 @@ namespace FacturasSRI.Infrastructure.Services
             invoice.DiasCredito = invoiceDto.DiasCredito;
             invoice.MontoAbonoInicial = invoiceDto.MontoAbonoInicial;
 
-            _context.FacturaDetalles.RemoveRange(invoice.Detalles);
+            context.FacturaDetalles.RemoveRange(invoice.Detalles);
             invoice.Detalles.Clear();
 
             decimal subtotalSinImpuestos = 0;
@@ -971,7 +972,7 @@ namespace FacturasSRI.Infrastructure.Services
 
             foreach (var item in invoiceDto.Items)
             {
-                var producto = await _context.Productos
+                var producto = await context.Productos
                     .Include(p => p.ProductoImpuestos).ThenInclude(pi => pi.Impuesto)
                     .SingleAsync(p => p.Id == item.ProductoId);
 
@@ -1003,7 +1004,7 @@ namespace FacturasSRI.Infrastructure.Services
             invoice.TotalIVA = totalIva;
             invoice.Total = subtotalSinImpuestos + totalIva;
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
             
             _logger.LogInformation("Borrador de factura {Id} actualizado.", invoice.Id);
 

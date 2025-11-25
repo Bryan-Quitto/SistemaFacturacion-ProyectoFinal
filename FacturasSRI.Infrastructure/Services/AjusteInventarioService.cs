@@ -13,19 +13,20 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class AjusteInventarioService : IAjusteInventarioService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
 
-        public AjusteInventarioService(FacturasSRIDbContext context)
+        public AjusteInventarioService(IDbContextFactory<FacturasSRIDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<List<AjusteListItemDto>> GetAdjustmentsAsync()
         {
-            var query = from ajuste in _context.AjustesInventario
-                        join producto in _context.Productos on ajuste.ProductoId equals producto.Id into productoJoin
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var query = from ajuste in context.AjustesInventario
+                        join producto in context.Productos on ajuste.ProductoId equals producto.Id into productoJoin
                         from producto in productoJoin.DefaultIfEmpty()
-                        join usuario in _context.Usuarios on ajuste.UsuarioIdAutoriza equals usuario.Id into usuarioJoin
+                        join usuario in context.Usuarios on ajuste.UsuarioIdAutoriza equals usuario.Id into usuarioJoin
                         from usuario in usuarioJoin.DefaultIfEmpty()
                         orderby ajuste.Fecha descending
                         select new AjusteListItemDto
@@ -43,7 +44,8 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task CreateAdjustmentAsync(AjusteInventarioDto ajusteDto)
         {
-            var producto = await _context.Productos.FindAsync(ajusteDto.ProductoId);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var producto = await context.Productos.FindAsync(ajusteDto.ProductoId);
             if (producto == null)
             {
                 throw new InvalidOperationException("El producto especificado no existe.");
@@ -68,7 +70,7 @@ namespace FacturasSRI.Infrastructure.Services
                     throw new InvalidOperationException("Debe seleccionar un lote para productos que manejan lotes.");
                 }
                 
-                var lote = await _context.Lotes.FindAsync(ajusteDto.LoteId.Value);
+                var lote = await context.Lotes.FindAsync(ajusteDto.LoteId.Value);
                 if (lote == null)
                 {
                     throw new InvalidOperationException("El lote especificado no existe.");
@@ -80,8 +82,8 @@ namespace FacturasSRI.Infrastructure.Services
                 AjustarStock(producto, ajusteDto.CantidadAjustada, ajusteDto.Tipo);
             }
 
-            _context.AjustesInventario.Add(ajuste);
-            await _context.SaveChangesAsync();
+            context.AjustesInventario.Add(ajuste);
+            await context.SaveChangesAsync();
         }
 
         private void AjustarStock(Lote lote, int cantidad, TipoAjusteInventario tipo)

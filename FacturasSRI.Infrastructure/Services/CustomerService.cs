@@ -12,12 +12,12 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class CustomerService : ICustomerService
     {
-        private readonly FacturasSRIDbContext _context;
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private readonly IValidationService _validationService;
 
-        public CustomerService(FacturasSRIDbContext context, IValidationService validationService)
+        public CustomerService(IDbContextFactory<FacturasSRIDbContext> contextFactory, IValidationService validationService)
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _validationService = validationService;
         }
 
@@ -28,7 +28,8 @@ namespace FacturasSRI.Infrastructure.Services
                 throw new InvalidOperationException("El número de identificación no es válido.");
             }
             
-            var existingCustomer = await _context.Clientes
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var existingCustomer = await context.Clientes
                 .FirstOrDefaultAsync(c => c.NumeroIdentificacion == customerDto.NumeroIdentificacion || 
                                            c.RazonSocial == customerDto.RazonSocial || 
                                            c.Telefono == customerDto.Telefono);
@@ -50,25 +51,27 @@ namespace FacturasSRI.Infrastructure.Services
                 UsuarioIdCreador = customerDto.UsuarioIdCreador,
                 FechaCreacion = DateTime.UtcNow
             };
-            _context.Clientes.Add(customer);
-            await _context.SaveChangesAsync();
+            context.Clientes.Add(customer);
+            await context.SaveChangesAsync();
             customerDto.Id = customer.Id;
             return customerDto;
         }
 
         public async Task DeleteCustomerAsync(Guid id)
         {
-            var customer = await _context.Clientes.FindAsync(id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var customer = await context.Clientes.FindAsync(id);
             if (customer != null)
             {
                 customer.EstaActivo = !customer.EstaActivo; // Toggle the active status
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
 
         public async Task<CustomerDto?> GetCustomerByIdAsync(Guid id)
         {
-            var customer = await _context.Clientes.FindAsync(id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var customer = await context.Clientes.FindAsync(id);
             if (customer == null || !customer.EstaActivo)
             {
                 return null;
@@ -88,10 +91,11 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<CustomerDto>> GetCustomersAsync()
         {
-            return await (from customer in _context.Clientes
-                          join usuarioCreador in _context.Usuarios on customer.UsuarioIdCreador equals usuarioCreador.Id into usuarioCreadorJoin
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await (from customer in context.Clientes
+                          join usuarioCreador in context.Usuarios on customer.UsuarioIdCreador equals usuarioCreador.Id into usuarioCreadorJoin
                           from usuarioCreador in usuarioCreadorJoin.DefaultIfEmpty()
-                          join usuarioModificador in _context.Usuarios on customer.UsuarioModificadorId equals usuarioModificador.Id into usuarioModificadorJoin
+                          join usuarioModificador in context.Usuarios on customer.UsuarioModificadorId equals usuarioModificador.Id into usuarioModificadorJoin
                           from usuarioModificador in usuarioModificadorJoin.DefaultIfEmpty()
                           select new CustomerDto
                           {
@@ -112,10 +116,11 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<CustomerDto>> GetActiveCustomersAsync()
         {
-            return await (from customer in _context.Clientes
-                          join usuarioCreador in _context.Usuarios on customer.UsuarioIdCreador equals usuarioCreador.Id into usuarioCreadorJoin
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await (from customer in context.Clientes
+                          join usuarioCreador in context.Usuarios on customer.UsuarioIdCreador equals usuarioCreador.Id into usuarioCreadorJoin
                           from usuarioCreador in usuarioCreadorJoin.DefaultIfEmpty()
-                          join usuarioModificador in _context.Usuarios on customer.UsuarioModificadorId equals usuarioModificador.Id into usuarioModificadorJoin
+                          join usuarioModificador in context.Usuarios on customer.UsuarioModificadorId equals usuarioModificador.Id into usuarioModificadorJoin
                           from usuarioModificador in usuarioModificadorJoin.DefaultIfEmpty()
                           where customer.EstaActivo == true // Filter for active customers
                           select new CustomerDto
@@ -142,7 +147,8 @@ namespace FacturasSRI.Infrastructure.Services
                 throw new InvalidOperationException("El número de identificación no es válido.");
             }
             
-            var existingCustomer = await _context.Clientes
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var existingCustomer = await context.Clientes
                 .FirstOrDefaultAsync(c => c.Id != customerDto.Id && 
                                            (c.NumeroIdentificacion == customerDto.NumeroIdentificacion || 
                                             c.RazonSocial == customerDto.RazonSocial || 
@@ -153,7 +159,7 @@ namespace FacturasSRI.Infrastructure.Services
                 throw new InvalidOperationException("Ya existe otro cliente con el mismo número de identificación, razón social o teléfono.");
             }
 
-            var customer = await _context.Clientes.FindAsync(customerDto.Id);
+            var customer = await context.Clientes.FindAsync(customerDto.Id);
             if (customer != null)
             {
                 customer.TipoIdentificacion = customerDto.TipoIdentificacion;
@@ -166,7 +172,7 @@ namespace FacturasSRI.Infrastructure.Services
                 customer.FechaModificacion = DateTime.UtcNow;
                 customer.UsuarioModificadorId = customerDto.UsuarioIdCreador; // Assuming UsuarioIdCreador in DTO is the modifier's ID
                 customer.UltimaModificacionPor = customerDto.UltimaModificacionPor; // Assuming UltimaModificacionPor in DTO is the modifier's name
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
     }
