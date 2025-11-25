@@ -28,6 +28,9 @@ builder.Services.AddControllers();
 builder.Services.AddPooledDbContextFactory<FacturasSRIDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddScoped(p => 
+    p.GetRequiredService<IDbContextFactory<FacturasSRIDbContext>>().CreateDbContext());
+
 builder.Services.AddSendGrid(options => {
     options.ApiKey = builder.Configuration.GetSection("SendGrid").GetValue<string>("ApiKey");
 });

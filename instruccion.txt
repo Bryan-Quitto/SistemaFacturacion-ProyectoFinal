@@ -1,0 +1,38 @@
+PS C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Web> dotnet run --environment Development
+info: FacturasSRI.Infrastructure.Services.VencimientoComprasService[0]
+      Servicio de Vencimiento de Compras iniciado.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5000
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Web
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+info: FacturasSRI.Web.Services.CookieAuthenticationStateProvider[0]
+      CookieAuthenticationStateProvider: No se encontró usuario autenticado. Devolviendo estado anónimo.
+info: FacturasSRI.Web.Services.CookieAuthenticationStateProvider[0]
+      CookieAuthenticationStateProvider: No se encontró usuario autenticado. Devolviendo estado anónimo.
+fail: Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware[1]
+      An unhandled exception has occurred while executing the request.
+      System.InvalidOperationException: Unable to resolve service for type 'FacturasSRI.Infrastructure.Persistence.FacturasSRIDbContext' while attempting to activate 'FacturasSRI.Web.Controllers.AccountController'.
+         at Microsoft.Extensions.DependencyInjection.ActivatorUtilities.ThrowHelperUnableToResolveService(Type type, Type requiredBy)
+         at lambda_method130(Closure, IServiceProvider, Object[])
+         at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.StatusCodePagesMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Localization.RequestLocalizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddlewareImpl.<Invoke>g__Awaited|10_0(ExceptionHandlerMiddlewareImpl middleware, HttpContext context, Task task)
+info: FacturasSRI.Web.Services.CookieAuthenticationStateProvider[0]
+      CookieAuthenticationStateProvider: No se encontró usuario autenticado. Devolviendo estado anónimo.
+info: FacturasSRI.Web.Services.CookieAuthenticationStateProvider[0]
+      CookieAuthenticationStateProvider: No se encontró usuario autenticado. Devolviendo estado anónimo.
