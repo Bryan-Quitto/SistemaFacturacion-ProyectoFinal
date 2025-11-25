@@ -223,7 +223,30 @@ else
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Respuesta del SRI:</label>
-                        <textarea class="form-control" rows="4" readonly>@invoice.RespuestaSRI</textarea>
+                        @if (string.IsNullOrEmpty(invoice.RespuestaSRI) || invoice.RespuestaSRI == "AUTORIZADO")
+                        {
+                            <div class="alert alert-success py-2">@invoice.RespuestaSRI</div>
+                        }
+                        else
+                        {
+                            var errors = ParseSriResponse(invoice.RespuestaSRI);
+                            foreach (var error in errors)
+                            {
+                                <div class="alert alert-danger py-2 mb-1">
+                                    <p class="mb-0 fw-bold">
+                                        @error.Mensaje 
+                                        @if (!string.IsNullOrEmpty(error.Identificador))
+                                        {
+                                            <text>(@error.Identificador)</text>
+                                        }
+                                    </p>
+                                    @if(!string.IsNullOrEmpty(error.InformacionAdicional))
+                                    {
+                                        <small class="d-block mt-1">@error.InformacionAdicional</small>
+                                    }
+                                </div>
+                            }
+                        }
                     </div>
                     
                     <div class="d-grid gap-2">
@@ -401,6 +424,35 @@ else
     private bool emailSuccess = false;
     private Guid currentUserId;
     private bool userIsAdmin = false;
+
+    private class SriError
+    {
+        public string? Identificador { get; set; }
+        public string? Mensaje { get; set; }
+        public string? InformacionAdicional { get; set; }
+        public string? Tipo { get; set; }
+    }
+
+    private List<SriError> ParseSriResponse(string? response)
+    {
+        if (string.IsNullOrEmpty(response))
+        {
+            return new List<SriError>();
+        }
+
+        try
+        {
+            if (!response.Trim().StartsWith("["))
+            {
+                return new List<SriError> { new SriError { Mensaje = response } };
+            }
+            return System.Text.Json.JsonSerializer.Deserialize<List<SriError>>(response, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<SriError>();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return new List<SriError> { new SriError { Mensaje = response } };
+        }
+    }
 
     protected override async Task OnInitializedAsync()
 {

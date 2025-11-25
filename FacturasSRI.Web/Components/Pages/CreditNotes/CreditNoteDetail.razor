@@ -202,10 +202,30 @@ else
                     {
                         <div class="mb-3">
                             <label class="form-label small text-muted">Respuesta SRI / Errores</label>
-                            <!-- Usamos alert-danger para que resalte si hay error -->
-                            <div class="p-2 bg-light border rounded small text-danger" style="max-height: 200px; overflow-y: auto; font-family: monospace;">
-                                @creditNote.RespuestaSRI
-                            </div>
+                            @if (creditNote.RespuestaSRI == "AUTORIZADO")
+                            {
+                                <div class="alert alert-success py-2">@creditNote.RespuestaSRI</div>
+                            }
+                            else
+                            {
+                                var errors = ParseSriResponse(creditNote.RespuestaSRI);
+                                foreach (var error in errors)
+                                {
+                                    <div class="alert alert-danger py-2 mb-1">
+                                        <p class="mb-0 fw-bold">
+                                        @error.Mensaje
+                                        @if (!string.IsNullOrEmpty(error.Identificador))
+                                        {
+                                            <text>(@error.Identificador)</text>
+                                        }
+                                    </p>
+                                        @if(!string.IsNullOrEmpty(error.InformacionAdicional))
+                                        {
+                                            <small class="d-block mt-1">@error.InformacionAdicional</small>
+                                        }
+                                    </div>
+                                }
+                            }
                         </div>
                     }
                     
@@ -286,6 +306,35 @@ else
     private bool sendingEmail = false;
     private bool emailSuccess = false;
     private string? emailMessage;
+
+    private class SriError
+    {
+        public string? Identificador { get; set; }
+        public string? Mensaje { get; set; }
+        public string? InformacionAdicional { get; set; }
+        public string? Tipo { get; set; }
+    }
+
+    private List<SriError> ParseSriResponse(string? response)
+    {
+        if (string.IsNullOrEmpty(response))
+        {
+            return new List<SriError>();
+        }
+
+        try
+        {
+            if (!response.Trim().StartsWith("["))
+            {
+                return new List<SriError> { new SriError { Mensaje = response } };
+            }
+            return System.Text.Json.JsonSerializer.Deserialize<List<SriError>>(response, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<SriError>();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return new List<SriError> { new SriError { Mensaje = response } };
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
