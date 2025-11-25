@@ -672,6 +672,8 @@ namespace FacturasSRI.Infrastructure.Services
                 Total = invoice.Total,
                 Estado = invoice.Estado,
                 FormaDePago = invoice.FormaDePago,
+                DiasCredito = invoice.DiasCredito,
+                MontoAbonoInicial = invoice.MontoAbonoInicial,
                 SaldoPendiente = cuentaPorCobrar?.SaldoPendiente ?? 0,
                 FechaVencimiento = cuentaPorCobrar?.FechaVencimiento,
                 Detalles = invoice.Detalles.Select(d => new InvoiceDetailDto
@@ -711,6 +713,8 @@ namespace FacturasSRI.Infrastructure.Services
                             Total = invoice.Total,
                             CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
                             FormaDePago = invoice.FormaDePago,
+                            DiasCredito = invoice.DiasCredito,
+                            MontoAbonoInicial = invoice.MontoAbonoInicial,
                             SaldoPendiente = cpc != null ? cpc.SaldoPendiente : 0,
                             FechaVencimiento = cpc != null ? cpc.FechaVencimiento : (DateTime?)null
                         }).ToListAsync();
@@ -783,6 +787,7 @@ namespace FacturasSRI.Infrastructure.Services
                 Estado = invoice.Estado,
                 FormaDePago = invoice.FormaDePago,
                 DiasCredito = invoice.DiasCredito,
+                MontoAbonoInicial = invoice.MontoAbonoInicial,
                 SaldoPendiente = cuentaPorCobrar?.SaldoPendiente ?? 0,
                 FechaVencimiento = cuentaPorCobrar?.FechaVencimiento,
                 ClaveAcceso = invoice.InformacionSRI?.ClaveAcceso,

@@ -23,6 +23,7 @@ namespace FacturasSRI.Application.Dtos
         public EstadoFactura Estado { get; set; }
         public FormaDePago FormaDePago { get; set; }
         public int? DiasCredito { get; set; }
+        public decimal MontoAbonoInicial { get; set; }
         public decimal SaldoPendiente { get; set; }
         public DateTime? FechaVencimiento { get; set; }
         public string? ClaveAcceso { get; set; }

@@ -19,6 +19,8 @@ namespace FacturasSRI.Application.Dtos
         public string CreadoPor { get; set; } = string.Empty;
         public List<InvoiceDetailDto> Detalles { get; set; } = new();
         public FormaDePago FormaDePago { get; set; }
+        public int? DiasCredito { get; set; }
+        public decimal MontoAbonoInicial { get; set; }
         public decimal SaldoPendiente { get; set; }
         public DateTime? FechaVencimiento { get; set; }
     }

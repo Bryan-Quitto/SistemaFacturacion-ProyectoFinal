@@ -388,10 +388,9 @@
         var invoiceDto = await InvoiceService.GetInvoiceDetailByIdAsync(InvoiceId.GetValueOrDefault());
         if (invoiceDto != null && invoiceDto.Estado == EstadoFactura.Borrador)
         {
-            formModel.FormaDePago = invoiceDto.FormaDePago;
-            formModel.DiasCredito = invoiceDto.DiasCredito;
-            formModel.MontoAbonoInicial = invoiceDto.SaldoPendiente > 0 ? (invoiceDto.Total - invoiceDto.SaldoPendiente) : 0; 
-
+                    formModel.FormaDePago = invoiceDto.FormaDePago;
+                    formModel.DiasCredito = invoiceDto.DiasCredito;
+                    formModel.MontoAbonoInicial = invoiceDto.MontoAbonoInicial;
             if (invoiceDto.ClienteIdentificacion == "9999999999999")
             {
                 customerSelectionType = "finalConsumer";
