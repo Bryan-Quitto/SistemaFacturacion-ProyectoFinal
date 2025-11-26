@@ -22,12 +22,12 @@ namespace FacturasSRI.Web.Controllers
             _productService = productService;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<List<ProductDto>>> GetProducts()
-        {
-            var products = await _productService.GetProductsAsync();
-            return Ok(products);
-        }
+        // [HttpGet]
+        // public async Task<ActionResult<List<ProductDto>>> GetProducts()
+        // {
+        //     var products = await _productService.GetProductsAsync();
+        //     return Ok(products);
+        // }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<ProductDto>> GetProduct(Guid id)

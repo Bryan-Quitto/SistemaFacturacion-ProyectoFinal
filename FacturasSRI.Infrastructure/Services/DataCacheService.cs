@@ -36,7 +36,7 @@ namespace FacturasSRI.Infrastructure.Services
             using (var scope = _scopeFactory.CreateScope())
             {
                 var productService = scope.ServiceProvider.GetRequiredService<IProductService>();
-                var products = await productService.GetProductsAsync();
+                var products = await productService.GetAllProductsForCacheAsync();
                 var json = JsonSerializer.Serialize(products);
                 var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "cache", "products.json");
                 var directory = Path.GetDirectoryName(path);

@@ -32,26 +32,52 @@
     </div>
 </div>
 
-<div class="row mb-3">
-    <div class="col-12">
-        <input type="text" class="form-control" placeholder="Buscar productos por nombre o código..."
-            @bind-value="searchTerm" @bind-value:event="oninput" />
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <input type="text" class="form-control" placeholder="Buscar productos por nombre o código..."
+                       @bind="searchTerm" @bind:event="oninput" @onkeyup="OnFilterChanged" />
+            </div>
+            <div class="col-md-2">
+                <InputSelect class="form-select" @bind-Value="selectedCategoryId" @bind-Value:after="OnFilterChanged">
+                    <option value="">Categoría</option>
+                    @foreach (var cat in allCategorias)
+                    {
+                        <option value="@cat.Id">@cat.Nombre</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-2">
+                <InputSelect class="form-select" @bind-Value="selectedMarca" @bind-Value:after="OnFilterChanged">
+                    <option value="">Marca</option>
+                    @foreach (var marca in allMarcas)
+                    {
+                        <option value="@marca">@marca</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-md-2">
+                <InputSelect class="form-select" @bind-Value="selectedStockStatus" @bind-Value:after="OnFilterChanged">
+                    <option value="All">Stock (Todos)</option>
+                    <option value="InStock">Con Stock</option>
+                    <option value="OutOfStock">Sin Stock</option>
+                </InputSelect>
+            </div>
+        </div>
     </div>
 </div>
 
 @if (!string.IsNullOrEmpty(errorMessage))
 {
-    <div class="alert alert-danger">
-        <h4>Ha ocurrido un error inesperado.</h4>
-        <p>Un problema ha impedido que la página se cargue correctamente. Por favor, inténtelo de nuevo, o revise su conexión a internet. Si el problema persiste, contacte a soporte técnico.</p>
-    </div>
+    <div class="alert alert-danger">@errorMessage</div>
 }
 
-@if (allProducts == null && string.IsNullOrEmpty(errorMessage))
+@if (paginatedProducts == null && string.IsNullOrEmpty(errorMessage))
 {
     <p><em>Cargando productos...</em></p>
 }
-else if(allProducts != null)
+else if (paginatedProducts != null)
 {
     <div class="table-responsive">
         <table class="table table-hover align-middle">
@@ -68,7 +94,7 @@ else if(allProducts != null)
                 </tr>
             </thead>
             <tbody>
-                @foreach (var product in FilteredProducts)
+                @foreach (var product in paginatedProducts.Items)
                 {
                     <tr>
                         <td class="fw-medium">@product.Nombre</td>
@@ -77,8 +103,8 @@ else if(allProducts != null)
                         <td>@product.CategoriaNombre</td>
                         <td class="fw-bold">@product.PrecioVentaUnitario.ToString("C")</td>
                         <td>
-                            <span class="@(product.StockTotal <= 5 ? "text-danger fw-bold" : "")">
-                                @product.StockTotal
+                            <span class="@(product.ManejaInventario && product.StockTotal <= 5 ? "text-danger fw-bold" : "")">
+                                @(product.ManejaInventario ? product.StockTotal.ToString() : "N/A")
                             </span>
                         </td>
                         <td>
@@ -112,6 +138,22 @@ else if(allProducts != null)
                 }
             </tbody>
         </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        @if (paginatedProducts.TotalCount > 0)
+        {
+            <p class="text-muted mb-0 small">
+                Mostrando del @((currentPage - 1) * pageSize + 1) al @Math.Min(currentPage * pageSize, paginatedProducts.TotalCount) de @paginatedProducts.TotalCount registros.
+            </p>
+            <Pagination CurrentPage="currentPage" 
+                        TotalPages="paginatedProducts.TotalPages" 
+                        OnPageSelected="SelectedPage" />
+        }
+        else
+        {
+            <p class="text-muted mb-0 small">No se encontraron productos con los filtros seleccionados.</p>
+        }
     </div>
 }
 
@@ -154,32 +196,94 @@ else if(allProducts != null)
 }
 
 @code {
-    private List<ProductDto>? allProducts;
+    private PaginatedList<ProductDto>? paginatedProducts;
     private string? errorMessage;
 
-    private bool showConfirmationModal = false;
-    private string confirmationModalTitle = string.Empty;
-    private string confirmationModalMessage = string.Empty;
-    private Guid productToToggleId;
+    // Paginación
+    private int currentPage = 1;
+    private int pageSize = 15;
 
+    // Filtros
     private string searchTerm = string.Empty;
+    private Guid? selectedCategoryId;
+    private string? selectedMarca;
+    private string selectedStockStatus = "All";
 
+    // Datos para los filtros
+    private List<CategoriaDto> allCategorias = new();
+    private List<string> allMarcas = new();
+
+    // Modal de Impuestos
     private Guid selectedTaxId;
     private List<TaxDto> allTaxes = new();
     private TaxDto? currentGlobalTax;
     private bool isGlobalTaxModalVisible = false;
 
-    private List<ProductDto> FilteredProducts => (allProducts ?? new())
-    .Where(p => (string.IsNullOrWhiteSpace(searchTerm) ||
-    p.Nombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-    p.CodigoPrincipal.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
-    .ToList();
+    // Modal de Confirmación
+    private bool showConfirmationModal = false;
+    private string confirmationModalTitle = string.Empty;
+    private string confirmationModalMessage = string.Empty;
+    private Guid productToToggleId;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadProducts();
-        await LoadTaxes();
-        await LoadCurrentGlobalTax();
+        await LoadInitialData();
+    }
+
+    private async Task LoadInitialData()
+    {
+        var tasks = new List<Task>
+        {
+            LoadProducts(1),
+            LoadTaxes(),
+            LoadCurrentGlobalTax(),
+            LoadCategorias(),
+            LoadMarcas()
+        };
+        await Task.WhenAll(tasks);
+    }
+
+    private async Task LoadProducts(int page)
+    {
+        currentPage = page;
+        errorMessage = null;
+        try
+        {
+            paginatedProducts = await ProductService.GetProductsAsync(currentPage, pageSize, searchTerm, selectedCategoryId, selectedMarca, selectedStockStatus);
+        }
+        catch (Exception)
+        {
+            errorMessage = "Error al cargar los productos.";
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnFilterChanged()
+    {
+        await LoadProducts(1);
+    }
+
+    private async Task SelectedPage(int page)
+    {
+        await LoadProducts(page);
+    }
+
+    private async Task LoadCategorias()
+    {
+        try
+        {
+            allCategorias = await ProductService.GetAllCategoriasAsync();
+        }
+        catch { errorMessage = "Error al cargar categorías."; }
+    }
+
+    private async Task LoadMarcas()
+    {
+        try
+        {
+            allMarcas = await ProductService.GetAllMarcasAsync();
+        }
+        catch { errorMessage = "Error al cargar marcas."; }
     }
 
     private async Task LoadTaxes()
@@ -188,10 +292,7 @@ else if(allProducts != null)
         {
             allTaxes = await TaxService.GetActiveTaxesAsync();
         }
-        catch (Exception)
-        {
-            errorMessage = "Error al cargar los impuestos.";
-        }
+        catch { errorMessage = "Error al cargar los impuestos."; }
     }
 
     private async Task LoadCurrentGlobalTax()
@@ -200,30 +301,15 @@ else if(allProducts != null)
         {
             currentGlobalTax = await ProductService.GetCurrentGlobalTaxAsync();
         }
-        catch (Exception)
-        {
-            errorMessage = "Error al cargar el impuesto global.";
-        }
+        catch { errorMessage = "Error al cargar el impuesto global."; }
     }
 
-    private void OpenGlobalTaxModal()
-    {
-        isGlobalTaxModalVisible = true;
-    }
-
-    private void CloseGlobalTaxModal()
-    {
-        isGlobalTaxModalVisible = false;
-    }
+    private void OpenGlobalTaxModal() => isGlobalTaxModalVisible = true;
+    private void CloseGlobalTaxModal() => isGlobalTaxModalVisible = false;
 
     private async Task ApplyGlobalTax()
     {
-        if (selectedTaxId == Guid.Empty)
-        {
-            errorMessage = "Por favor, seleccione un impuesto para aplicar.";
-            return;
-        }
-
+        if (selectedTaxId == Guid.Empty) return;
         errorMessage = null;
         try
         {
@@ -231,28 +317,12 @@ else if(allProducts != null)
             CloseGlobalTaxModal();
             await LoadCurrentGlobalTax();
         }
-        catch (Exception)
-        {
-            errorMessage = "Error al aplicar el impuesto global.";
-        }
-    }
-
-    private async Task LoadProducts()
-    {
-        errorMessage = null;
-        try
-        {
-            allProducts = await ProductService.GetProductsAsync();
-        }
-        catch (Exception)
-        {
-            errorMessage = "Error al cargar los productos.";
-        }
+        catch (Exception) { errorMessage = "Error al aplicar el impuesto global."; }
     }
 
     private void HandleDeleteProduct(Guid id)
     {
-        var productToToggle = allProducts?.FirstOrDefault(p => p.Id == id);
+        var productToToggle = paginatedProducts?.Items.FirstOrDefault(p => p.Id == id);
         if (productToToggle == null) return;
 
         productToToggleId = id;
@@ -263,21 +333,16 @@ else if(allProducts != null)
 
     private async Task ConfirmToggleProductStatus()
     {
-        errorMessage = null;
         showConfirmationModal = false;
-
-        var productToToggle = allProducts?.FirstOrDefault(p => p.Id == productToToggleId);
-        if (productToToggle == null) return;
-
-        string action = productToToggle.IsActive ? "desactivar" : "activar";
-
         try
         {
             await ProductService.DeleteProductAsync(productToToggleId);
-            await LoadProducts();
+            await LoadProducts(currentPage); // Recargar la página actual
         }
         catch (Exception)
         {
+            var product = paginatedProducts?.Items.FirstOrDefault(p => p.Id == productToToggleId);
+            var action = product != null && product.IsActive ? "desactivar" : "activar";
             errorMessage = $"Error al {action} el producto.";
         }
     }

@@ -25,12 +25,12 @@ namespace FacturasSRI.Web.Controllers
             _logger = logger;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<List<AjusteListItemDto>>> GetAdjustments()
-        {
-            var adjustments = await _ajusteInventarioService.GetAdjustmentsAsync();
-            return Ok(adjustments);
-        }
+        // [HttpGet]
+        // public async Task<ActionResult<List<AjusteListItemDto>>> GetAdjustments()
+        // {
+        //     var adjustments = await _ajusteInventarioService.GetAdjustmentsAsync();
+        //     return Ok(adjustments);
+        // }
 
         [HttpPost]
         public async Task<IActionResult> CreateAdjustment([FromBody] AjusteInventarioDto ajusteDto)

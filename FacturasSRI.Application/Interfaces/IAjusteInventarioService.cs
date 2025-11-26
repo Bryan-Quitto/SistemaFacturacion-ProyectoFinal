@@ -7,6 +7,6 @@ namespace FacturasSRI.Application.Interfaces
     public interface IAjusteInventarioService
     {
         Task CreateAdjustmentAsync(AjusteInventarioDto ajusteDto);
-        Task<List<AjusteListItemDto>> GetAdjustmentsAsync();
+        Task<PaginatedList<AjusteListItemDto>> GetAdjustmentsAsync(int pageNumber, int pageSize, string? searchTerm);
     }
 }

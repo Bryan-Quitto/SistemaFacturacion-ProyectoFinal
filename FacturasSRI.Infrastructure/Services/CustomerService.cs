@@ -89,10 +89,10 @@ namespace FacturasSRI.Infrastructure.Services
             };
         }
 
-        public async Task<List<CustomerDto>> GetCustomersAsync()
+        public async Task<PaginatedList<CustomerDto>> GetCustomersAsync(int pageNumber, int pageSize, string? searchTerm)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            return await (from customer in context.Clientes
+            var query = from customer in context.Clientes
                           join usuarioCreador in context.Usuarios on customer.UsuarioIdCreador equals usuarioCreador.Id into usuarioCreadorJoin
                           from usuarioCreador in usuarioCreadorJoin.DefaultIfEmpty()
                           join usuarioModificador in context.Usuarios on customer.UsuarioModificadorId equals usuarioModificador.Id into usuarioModificadorJoin
@@ -111,7 +111,20 @@ namespace FacturasSRI.Infrastructure.Services
                               FechaCreacion = customer.FechaCreacion,
                               FechaModificacion = customer.FechaModificacion,
                               UltimaModificacionPor = usuarioModificador != null ? usuarioModificador.PrimerNombre + " " + usuarioModificador.PrimerApellido : "N/A"
-                          }).ToListAsync();
+                          };
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(c => 
+                    c.RazonSocial.Contains(searchTerm) || 
+                    c.NumeroIdentificacion.Contains(searchTerm) ||
+                    (c.Email != null && c.Email.Contains(searchTerm)) ||
+                    (c.Telefono != null && c.Telefono.Contains(searchTerm)));
+            }
+            
+            query = query.OrderByDescending(c => c.FechaCreacion);
+
+            return await PaginatedList<CustomerDto>.CreateAsync(query, pageNumber, pageSize);
         }
 
         public async Task<List<CustomerDto>> GetActiveCustomersAsync()

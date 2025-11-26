@@ -20,7 +20,7 @@ namespace FacturasSRI.Infrastructure.Services
             _contextFactory = contextFactory;
         }
 
-        public async Task<List<AjusteListItemDto>> GetAdjustmentsAsync()
+        public async Task<PaginatedList<AjusteListItemDto>> GetAdjustmentsAsync(int pageNumber, int pageSize, string? searchTerm)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
             var query = from ajuste in context.AjustesInventario
@@ -28,18 +28,31 @@ namespace FacturasSRI.Infrastructure.Services
                         from producto in productoJoin.DefaultIfEmpty()
                         join usuario in context.Usuarios on ajuste.UsuarioIdAutoriza equals usuario.Id into usuarioJoin
                         from usuario in usuarioJoin.DefaultIfEmpty()
-                        orderby ajuste.Fecha descending
-                        select new AjusteListItemDto
+                        select new
                         {
-                            Fecha = ajuste.Fecha,
-                            ProductoNombre = producto != null ? producto.Nombre : "[Producto Eliminado]",
-                            Tipo = ajuste.Tipo,
-                            CantidadAjustada = ajuste.CantidadAjustada,
-                            Motivo = ajuste.Motivo,
-                            UsuarioAutoriza = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado"
+                            ajuste,
+                            producto,
+                            usuario
                         };
-            
-            return await query.ToListAsync();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(x => x.producto != null && x.producto.Nombre.Contains(searchTerm));
+            }
+
+            var finalQuery = query
+                .OrderByDescending(x => x.ajuste.Fecha)
+                .Select(x => new AjusteListItemDto
+                {
+                    Fecha = x.ajuste.Fecha,
+                    ProductoNombre = x.producto != null ? x.producto.Nombre : "[Producto Eliminado]",
+                    Tipo = x.ajuste.Tipo,
+                    CantidadAjustada = x.ajuste.CantidadAjustada,
+                    Motivo = x.ajuste.Motivo,
+                    UsuarioAutoriza = x.usuario != null ? x.usuario.PrimerNombre + " " + x.usuario.PrimerApellido : "Usuario no encontrado"
+                });
+
+            return await PaginatedList<AjusteListItemDto>.CreateAsync(finalQuery, pageNumber, pageSize);
         }
 
         public async Task CreateAdjustmentAsync(AjusteInventarioDto ajusteDto)

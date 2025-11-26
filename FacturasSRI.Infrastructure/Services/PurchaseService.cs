@@ -212,36 +212,55 @@ namespace FacturasSRI.Infrastructure.Services
             await context.SaveChangesAsync();
         }
 
-        public async Task<List<PurchaseListItemDto>> GetPurchasesAsync()
-{
-    await using var context = await _contextFactory.CreateDbContextAsync();
-    return await context.CuentasPorPagar
-        .Include(p => p.Producto)
-        .Include(p => p.Lote) // <--- 1. AGREGAR ESTA LÍNEA IMPORTANTE
-        .OrderByDescending(p => p.FechaCreacion)
-        .Select(p => new PurchaseListItemDto
+        public async Task<PaginatedList<PurchaseListItemDto>> GetPurchasesAsync(int pageNumber, int pageSize, string? searchTerm, EstadoCompra? status, FormaDePago? formaDePago)
         {
-            Id = p.Id,
-            ProductName = p.Producto.Nombre,
-            NombreProveedor = p.NombreProveedor,
-            Cantidad = p.Cantidad,
-            MontoTotal = p.MontoTotal,
-            
-            PrecioCompraUnitario = p.Lote != null 
-                                    ? p.Lote.PrecioCompraUnitario 
-                                    : ((p.Cantidad > 0) ? (p.MontoTotal / p.Cantidad) : 0),
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var query = context.CuentasPorPagar
+                .Include(p => p.Producto)
+                .Include(p => p.Lote)
+                .AsQueryable();
 
-            Estado = p.Estado,
-            FechaEmision = p.FechaEmision,
-            FechaVencimiento = p.FechaVencimiento,
-            FechaPago = p.FechaPago,
-            FacturaCompraPath = p.FacturaCompraPath,
-            ComprobantePagoPath = p.ComprobantePagoPath,
-            NotaCreditoPath = p.NotaCreditoPath,
-            FormaDePago = p.FormaDePago
-        })
-        .ToListAsync();
-}
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(p => 
+                    (p.Producto.Nombre != null && p.Producto.Nombre.Contains(searchTerm)) ||
+                    (p.NombreProveedor != null && p.NombreProveedor.Contains(searchTerm)));
+            }
+
+            if (status.HasValue)
+            {
+                query = query.Where(p => p.Estado == status.Value);
+            }
+            
+            if (formaDePago.HasValue)
+            {
+                query = query.Where(p => p.FormaDePago == formaDePago.Value);
+            }
+
+            var finalQuery = query
+                .OrderByDescending(p => p.FechaCreacion)
+                .Select(p => new PurchaseListItemDto
+                {
+                    Id = p.Id,
+                    ProductName = p.Producto.Nombre,
+                    NombreProveedor = p.NombreProveedor,
+                    Cantidad = p.Cantidad,
+                    MontoTotal = p.MontoTotal,
+                    PrecioCompraUnitario = p.Lote != null 
+                                            ? p.Lote.PrecioCompraUnitario 
+                                            : ((p.Cantidad > 0) ? (p.MontoTotal / p.Cantidad) : 0),
+                    Estado = p.Estado,
+                    FechaEmision = p.FechaEmision,
+                    FechaVencimiento = p.FechaVencimiento,
+                    FechaPago = p.FechaPago,
+                    FacturaCompraPath = p.FacturaCompraPath,
+                    ComprobantePagoPath = p.ComprobantePagoPath,
+                    NotaCreditoPath = p.NotaCreditoPath,
+                    FormaDePago = p.FormaDePago
+                });
+
+            return await PaginatedList<PurchaseListItemDto>.CreateAsync(finalQuery, pageNumber, pageSize);
+        }
         
         public async Task<PurchaseListItemDto?> GetPurchaseByIdAsync(Guid id)
 {

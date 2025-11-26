@@ -41,11 +41,11 @@ namespace FacturasSRI.Web.Controllers
             return BadRequest("No se pudo registrar la compra.");
         }
 
-        [HttpGet]
-        public async Task<ActionResult<List<PurchaseListItemDto>>> GetPurchases()
-        {
-            var purchases = await _purchaseService.GetPurchasesAsync();
-            return Ok(purchases);
-        }
+        // [HttpGet]
+        // public async Task<ActionResult<List<PurchaseListItemDto>>> GetPurchases()
+        // {
+        //     var purchases = await _purchaseService.GetPurchasesAsync();
+        //     return Ok(purchases);
+        // }
     }
 }

@@ -158,7 +158,7 @@ namespace FacturasSRI.Infrastructure.Services
             return await PaginatedList<ProductDto>.CreateAsync(finalQuery, pageNumber, pageSize);
         }
 
-        public async Task<List<ProductDto>> GetProductsAsync()
+        public async Task<List<ProductDto>> GetAllProductsForCacheAsync()
         {
             // This method is now obsolete for large lists, but might be used by the cache.
             // Keeping it simple, but for a real-world app, you might remove or refactor this.

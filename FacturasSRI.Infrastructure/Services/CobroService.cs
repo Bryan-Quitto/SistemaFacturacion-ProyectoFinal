@@ -1,6 +1,7 @@
 using FacturasSRI.Application.Dtos;
 using FacturasSRI.Application.Interfaces;
 using FacturasSRI.Domain.Entities;
+using FacturasSRI.Domain.Enums;
 using FacturasSRI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -26,13 +27,23 @@ namespace FacturasSRI.Infrastructure.Services
             _logger = logger;
         }
 
-        public async Task<List<CobroDto>> GetAllCobrosAsync()
+        public async Task<PaginatedList<CobroDto>> GetAllCobrosAsync(int pageNumber, int pageSize, string? searchTerm)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Cobros
+            var query = context.Cobros
                 .Include(c => c.Factura)
                     .ThenInclude(f => f.Cliente)
                 .Include(c => c.UsuarioCreador)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(c => 
+                    (c.Factura.NumeroFactura != null && c.Factura.NumeroFactura.Contains(searchTerm)) ||
+                    (c.Factura.Cliente.RazonSocial != null && c.Factura.Cliente.RazonSocial.Contains(searchTerm)));
+            }
+
+            var finalQuery = query
                 .OrderByDescending(c => c.FechaCobro)
                 .Select(c => new CobroDto
                 {
@@ -46,8 +57,9 @@ namespace FacturasSRI.Infrastructure.Services
                     Referencia = c.Referencia,
                     ComprobantePagoPath = c.ComprobantePagoPath,
                     CreadoPor = c.UsuarioCreador != null ? $"{c.UsuarioCreador.PrimerNombre} {c.UsuarioCreador.PrimerApellido}" : "N/A"
-                })
-                .ToListAsync();
+                });
+            
+            return await PaginatedList<CobroDto>.CreateAsync(finalQuery, pageNumber, pageSize);
         }
 
         public async Task<List<CobroDto>> GetCobrosByFacturaIdAsync(Guid facturaId)
@@ -163,29 +175,54 @@ namespace FacturasSRI.Infrastructure.Services
             }
         }
 
-        public async Task<List<FacturasConPagosDto>> GetFacturasConPagosAsync()
+        public async Task<PaginatedList<FacturasConPagosDto>> GetFacturasConPagosAsync(int pageNumber, int pageSize, string? searchTerm, FormaDePago? formaDePago, EstadoFactura? estadoFactura)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            var facturasConPagos = await (from f in context.Facturas
-                                        join c in context.Clientes on f.ClienteId equals c.Id into clienteJoin
-                                        from cliente in clienteJoin.DefaultIfEmpty()
-                                        join cpc in context.CuentasPorCobrar on f.Id equals cpc.FacturaId into cpcJoin
-                                        from cuentaPorCobrar in cpcJoin.DefaultIfEmpty()
-                                        where f.Cobros.Any()
-                                        select new FacturasConPagosDto
-                                        {
-                                            FacturaId = f.Id,
-                                            NumeroFactura = f.NumeroFactura,
-                                            ClienteNombre = cliente != null ? cliente.RazonSocial : "N/A",
-                                            TotalFactura = f.Total,
-                                            SaldoPendiente = cuentaPorCobrar != null ? cuentaPorCobrar.SaldoPendiente : 0,
-                                            TotalPagado = f.Cobros.Sum(c => c.Monto),
-                                            FormaDePago = f.FormaDePago,
-                                            EstadoFactura = f.Estado
-                                        })
-                                        .ToListAsync();
+            var query = from f in context.Facturas
+                        join c in context.Clientes on f.ClienteId equals c.Id into clienteJoin
+                        from cliente in clienteJoin.DefaultIfEmpty()
+                        join cpc in context.CuentasPorCobrar on f.Id equals cpc.FacturaId into cpcJoin
+                        from cuentaPorCobrar in cpcJoin.DefaultIfEmpty()
+                        where f.Cobros.Any()
+                        select new
+                        {
+                            Factura = f,
+                            Cliente = cliente,
+                            CuentaPorCobrar = cuentaPorCobrar
+                        };
 
-            return facturasConPagos;
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(x => 
+                    x.Factura.NumeroFactura.Contains(searchTerm) ||
+                    (x.Cliente != null && x.Cliente.RazonSocial.Contains(searchTerm)));
+            }
+
+            if (formaDePago.HasValue)
+            {
+                query = query.Where(x => x.Factura.FormaDePago == formaDePago.Value);
+            }
+
+            if (estadoFactura.HasValue)
+            {
+                query = query.Where(x => x.Factura.Estado == estadoFactura.Value);
+            }
+
+            var finalQuery = query
+                .OrderByDescending(x => x.Factura.FechaEmision)
+                .Select(x => new FacturasConPagosDto
+                {
+                    FacturaId = x.Factura.Id,
+                    NumeroFactura = x.Factura.NumeroFactura,
+                    ClienteNombre = x.Cliente != null ? x.Cliente.RazonSocial : "N/A",
+                    TotalFactura = x.Factura.Total,
+                    SaldoPendiente = x.CuentaPorCobrar != null ? x.CuentaPorCobrar.SaldoPendiente : 0,
+                    TotalPagado = x.Factura.Cobros.Sum(c => c.Monto),
+                    FormaDePago = x.Factura.FormaDePago,
+                    EstadoFactura = x.Factura.Estado
+                });
+
+            return await PaginatedList<FacturasConPagosDto>.CreateAsync(finalQuery, pageNumber, pageSize);
         }
     }
 }

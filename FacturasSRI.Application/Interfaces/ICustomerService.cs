@@ -7,7 +7,7 @@ namespace FacturasSRI.Application.Interfaces
 {
     public interface ICustomerService
     {
-        Task<List<CustomerDto>> GetCustomersAsync();
+        Task<PaginatedList<CustomerDto>> GetCustomersAsync(int pageNumber, int pageSize, string? searchTerm);
         Task<CustomerDto?> GetCustomerByIdAsync(Guid id);
         Task<CustomerDto> CreateCustomerAsync(CustomerDto customer);
         Task UpdateCustomerAsync(CustomerDto customer);

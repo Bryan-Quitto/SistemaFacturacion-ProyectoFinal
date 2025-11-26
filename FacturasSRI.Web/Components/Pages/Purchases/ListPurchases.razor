@@ -3,6 +3,7 @@
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Domain.Enums
+@using FacturasSRI.Web.Components.Shared
 @inject IPurchaseService PurchaseService
 @inject NavigationManager Navigation
 
@@ -20,10 +21,11 @@
 
 <div class="row g-2 mb-3">
     <div class="col-md-5">
-        <input type="text" class="form-control" placeholder="Buscar por producto o proveedor..." @bind-value="searchTerm" @bind-value:event="oninput" />
+        <input type="text" class="form-control" placeholder="Buscar por producto o proveedor..." 
+               @bind="searchTerm" @bind:event="oninput" @onkeyup="OnFilterChanged" />
     </div>
     <div class="col-md-4">
-        <InputSelect class="form-select" @bind-Value="selectedStatus">
+        <InputSelect class="form-select" @bind-Value="selectedStatus" @bind-Value:after="OnFilterChanged">
             <option value="">Todos los Estados</option>
             @foreach (var s in Enum.GetValues(typeof(EstadoCompra)))
             {
@@ -32,7 +34,7 @@
         </InputSelect>
     </div>
     <div class="col-md-3">
-        <InputSelect class="form-select" @bind-Value="selectedFormaDePago">
+        <InputSelect class="form-select" @bind-Value="selectedFormaDePago" @bind-Value:after="OnFilterChanged">
             <option value="">Todas las Formas de Pago</option>
             @foreach (var forma in Enum.GetValues(typeof(FormaDePago)))
             {
@@ -46,7 +48,7 @@
 {
     <p><em>Cargando historial de compras...</em></p>
 }
-else if (FilteredPurchases.Any())
+else if (paginatedPurchases != null && paginatedPurchases.Items.Any())
 {
     <div class="table-responsive">
         <table class="table table-hover align-middle">
@@ -65,7 +67,7 @@ else if (FilteredPurchases.Any())
                 </tr>
             </thead>
             <tbody>
-                @foreach (var purchase in FilteredPurchases)
+                @foreach (var purchase in paginatedPurchases.Items)
                 {
                     <tr>
                         <td>
@@ -87,7 +89,6 @@ else if (FilteredPurchases.Any())
                         <td>
                             @if(purchase.FechaVencimiento.HasValue)
                             {
-                                @* AQUI ESTÁ EL CAMBIO: Se marca rojo si faltan 5 días o menos (o si ya pasó) *@
                                 <span class="@(purchase.FechaVencimiento.Value <= DateTime.Now.AddDays(5) && purchase.Estado == EstadoCompra.Pendiente ? "text-danger fw-bold" : "")">
                                     @purchase.FechaVencimiento.Value.ToShortDateString()
                                 </span>
@@ -116,6 +117,15 @@ else if (FilteredPurchases.Any())
             </tbody>
         </table>
     </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <p class="text-muted mb-0 small">
+            Mostrando del @((currentPage - 1) * pageSize + 1) al @Math.Min(currentPage * pageSize, paginatedPurchases.TotalCount) de @paginatedPurchases.TotalCount registros.
+        </p>
+        <Pagination CurrentPage="currentPage" 
+                    TotalPages="paginatedPurchases.TotalPages" 
+                    OnPageSelected="SelectedPage" />
+    </div>
 }
 else
 {
@@ -126,51 +136,44 @@ else
 }
 
 @code {
-    private List<PurchaseListItemDto> allPurchases = new();
+    private PaginatedList<PurchaseListItemDto>? paginatedPurchases;
     private bool isLoading = true;
     
+    // Paginación y Filtros
+    private int currentPage = 1;
+    private int pageSize = 15;
     private string searchTerm = string.Empty;
     private EstadoCompra? selectedStatus; 
     private FormaDePago? selectedFormaDePago;
 
-    private List<PurchaseListItemDto> FilteredPurchases
-    {
-        get
-        {
-            var filtered = allPurchases;
-
-            if (selectedStatus.HasValue)
-            {
-                filtered = filtered.Where(p => p.Estado == selectedStatus.Value).ToList();
-            }
-            
-            if (selectedFormaDePago.HasValue)
-            {
-                filtered = filtered.Where(p => p.FormaDePago == selectedFormaDePago.Value).ToList();
-            }
-
-            if (!string.IsNullOrWhiteSpace(searchTerm))
-            {
-                filtered = filtered.Where(p => p.ProductName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                                              p.NombreProveedor.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
-            }
-
-            return filtered;
-        }
-    }
-
     protected override async Task OnInitializedAsync()
     {
+        await LoadData(currentPage);
+    }
+
+    private async Task LoadData(int page)
+    {
+        currentPage = page;
+        isLoading = true;
         try
         {
-            isLoading = true;
-            allPurchases = await PurchaseService.GetPurchasesAsync();
-            selectedFormaDePago = null;
+            paginatedPurchases = await PurchaseService.GetPurchasesAsync(currentPage, pageSize, searchTerm, selectedStatus, selectedFormaDePago);
         }
         finally
         {
             isLoading = false;
+            StateHasChanged();
         }
+    }
+
+    private async Task OnFilterChanged()
+    {
+        await LoadData(1);
+    }
+
+    private async Task SelectedPage(int page)
+    {
+        await LoadData(page);
     }
 
     private string GetBadgeClass(EstadoCompra estado)

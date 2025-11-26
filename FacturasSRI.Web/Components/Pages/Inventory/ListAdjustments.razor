@@ -3,6 +3,7 @@
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Domain.Enums
+@using FacturasSRI.Web.Components.Shared
 @inject IAjusteInventarioService AjusteInventarioService
 
 <PageTitle>Historial de Ajustes</PageTitle>
@@ -15,7 +16,8 @@
 </div>
 
 <div class="mb-3">
-    <input type="text" class="form-control" placeholder="Buscar por producto, motivo o usuario..." @bind-value="searchTerm" @bind-value:event="oninput" />
+    <input type="text" class="form-control" placeholder="Buscar por producto..." 
+           @bind="searchTerm" @bind:event="oninput" @onkeyup="OnFilterChanged" />
 </div>
 
 @if (!string.IsNullOrEmpty(errorMessage))
@@ -30,7 +32,7 @@
 {
     <p><em>Cargando historial...</em></p>
 }
-else if (FilteredAdjustments.Any())
+else if (paginatedAdjustments != null && paginatedAdjustments.Items.Any())
 {
     <div class="table-responsive">
         <table class="table table-hover align-middle">
@@ -45,13 +47,12 @@ else if (FilteredAdjustments.Any())
                 </tr>
             </thead>
             <tbody>
-                @foreach (var ajuste in FilteredAdjustments)
+                @foreach (var ajuste in paginatedAdjustments.Items)
                 {
                     <tr>
                         <td class="text-muted small">@ajuste.Fecha.ToLocalTime().ToString("g")</td>
                         <td class="fw-medium">@ajuste.ProductoNombre</td>
                         <td>
-                            @* LOGICA CORREGIDA: El color depende de si la cantidad es positiva o negativa *@
                             @if (ajuste.CantidadAjustada > 0)
                             {
                                 <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-10">
@@ -82,33 +83,45 @@ else if (FilteredAdjustments.Any())
             </tbody>
         </table>
     </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <p class="text-muted mb-0 small">
+            Mostrando del @((currentPage - 1) * pageSize + 1) al @Math.Min(currentPage * pageSize, paginatedAdjustments.TotalCount) de @paginatedAdjustments.TotalCount registros.
+        </p>
+        <Pagination CurrentPage="currentPage" 
+                    TotalPages="paginatedAdjustments.TotalPages" 
+                    OnPageSelected="SelectedPage" />
+    </div>
 }
 else
 {
     <div class="alert alert-light border text-center py-4">
         <i class="bi bi-inbox display-6 text-muted mb-3 d-block"></i>
-        No se han registrado ajustes de inventario todavía.
+        No se han registrado ajustes de inventario con los filtros actuales.
     </div>
 }
 
 @code {
-    private List<AjusteListItemDto> allAdjustments = new();
+    private PaginatedList<AjusteListItemDto>? paginatedAdjustments;
     private bool isLoading = true;
     private string? errorMessage;
+    
+    private int currentPage = 1;
+    private int pageSize = 15;
     private string searchTerm = string.Empty;
-
-    private List<AjusteListItemDto> FilteredAdjustments => string.IsNullOrWhiteSpace(searchTerm)
-        ? allAdjustments
-        : allAdjustments.Where(a => a.ProductoNombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                                    a.Motivo.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                                    a.UsuarioAutoriza.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
-                      .ToList();
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadData(currentPage);
+    }
+
+    private async Task LoadData(int page)
+    {
+        currentPage = page;
+        isLoading = true;
         try
         {
-            allAdjustments = await AjusteInventarioService.GetAdjustmentsAsync();
+            paginatedAdjustments = await AjusteInventarioService.GetAdjustmentsAsync(currentPage, pageSize, searchTerm);
         }
         catch (Exception ex)
         {
@@ -117,7 +130,18 @@ else
         finally
         {
             isLoading = false;
+            StateHasChanged();
         }
+    }
+
+    private async Task OnFilterChanged()
+    {
+        await LoadData(1);
+    }
+    
+    private async Task SelectedPage(int page)
+    {
+        await LoadData(page);
     }
 
     private void ClearErrorMessage()
