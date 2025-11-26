@@ -7,6 +7,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @inject IPurchaseService PurchaseService
 @inject IProductService ProductService
+@inject ITaxService TaxService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject Supabase.Client Supabase
@@ -35,15 +36,22 @@
                 <div class="col-md-6">
                     <div class="mb-3">
                         <label for="product" class="form-label">Producto</label>
-                        <InputSelect id="product" class="form-select" @bind-Value="newPurchase.ProductoId" disabled="@isSubmitting">
-                            <option value="">Seleccione un producto</option>
+                        <select id="product" class="form-select" @onchange="OnProductSelected" disabled="@isSubmitting">
+                            <option value="@Guid.Empty">Seleccione un producto</option>
                             @foreach (var product in products)
                             {
                                 <option value="@product.Id">@product.Nombre</option>
                             }
-                        </InputSelect>
+                        </select>
                         <ValidationMessage For="@(() => newPurchase.ProductoId)" />
                     </div>
+                    @if(selectedProduct != null)
+                    {
+                        <div class="alert alert-info small p-2 mb-3">
+                            <div>PVP Actual del Producto: <strong>@selectedProduct.PrecioVentaUnitario.ToString("C")</strong></div>
+                            <div>Costo Promedio Ponderado Actual: <strong>@selectedProduct.PrecioCompraPromedioPonderado.ToString("C")</strong></div>
+                        </div>
+                    }
 
                     <div class="mb-3">
                         <label for="nombreProveedor" class="form-label">Nombre del Proveedor</label>
@@ -67,14 +75,31 @@
                         <ValidationMessage For="@(() => newPurchase.Cantidad)" />
                     </div>
                     <div class="mb-3">
-                        <label for="precioCompra" class="form-label">Precio de Compra Unitario (IVA incluido)</label>
+                        <label for="impuesto" class="form-label">Impuesto Aplicado</label>
+                        <InputSelect id="impuesto" class="form-select" @bind-Value="newPurchase.ImpuestoId" @bind-Value:after="UpdateMontoTotal" disabled="@isSubmitting">
+                            @foreach (var tax in activeTaxes)
+                            {
+                                <option value="@tax.Id">@tax.Nombre (@tax.Porcentaje%)</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => newPurchase.ImpuestoId)" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="precioCompra" class="form-label">Precio de Compra Unitario (Sin IVA)</label>
                         <InputNumber id="precioCompra" class="form-control" @bind-Value="newPurchase.PrecioCompraUnitario" @bind-Value:after="UpdateMontoTotal" disabled="@isSubmitting" step="0.01" />
                         <ValidationMessage For="@(() => newPurchase.PrecioCompraUnitario)" />
                     </div>
                      <div class="mb-3">
-                        <label class="form-label">Monto Total Calculado</label>
+                        <label class="form-label">Monto Total Calculado (IVA Incluido)</label>
                         <input class="form-control" value="@montoTotalCalculado.ToString("C")" readonly disabled />
                     </div>
+                    @if (showPvpWarning && selectedProduct != null)
+                    {
+                        <div class="alert alert-warning small p-2">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            Atención: El nuevo Costo Promedio (@newAverageCost.ToString("C")) será mayor que el PVP actual del producto (@selectedProduct.PrecioVentaUnitario.ToString("C")).
+                        </div>
+                    }
                     <div class="mb-3">
                         <label for="fechaCaducidad" class="form-label">Fecha de Caducidad (Opcional)</label>
                         <InputDate id="fechaCaducidad" class="form-control" @bind-Value="newPurchase.FechaCaducidad" disabled="@isSubmitting" />
@@ -130,27 +155,109 @@
     private IBrowserFile? comprobanteFile;
     private string? fileValidationMessage;
     private decimal montoTotalCalculado = 0;
+    private List<TaxDto> activeTaxes = new();
+    private ProductDto? selectedProduct;
+    private bool showPvpWarning = false;
+    private decimal newAverageCost = 0;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var allProducts = await ProductService.GetProductsAsync();
+            var allProductsTask = ProductService.GetProductsAsync();
+            var taxesTask = TaxService.GetActiveTaxesAsync();
+
+            await Task.WhenAll(allProductsTask, taxesTask);
+
+            var allProducts = await allProductsTask;
             products = allProducts.Where(p => p.ManejaInventario && p.IsActive).ToList();
+            activeTaxes = await taxesTask;
+            
+            // Pre-select the most common tax if available (e.g., IVA 15%)
+            var defaultTax = activeTaxes.FirstOrDefault(t => t.Porcentaje == 15);
+            if(defaultTax != null)
+            {
+                newPurchase.ImpuestoId = defaultTax.Id;
+            }
         }
         catch (Exception ex)
         {
-            statusMessage = $"No se pudieron cargar los productos. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            statusMessage = $"No se pudieron cargar los datos iniciales (productos o impuestos). Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
             isSuccess = false;
         }
     }
 
-    private void UpdateMontoTotal()
+    private void OnProductSelected(ChangeEventArgs e)
     {
-        montoTotalCalculado = newPurchase.Cantidad * newPurchase.PrecioCompraUnitario;
-        StateHasChanged();
+        // 1. Extraemos el valor a una variable string una sola vez
+        // El operador ? asegura que si e.Value es null, valueString sea null
+        var valueString = e.Value?.ToString();
+
+        // 2. Verificamos sobre esa variable
+        if (string.IsNullOrEmpty(valueString) || valueString == Guid.Empty.ToString())
+        {
+            newPurchase.ProductoId = Guid.Empty;
+            selectedProduct = null;
+        }
+        else
+        {
+            // 3. Parseamos. Usamos el operador ! para decirle al compilador: 
+            // "Te prometo que valueString no es null aquí" (porque ya pasó el check de arriba)
+            var selectedProductId = Guid.Parse(valueString!); 
+            
+            newPurchase.ProductoId = selectedProductId;
+            selectedProduct = products.FirstOrDefault(p => p.Id == selectedProductId);
+        }
+        UpdateMontoTotal();
     }
 
+   private void UpdateMontoTotal()
+    {
+        var selectedTax = activeTaxes.FirstOrDefault(t => t.Id == newPurchase.ImpuestoId);
+        var taxRate = selectedTax?.Porcentaje / 100m ?? 0;
+        
+        // 1. Calculamos cuánto le debemos al proveedor (ESTO SÍ LLEVA IVA)
+        montoTotalCalculado = (newPurchase.Cantidad * newPurchase.PrecioCompraUnitario) * (1 + taxRate);
+        
+        newAverageCost = 0; 
+
+        if (selectedProduct != null && newPurchase.Cantidad > 0)
+        {
+            var currentStock = selectedProduct.StockTotal;
+            // OJO: Este precio promedio histórico ya debe venir SIN IVA desde la BD
+            var currentAverageCost = selectedProduct.PrecioCompraPromedioPonderado; 
+            
+            var newQuantity = newPurchase.Cantidad;
+            // Usamos el precio SIN IVA para el cálculo del costo
+            var newPurchasePrice = newPurchase.PrecioCompraUnitario; 
+
+            var totalStock = currentStock + newQuantity;
+            
+            if (totalStock > 0)
+            {
+                // Fórmula de Promedio Ponderado (Todo en base neta, SIN IVA)
+                newAverageCost = ((currentStock * currentAverageCost) + (newQuantity * newPurchasePrice)) / totalStock;
+                
+                // Ahora comparamos peras con peras (Costo Neto vs PVP Neto)
+                // Si mi costo promedio (ej. $8) es mayor que mi precio de venta (ej. $7), pierdo dinero.
+                if (newAverageCost > selectedProduct.PrecioVentaUnitario)
+                {
+                    showPvpWarning = true;
+                }
+                else
+                {
+                    showPvpWarning = false;
+                }
+            }
+        }
+        else
+        {
+            showPvpWarning = false;
+        }
+
+        StateHasChanged();
+    }
+    
     private void OnInputFileChange(InputFileChangeEventArgs e)
     {
         fileValidationMessage = null;

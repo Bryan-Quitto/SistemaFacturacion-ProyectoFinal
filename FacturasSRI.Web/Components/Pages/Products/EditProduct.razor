@@ -58,9 +58,9 @@ else
                             <ValidationMessage For="@(() => product.PrecioVentaUnitario)" />
                             @if (showPriceWarning)
                             {
-                                <div class="alert alert-warning mt-2 small">
+                                <div class="alert alert-warning mt-2 small p-2">
                                     <i class="bi bi-exclamation-triangle-fill"></i>
-                                    Atención: El PVP es menor que el precio máximo de compra registrado (@maxPurchasePrice?.ToString("C")).
+                                    Atención: El PVP es menor que el costo promedio ponderado de compra (@precioCompraPromedioPonderado.ToString("C")).
                                 </div>
                             }
                         </div>
@@ -113,7 +113,7 @@ else
     private ProductDto? product;
     private string? errorMessage;
     private List<CategoriaDto> todasLasCategorias = new();
-    private decimal? maxPurchasePrice;
+    private decimal precioCompraPromedioPonderado;
     private bool showPriceWarning = false;
 
     protected override async Task OnInitializedAsync()
@@ -128,7 +128,7 @@ else
             }
 
             todasLasCategorias = await ProductService.GetAllCategoriasAsync();
-            maxPurchasePrice = product.MaxPurchasePrice;
+            precioCompraPromedioPonderado = product.PrecioCompraPromedioPonderado;
             CheckPrice(); // Initial check
         }
         catch (Exception ex)
@@ -139,7 +139,7 @@ else
 
     private void CheckPrice()
     {
-        if (product != null && maxPurchasePrice.HasValue && product.PrecioVentaUnitario < maxPurchasePrice.Value)
+        if (product != null && precioCompraPromedioPonderado > 0 && product.PrecioVentaUnitario < precioCompraPromedioPonderado)
         {
             showPriceWarning = true;
         }

@@ -14,6 +14,7 @@ namespace FacturasSRI.Domain.Entities
         public bool ManejaInventario { get; set; } = true;
         public bool ManejaLotes { get; set; } = true;
         public int StockTotal { get; set; }
+        public decimal PrecioCompraPromedioPonderado { get; set; } = 0m;
         public bool EstaActivo { get; set; } = true;
         public Guid UsuarioIdCreador { get; set;}
         public DateTime FechaCreacion { get; set; }

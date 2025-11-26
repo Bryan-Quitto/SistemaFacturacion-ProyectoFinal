@@ -54,7 +54,7 @@ namespace FacturasSRI.Infrastructure.Services
             using var transaction = await context.Database.BeginTransactionAsync();
             try
             {
-                var producto = await context.Productos.FindAsync(purchaseDto.ProductoId);
+                var producto = await context.Productos.Include(p => p.Lotes).FirstOrDefaultAsync(p => p.Id == purchaseDto.ProductoId);
                 if (producto == null) throw new InvalidOperationException("El producto no existe.");
                 if (!producto.ManejaInventario) throw new InvalidOperationException("No se puede registrar una compra para un producto que no maneja inventario.");
 
@@ -66,8 +66,32 @@ namespace FacturasSRI.Infrastructure.Services
                 {
                     throw new InvalidOperationException("La fecha de vencimiento debe ser una fecha futura.");
                 }
+
+                var tax = await context.Impuestos.FindAsync(purchaseDto.ImpuestoId) ?? throw new InvalidOperationException("Impuesto no válido.");
+                var taxRate = tax.Porcentaje / 100m;
+                var montoTotalConIva = (purchaseDto.Cantidad * purchaseDto.PrecioCompraUnitario) * (1 + taxRate);
                 
-                var montoTotal = purchaseDto.Cantidad * purchaseDto.PrecioCompraUnitario;
+                var currentStock = producto.StockTotal;
+                var currentAverageCost = producto.PrecioCompraPromedioPonderado;
+                var newQuantity = purchaseDto.Cantidad;
+                var newPurchasePrice = purchaseDto.PrecioCompraUnitario;
+
+                _logger.LogInformation("--- Iniciando Cálculo de PMP para Producto ID: {ProductId} ---", producto.Id);
+                _logger.LogInformation("Stock Actual: {CurrentStock}, Costo Promedio Actual: {CurrentAvgCost}", currentStock, currentAverageCost);
+                _logger.LogInformation("Cantidad Nueva: {NewQty}, Precio de Compra Nuevo: {NewPrice}", newQuantity, newPurchasePrice);
+
+                var totalStock = currentStock + newQuantity;
+                if (totalStock > 0)
+                {
+                    var newAverageCost = ((currentStock * currentAverageCost) + (newQuantity * newPurchasePrice)) / totalStock;
+                    producto.PrecioCompraPromedioPonderado = newAverageCost;
+                }
+                else
+                {
+                    producto.PrecioCompraPromedioPonderado = newPurchasePrice;
+                }
+
+                producto.StockTotal = totalStock;
 
                 var cuenta = new CuentaPorPagar
                 {
@@ -76,7 +100,7 @@ namespace FacturasSRI.Infrastructure.Services
                     NombreProveedor = purchaseDto.NombreProveedor,
                     FacturaCompraPath = purchaseDto.FacturaCompraPath,
                     FechaEmision = DateTime.UtcNow,
-                    MontoTotal = montoTotal,
+                    MontoTotal = montoTotalConIva,
                     Cantidad = purchaseDto.Cantidad,
                     Estado = purchaseDto.FormaDePago == FormaDePago.Credito ? EstadoCompra.Pendiente : EstadoCompra.Pagada,
                     FormaDePago = purchaseDto.FormaDePago,
@@ -102,10 +126,6 @@ namespace FacturasSRI.Infrastructure.Services
                     };
                     context.Lotes.Add(lote);
                     cuenta.LoteId = lote.Id;
-                }
-                else
-                {
-                    producto.StockTotal += purchaseDto.Cantidad;
                 }
 
                 context.CuentasPorPagar.Add(cuenta);
@@ -193,55 +213,65 @@ namespace FacturasSRI.Infrastructure.Services
         }
 
         public async Task<List<PurchaseListItemDto>> GetPurchasesAsync()
+{
+    await using var context = await _contextFactory.CreateDbContextAsync();
+    return await context.CuentasPorPagar
+        .Include(p => p.Producto)
+        .Include(p => p.Lote) // <--- 1. AGREGAR ESTA LÍNEA IMPORTANTE
+        .OrderByDescending(p => p.FechaCreacion)
+        .Select(p => new PurchaseListItemDto
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.CuentasPorPagar
-                .Include(p => p.Producto)
-                .OrderByDescending(p => p.FechaCreacion)
-                .Select(p => new PurchaseListItemDto
-                {
-                    Id = p.Id,
-                    ProductName = p.Producto.Nombre,
-                    NombreProveedor = p.NombreProveedor,
-                    Cantidad = p.Cantidad,
-                    MontoTotal = p.MontoTotal,
-                    PrecioCompraUnitario = (p.Cantidad > 0) ? (p.MontoTotal / p.Cantidad) : 0,
-                    Estado = p.Estado,
-                    FechaEmision = p.FechaEmision,
-                    FechaVencimiento = p.FechaVencimiento,
-                    FechaPago = p.FechaPago,
-                    FacturaCompraPath = p.FacturaCompraPath,
-                    ComprobantePagoPath = p.ComprobantePagoPath,
-                    NotaCreditoPath = p.NotaCreditoPath,
-                    FormaDePago = p.FormaDePago
-                })
-                .ToListAsync();
-        }
+            Id = p.Id,
+            ProductName = p.Producto.Nombre,
+            NombreProveedor = p.NombreProveedor,
+            Cantidad = p.Cantidad,
+            MontoTotal = p.MontoTotal,
+            
+            PrecioCompraUnitario = p.Lote != null 
+                                    ? p.Lote.PrecioCompraUnitario 
+                                    : ((p.Cantidad > 0) ? (p.MontoTotal / p.Cantidad) : 0),
+
+            Estado = p.Estado,
+            FechaEmision = p.FechaEmision,
+            FechaVencimiento = p.FechaVencimiento,
+            FechaPago = p.FechaPago,
+            FacturaCompraPath = p.FacturaCompraPath,
+            ComprobantePagoPath = p.ComprobantePagoPath,
+            NotaCreditoPath = p.NotaCreditoPath,
+            FormaDePago = p.FormaDePago
+        })
+        .ToListAsync();
+}
         
         public async Task<PurchaseListItemDto?> GetPurchaseByIdAsync(Guid id)
+{
+    await using var context = await _contextFactory.CreateDbContextAsync();
+    return await context.CuentasPorPagar
+        .Include(p => p.Lote)
+        .Where(p => p.Id == id)
+        .Select(p => new PurchaseListItemDto
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.CuentasPorPagar
-                .Where(p => p.Id == id)
-                .Select(p => new PurchaseListItemDto
-                {
-                    Id = p.Id,
-                    ProductName = p.Producto.Nombre,
-                    NombreProveedor = p.NombreProveedor,
-                    Cantidad = p.Cantidad,
-                    MontoTotal = p.MontoTotal,
-                    PrecioCompraUnitario = (p.Cantidad > 0) ? (p.MontoTotal / p.Cantidad) : 0,
-                    Estado = p.Estado,
-                    FechaEmision = p.FechaEmision,
-                    FechaVencimiento = p.FechaVencimiento,
-                    FechaPago = p.FechaPago,
-                    FacturaCompraPath = p.FacturaCompraPath,
-                    ComprobantePagoPath = p.ComprobantePagoPath,
-                    NotaCreditoPath = p.NotaCreditoPath,
-                    FormaDePago = p.FormaDePago
-                })
-                .FirstOrDefaultAsync();
-        }
+            Id = p.Id,
+            ProductName = p.Producto.Nombre,
+            NombreProveedor = p.NombreProveedor,
+            Cantidad = p.Cantidad,
+            MontoTotal = p.MontoTotal,
+
+            PrecioCompraUnitario = p.Lote != null 
+                                    ? p.Lote.PrecioCompraUnitario 
+                                    : ((p.Cantidad > 0) ? (p.MontoTotal / p.Cantidad) : 0),
+
+            Estado = p.Estado,
+            FechaEmision = p.FechaEmision,
+            FechaVencimiento = p.FechaVencimiento,
+            FechaPago = p.FechaPago,
+            FacturaCompraPath = p.FacturaCompraPath,
+            ComprobantePagoPath = p.ComprobantePagoPath,
+            NotaCreditoPath = p.NotaCreditoPath,
+            FormaDePago = p.FormaDePago
+        })
+        .FirstOrDefaultAsync();
+}
 
         public async Task<bool> RegisterPaymentAsync(RegisterPaymentDto paymentDto, Stream fileStream, string fileName)
         {

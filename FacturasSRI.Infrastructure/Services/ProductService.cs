@@ -7,16 +7,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FacturasSRI.Infrastructure.Services
 {
     public class ProductService : IProductService
     {
         private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
+        private readonly ILogger<ProductService> _logger;
 
-        public ProductService(IDbContextFactory<FacturasSRIDbContext> contextFactory)
+        public ProductService(IDbContextFactory<FacturasSRIDbContext> contextFactory, ILogger<ProductService> logger)
         {
             _contextFactory = contextFactory;
+            _logger = logger;
         }
 
         public async Task<ProductDto> CreateProductAsync(ProductDto productDto)
@@ -80,7 +83,7 @@ namespace FacturasSRI.Infrastructure.Services
                               ManejaInventario = product.ManejaInventario,
                               ManejaLotes = product.ManejaLotes,
                               StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
-                              MaxPurchasePrice = product.ManejaLotes && product.Lotes.Any() ? product.Lotes.Max(l => l.PrecioCompraUnitario) : (decimal?)null,
+                              PrecioCompraPromedioPonderado = product.PrecioCompraPromedioPonderado,
                               CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
                               IsActive = product.EstaActivo,
                               FechaCreacion = product.FechaCreacion,
@@ -109,6 +112,7 @@ namespace FacturasSRI.Infrastructure.Services
                               ManejaInventario = product.ManejaInventario,
                               ManejaLotes = product.ManejaLotes,
                               StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
+                              PrecioCompraPromedioPonderado = product.PrecioCompraPromedioPonderado,
                               CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
                               IsActive = product.EstaActivo,
                               Marca = product.Marca,
@@ -135,6 +139,7 @@ namespace FacturasSRI.Infrastructure.Services
                               ManejaInventario = product.ManejaInventario,
                               ManejaLotes = product.ManejaLotes,
                               StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
+                              PrecioCompraPromedioPonderado = product.PrecioCompraPromedioPonderado,
                               CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
                               IsActive = product.EstaActivo,
                               Marca = product.Marca,
@@ -146,7 +151,8 @@ namespace FacturasSRI.Infrastructure.Services
         public async Task UpdateProductAsync(ProductDto productDto)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            var product = await context.Productos.FindAsync(productDto.Id);
+            var product = await context.Productos.Include(p => p.Lotes).FirstOrDefaultAsync(p => p.Id == productDto.Id);
+            
             if (product != null)
             {
                 if (await context.Productos.AnyAsync(p => p.Id != productDto.Id && p.Nombre.ToLower() == productDto.Nombre.ToLower()))

@@ -36,7 +36,7 @@ namespace FacturasSRI.Application.Dtos
         public string Marca { get; set; } = string.Empty;
         public Guid CategoriaId { get; set; }
         public string CategoriaNombre { get; set; } = string.Empty;
-        public decimal? MaxPurchasePrice { get; set; }
+        public decimal PrecioCompraPromedioPonderado { get; set; }
 
 
     }

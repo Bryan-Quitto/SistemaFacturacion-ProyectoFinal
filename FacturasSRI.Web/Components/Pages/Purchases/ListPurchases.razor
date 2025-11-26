@@ -56,6 +56,7 @@ else if (FilteredPurchases.Any())
                     <th>Forma de Pago</th>
                     <th>Producto</th>
                     <th>Proveedor</th>
+                    <th class="text-end">Cantidad</th>
                     <th class="text-end">Precio Unitario</th>
                     <th class="text-end">Monto Total</th>
                     <th>Fecha Emisión</th>
@@ -79,6 +80,7 @@ else if (FilteredPurchases.Any())
                         </td>
                         <td class="fw-medium">@purchase.ProductName</td>
                         <td>@purchase.NombreProveedor</td>
+                        <td class="text-end">@purchase.Cantidad</td>
                         <td class="text-end">@purchase.PrecioCompraUnitario.ToString("C")</td>
                         <td class="text-end fw-bold">@purchase.MontoTotal.ToString("C")</td>
                         <td>@purchase.FechaEmision.ToLocalTime().ToShortDateString()</td>

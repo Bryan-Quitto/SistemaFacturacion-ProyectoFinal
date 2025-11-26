@@ -16,6 +16,9 @@ namespace FacturasSRI.Application.Dtos
         [Range(0.01, double.MaxValue, ErrorMessage = "El precio de compra debe ser mayor que cero.")]
         public decimal PrecioCompraUnitario { get; set; }
 
+        [Required(ErrorMessage = "Debe seleccionar un impuesto.")]
+        public Guid ImpuestoId { get; set; }
+
         public DateTime? FechaCaducidad { get; set; }
         
         [Required]
