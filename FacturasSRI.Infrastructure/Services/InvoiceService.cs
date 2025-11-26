@@ -688,36 +688,68 @@ namespace FacturasSRI.Infrastructure.Services
             };
         }
 
-        public async Task<List<InvoiceDto>> GetInvoicesAsync()
+        public async Task<PaginatedList<InvoiceDto>> GetInvoicesAsync(int pageNumber, int pageSize, string? searchTerm, EstadoFactura? status, FormaDePago? formaDePago, string? paymentStatus)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            return await (from invoice in context.Facturas.AsNoTracking()
+            var query = from invoice in context.Facturas.AsNoTracking()
                         join cpc in context.CuentasPorCobrar on invoice.Id equals cpc.FacturaId into cpcJoin
                         from cpc in cpcJoin.DefaultIfEmpty()
                         join usuario in context.Usuarios on invoice.UsuarioIdCreador equals usuario.Id into usuarioJoin
                         from usuario in usuarioJoin.DefaultIfEmpty()
                         join cliente in context.Clientes on invoice.ClienteId equals cliente.Id into clienteJoin
                         from cliente in clienteJoin.DefaultIfEmpty()
-                        orderby invoice.FechaCreacion descending
-                        select new InvoiceDto
-                        {
-                            Id = invoice.Id,
-                            FechaEmision = invoice.FechaEmision,
-                            NumeroFactura = invoice.NumeroFactura,
-                            Estado = invoice.Estado,
-                            ClienteId = invoice.ClienteId,
-                            ClienteNombre = cliente != null ? cliente.RazonSocial : "Consumidor Final",
-                            SubtotalSinImpuestos = invoice.SubtotalSinImpuestos,
-                            TotalDescuento = invoice.TotalDescuento,
-                            TotalIVA = invoice.TotalIVA,
-                            Total = invoice.Total,
-                            CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
-                            FormaDePago = invoice.FormaDePago,
-                            DiasCredito = invoice.DiasCredito,
-                            MontoAbonoInicial = invoice.MontoAbonoInicial,
-                            SaldoPendiente = cpc != null ? cpc.SaldoPendiente : 0,
-                            FechaVencimiento = cpc != null ? cpc.FechaVencimiento : (DateTime?)null
-                        }).ToListAsync();
+                        select new { invoice, cpc, usuario, cliente };
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(x => x.invoice.NumeroFactura.Contains(searchTerm) || (x.cliente != null && x.cliente.RazonSocial.Contains(searchTerm)));
+            }
+
+            if (status.HasValue)
+            {
+                query = query.Where(x => x.invoice.Estado == status.Value);
+            }
+
+            if (formaDePago.HasValue)
+            {
+                query = query.Where(x => x.invoice.FormaDePago == formaDePago.Value);
+            }
+
+            if (!string.IsNullOrEmpty(paymentStatus) && paymentStatus != "All")
+            {
+                if (paymentStatus == "Pending")
+                {
+                    query = query.Where(x => x.cpc != null && x.cpc.SaldoPendiente > 0);
+                }
+                else if (paymentStatus == "Paid")
+                {
+                    query = query.Where(x => x.cpc == null || x.cpc.SaldoPendiente <= 0);
+                }
+            }
+
+            var finalQuery = query
+                .OrderByDescending(x => x.invoice.FechaCreacion)
+                .Select(x => new InvoiceDto
+                {
+                    Id = x.invoice.Id,
+                    FechaEmision = x.invoice.FechaEmision,
+                    NumeroFactura = x.invoice.NumeroFactura,
+                    Estado = x.invoice.Estado,
+                    ClienteId = x.invoice.ClienteId,
+                    ClienteNombre = x.cliente != null ? x.cliente.RazonSocial : "Consumidor Final",
+                    SubtotalSinImpuestos = x.invoice.SubtotalSinImpuestos,
+                    TotalDescuento = x.invoice.TotalDescuento,
+                    TotalIVA = x.invoice.TotalIVA,
+                    Total = x.invoice.Total,
+                    CreadoPor = x.usuario != null ? x.usuario.PrimerNombre + " " + x.usuario.PrimerApellido : "Usuario no encontrado",
+                    FormaDePago = x.invoice.FormaDePago,
+                    DiasCredito = x.invoice.DiasCredito,
+                    MontoAbonoInicial = x.invoice.MontoAbonoInicial,
+                    SaldoPendiente = x.cpc != null ? x.cpc.SaldoPendiente : 0,
+                    FechaVencimiento = x.cpc != null ? x.cpc.FechaVencimiento : (DateTime?)null
+                });
+            
+            return await PaginatedList<InvoiceDto>.CreateAsync(finalQuery, pageNumber, pageSize);
         }
 
         public async Task<InvoiceDetailViewDto?> GetInvoiceDetailByIdAsync(Guid id)

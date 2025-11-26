@@ -94,31 +94,80 @@ namespace FacturasSRI.Infrastructure.Services
                           }).FirstOrDefaultAsync();
         }
 
-        public async Task<List<ProductDto>> GetProductsAsync()
+        public async Task<PaginatedList<ProductDto>> GetProductsAsync(int pageNumber, int pageSize, string? searchTerm, Guid? categoryId, string? marca, string? stockStatus)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            return await (from product in context.Productos
+            var query = from product in context.Productos
                           join usuario in context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
                           from usuario in usuarioJoin.DefaultIfEmpty()
                           join categoria in context.Categorias on product.CategoriaId equals categoria.Id
-
-                          select new ProductDto
+                          select new 
                           {
-                              Id = product.Id,
-                              CodigoPrincipal = product.CodigoPrincipal,
-                              Nombre = product.Nombre,
-                              Descripcion = product.Descripcion,
-                              PrecioVentaUnitario = product.PrecioVentaUnitario,
-                              ManejaInventario = product.ManejaInventario,
-                              ManejaLotes = product.ManejaLotes,
-                              StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
-                              PrecioCompraPromedioPonderado = product.PrecioCompraPromedioPonderado,
-                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
-                              IsActive = product.EstaActivo,
-                              Marca = product.Marca,
-                              CategoriaId = product.CategoriaId,
-                              CategoriaNombre = categoria.Nombre
-                          }).ToListAsync();
+                              product,
+                              usuario,
+                              categoria
+                          };
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(x => x.product.Nombre.Contains(searchTerm) || x.product.CodigoPrincipal.Contains(searchTerm));
+            }
+
+            if (categoryId.HasValue)
+            {
+                query = query.Where(x => x.product.CategoriaId == categoryId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(marca))
+            {
+                query = query.Where(x => x.product.Marca == marca);
+            }
+            
+            if (!string.IsNullOrEmpty(stockStatus) && stockStatus != "All")
+            {
+                if (stockStatus == "InStock")
+                {
+                    query = query.Where(x => (x.product.ManejaLotes ? x.product.Lotes.Sum(l => l.CantidadDisponible) : x.product.StockTotal) > 0);
+                }
+                else if (stockStatus == "OutOfStock")
+                {
+                    query = query.Where(x => (x.product.ManejaLotes ? x.product.Lotes.Sum(l => l.CantidadDisponible) : x.product.StockTotal) <= 0);
+                }
+            }
+            
+            var finalQuery = query
+                .OrderBy(x => x.product.Nombre)
+                .Select(x => new ProductDto
+                {
+                    Id = x.product.Id,
+                    CodigoPrincipal = x.product.CodigoPrincipal,
+                    Nombre = x.product.Nombre,
+                    Descripcion = x.product.Descripcion,
+                    PrecioVentaUnitario = x.product.PrecioVentaUnitario,
+                    ManejaInventario = x.product.ManejaInventario,
+                    ManejaLotes = x.product.ManejaLotes,
+                    StockTotal = x.product.ManejaLotes ? x.product.Lotes.Sum(l => l.CantidadDisponible) : x.product.StockTotal,
+                    PrecioCompraPromedioPonderado = x.product.PrecioCompraPromedioPonderado,
+                    CreadoPor = x.usuario != null ? x.usuario.PrimerNombre + " " + x.usuario.PrimerApellido : "Usuario no encontrado",
+                    IsActive = x.product.EstaActivo,
+                    Marca = x.product.Marca,
+                    CategoriaId = x.product.CategoriaId,
+                    CategoriaNombre = x.categoria.Nombre
+                });
+
+            return await PaginatedList<ProductDto>.CreateAsync(finalQuery, pageNumber, pageSize);
+        }
+
+        public async Task<List<ProductDto>> GetProductsAsync()
+        {
+            // This method is now obsolete for large lists, but might be used by the cache.
+            // Keeping it simple, but for a real-world app, you might remove or refactor this.
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Productos
+                .AsNoTracking()
+                .OrderBy(p => p.Nombre)
+                .Select(p => new ProductDto { Id = p.Id, Nombre = p.Nombre, CodigoPrincipal = p.CodigoPrincipal, PrecioVentaUnitario = p.PrecioVentaUnitario, IsActive = p.EstaActivo, ManejaInventario = p.ManejaInventario, StockTotal = p.StockTotal, PrecioCompraPromedioPonderado = p.PrecioCompraPromedioPonderado })
+                .ToListAsync();
         }
 
         public async Task<List<ProductDto>> GetActiveProductsAsync()

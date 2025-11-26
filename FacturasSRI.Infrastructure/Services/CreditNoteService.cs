@@ -97,10 +97,10 @@ namespace FacturasSRI.Infrastructure.Services
             return Task.CompletedTask;
         }
 
-        public async Task<List<CreditNoteDto>> GetCreditNotesAsync()
+        public async Task<PaginatedList<CreditNoteDto>> GetCreditNotesAsync(int pageNumber, int pageSize, string? searchTerm, EstadoNotaDeCredito? status)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.NotasDeCredito
+            var query = context.NotasDeCredito
                 .AsNoTracking()
                 .Include(nc => nc.Cliente)
                 .Include(nc => nc.Factura)
@@ -115,8 +115,22 @@ namespace FacturasSRI.Infrastructure.Services
                     Total = nc.Total,
                     Estado = nc.Estado,
                     RazonModificacion = nc.RazonModificacion
-                })
-                .ToListAsync();
+                });
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(nc => 
+                    (nc.NumeroNotaCredito != null && nc.NumeroNotaCredito.Contains(searchTerm)) ||
+                    (nc.ClienteNombre != null && nc.ClienteNombre.Contains(searchTerm)) ||
+                    (nc.NumeroFacturaModificada != null && nc.NumeroFacturaModificada.Contains(searchTerm)));
+            }
+
+            if (status.HasValue)
+            {
+                query = query.Where(nc => nc.Estado == status.Value);
+            }
+
+            return await PaginatedList<CreditNoteDto>.CreateAsync(query, pageNumber, pageSize);
         }
 
         public async Task<CreditNoteDetailViewDto?> GetCreditNoteDetailByIdAsync(Guid id)

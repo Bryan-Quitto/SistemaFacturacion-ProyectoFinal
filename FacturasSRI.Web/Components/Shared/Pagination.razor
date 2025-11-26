@@ -1,0 +1,57 @@
+@if (TotalPages > 1)
+{
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            <li class="page-item @(CurrentPage == 1 ? "disabled" : "")">
+                <button class="page-link" @onclick="() => OnPageSelected.InvokeAsync(CurrentPage - 1)">Anterior</button>
+            </li>
+
+            @for (int i = StartPage; i <= EndPage; i++)
+            {
+                var pageNumber = i;
+                <li class="page-item @(pageNumber == CurrentPage ? "active" : "")">
+                    <button class="page-link" @onclick="() => OnPageSelected.InvokeAsync(pageNumber)">@pageNumber</button>
+                </li>
+            }
+
+            <li class="page-item @(CurrentPage == TotalPages ? "disabled" : "")">
+                <button class="page-link" @onclick="() => OnPageSelected.InvokeAsync(CurrentPage + 1)">Siguiente</button>
+            </li>
+        </ul>
+    </nav>
+}
+
+@code {
+    [Parameter]
+    public int CurrentPage { get; set; }
+
+    [Parameter]
+    public int TotalPages { get; set; }
+
+    [Parameter]
+    public int Radius { get; set; } = 2; // Número de páginas a mostrar antes y después de la actual
+
+    [Parameter]
+    public EventCallback<int> OnPageSelected { get; set; }
+
+    private int StartPage { get; set; }
+    private int EndPage { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        StartPage = Math.Max(1, CurrentPage - Radius);
+        EndPage = Math.Min(TotalPages, CurrentPage + Radius);
+
+        if (EndPage - StartPage < (Radius * 2))
+        {
+            if (StartPage == 1)
+            {
+                EndPage = Math.Min(TotalPages, StartPage + (Radius * 2));
+            }
+            else if (EndPage == TotalPages)
+            {
+                StartPage = Math.Max(1, EndPage - (Radius * 2));
+            }
+        }
+    }
+}

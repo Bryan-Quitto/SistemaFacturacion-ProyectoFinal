@@ -4,6 +4,7 @@
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Domain.Enums
 @using System.Security.Claims
+@using FacturasSRI.Web.Components.Shared
 @inject IInvoiceService InvoiceService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -22,10 +23,10 @@
 <div class="row g-2 mb-3">
     <div class="col-md-4">
         <input type="text" class="form-control" placeholder="Buscar por número o cliente..." 
-               @bind-value="searchTerm" @bind-value:event="oninput" />
+               @bind="searchTerm" @bind:event="oninput" @onkeyup="OnFilterChanged" />
     </div>
     <div class="col-md-3">
-        <InputSelect class="form-select" @bind-Value="selectedStatus">
+        <InputSelect class="form-select" @bind-Value="selectedStatus" @bind-Value:after="OnFilterChanged">
             <option value="">Todos los estados de factura</option>
             @foreach (var s in Enum.GetValues(typeof(EstadoFactura)))
             {
@@ -34,7 +35,7 @@
         </InputSelect>
     </div>
     <div class="col-md-3">
-        <InputSelect class="form-select" @bind-Value="selectedFormaDePago">
+        <InputSelect class="form-select" @bind-Value="selectedFormaDePago" @bind-Value:after="OnFilterChanged">
             <option value="">Todas las Formas de Pago</option>
             @foreach (var s in Enum.GetValues(typeof(FormaDePago)))
             {
@@ -43,7 +44,7 @@
         </InputSelect>
     </div>
     <div class="col-md-2">
-        <InputSelect class="form-select" @bind-Value="selectedPaymentStatus">
+        <InputSelect class="form-select" @bind-Value="selectedPaymentStatus" @bind-Value:after="OnFilterChanged">
             <option value="All">Todos los estados</option>
             <option value="Pending">Pendientes</option>
             <option value="Paid">Pagadas</option>
@@ -59,11 +60,11 @@
     </div>
 }
 
-@if (allInvoices == null && errorMessage == null)
+@if (paginatedInvoices == null && errorMessage == null)
 {
     <p><em>Cargando facturas...</em></p>
 }
-else if(allInvoices != null)
+else if(paginatedInvoices != null)
 {
     <div class="table-responsive">
         <table class="table">
@@ -81,7 +82,7 @@ else if(allInvoices != null)
                 </tr>
             </thead>
             <tbody>
-                @foreach (var invoice in FilteredInvoices)
+                @foreach (var invoice in paginatedInvoices.Items)
                 {
                     <tr>
                         <td class="fw-bold">@invoice.NumeroFactura</td>
@@ -183,6 +184,22 @@ else if(allInvoices != null)
             </tbody>
         </table>
     </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        @if (paginatedInvoices.TotalCount > 0)
+        {
+            <p class="text-muted mb-0 small">
+                Mostrando del @((currentPage - 1) * pageSize + 1) al @Math.Min(currentPage * pageSize, paginatedInvoices.TotalCount) de @paginatedInvoices.TotalCount registros.
+            </p>
+            <Pagination CurrentPage="currentPage" 
+                        TotalPages="paginatedInvoices.TotalPages" 
+                        OnPageSelected="SelectedPage" />
+        }
+        else
+        {
+            <p class="text-muted mb-0 small">No se encontraron registros.</p>
+        }
+    </div>
 }
                         
 @if (showCancelModal)
@@ -209,156 +226,321 @@ else if(allInvoices != null)
 }
 
 @code {
-    private List<InvoiceDto>? allInvoices;
+
+    private PaginatedList<InvoiceDto>? paginatedInvoices;
+
     private string? errorMessage;
 
+    private int currentPage = 1;
+
+    private int pageSize = 15; // Coincide con la propuesta
+
+
+
     private string searchTerm = string.Empty;
+
     private EstadoFactura? selectedStatus;
+
     private FormaDePago? selectedFormaDePago;
+
     private string selectedPaymentStatus = "All";
+
+
 
     private bool userIsAdmin = false;
 
-    private List<InvoiceDto> FilteredInvoices
-    {
-        get
+
+
+        protected override async Task OnInitializedAsync()
+
+
+
         {
-            var filtered = allInvoices;
 
-            if (filtered == null) return new List<InvoiceDto>();
 
-            // Filtro Estado SRI
-            if (selectedStatus.HasValue)
-            {
-                filtered = filtered.Where(i => i.Estado == selectedStatus.Value).ToList();
-            }
 
-            // Filtro Forma Pago
-            if (selectedFormaDePago.HasValue)
-            {
-                filtered = filtered.Where(i => i.FormaDePago == selectedFormaDePago.Value).ToList();
-            }
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
 
-            // Filtro Estado Pago (Pagado vs Pendiente)
-            if (selectedPaymentStatus == "Pending")
-            {
-                filtered = filtered.Where(i => i.SaldoPendiente > 0).ToList();
-            }
-            else if (selectedPaymentStatus == "Paid")
-            {
-                filtered = filtered.Where(i => i.SaldoPendiente <= 0).ToList();
-            }
 
-            // Filtro Buscador Texto
-            if (!string.IsNullOrWhiteSpace(searchTerm))
-            {
-                filtered = filtered.Where(invoice => invoice.NumeroFactura.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                                                (invoice.ClienteNombre?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
-                                     .ToList();
-            }
 
-            return filtered;
+            var user = authState.User;
+
+
+
+            userIsAdmin = user.IsInRole("Administrador");
+
+
+
+    
+
+
+
+            await LoadInvoices(1);
+
+
+
         }
-    }
 
-    protected override async Task OnInitializedAsync()
-    {
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        userIsAdmin = user.IsInRole("Administrador");
 
-        await LoadInvoices();
-    }
 
-    private async Task LoadInvoices()
-    {
-        try
+    
+
+
+
+        private async Task LoadInvoices(int pageNumber)
+
+
+
         {
-            allInvoices = await InvoiceService.GetInvoicesAsync();
+
+
+
+            currentPage = pageNumber;
+
+
+
+            try
+
+
+
+            {
+
+
+
+                paginatedInvoices = await InvoiceService.GetInvoicesAsync(currentPage, pageSize, searchTerm, selectedStatus, selectedFormaDePago, selectedPaymentStatus);
+
+
+
+                StateHasChanged(); // Forzar actualización de la UI
+
+
+
+            }
+
+
+
+            catch (Exception)
+
+
+
+            {
+
+
+
+                errorMessage = "Error al cargar facturas.";
+
+
+
+            }
+
+
+
         }
-        catch (Exception)
+
+
+
+    
+
+
+
+        private async Task OnFilterChanged()
+
+
+
         {
-            errorMessage = "Error al cargar facturas.";
+
+
+
+            await LoadInvoices(1);
+
+
+
         }
-    }
+
+
+
+    
+
+
+
+        private async Task SelectedPage(int page)
+
+
+
+        {
+
+
+
+            await LoadInvoices(page);
+
+
+
+        }
+
+
 
     private void GoToCreateInvoice()
+
     {
+
         Navigation.NavigateTo("/invoices/create");
+
     }
+
+    
+
+    // ... (El resto de los métodos como CancelInvoice, etc. se mantienen)
+
+    // Se eliminará FilteredInvoices y se modificará la tabla para usar paginatedInvoices.Items
+
+    
 
     private async Task CancelInvoice(Guid invoiceId)
+
     {
+
         try
+
         {
+
             await InvoiceService.CancelInvoiceAsync(invoiceId);
-            await LoadInvoices();
+
+            await LoadInvoices(currentPage); // Recargar la página actual
+
         }
+
         catch (Exception ex)
+
         {
+
             errorMessage = $"Error al cancelar la factura: {ex.Message}";
+
         }
+
     }
+
+
 
     private bool showCancelModal = false;
+
     private Guid? invoiceToCancelId;
 
+
+
     private void OpenCancelModal(Guid invoiceId)
+
     {
+
         invoiceToCancelId = invoiceId;
+
         showCancelModal = true;
+
     }
+
+
 
     private void CloseCancelModal()
+
     {
+
         invoiceToCancelId = null;
+
         showCancelModal = false;
+
     }
+
+
 
     private async Task ConfirmCancelInvoice()
+
     {
+
         if (invoiceToCancelId.HasValue)
+
         {
+
             await CancelInvoice(invoiceToCancelId.Value);
+
         }
+
         CloseCancelModal();
+
     }
+
     
+
     private async Task ReactivateInvoice(Guid invoiceId)
+
     {
+
         try
+
         {
+
             await InvoiceService.ReactivateCancelledInvoiceAsync(invoiceId);
-            await LoadInvoices();
+
+            await LoadInvoices(currentPage); // Recargar la página actual
+
         }
+
         catch (Exception ex)
+
         {
+
             errorMessage = $"Error al reactivar la factura: {ex.Message}";
+
         }
+
     }
+
+
 
     private RenderFragment GetStatusBadge(EstadoFactura estado)
+
     {
+
         return builder =>
+
         {
+
             var (badgeClass, iconClass, text) = estado switch
+
             {
+
                 EstadoFactura.Autorizada => ("bg-success", "bi-check-circle-fill", "Autorizada"),
+
                 EstadoFactura.EnviadaSRI => ("bg-info text-dark", "bi-send", "Enviada SRI"),
+
                 EstadoFactura.Borrador => ("bg-warning text-dark", "bi-pencil-square", "Borrador"),
+
                 EstadoFactura.Cancelada => ("bg-secondary", "bi-x-octagon-fill", "Cancelada"),
+
                 _ => ("bg-danger", "bi-x-circle-fill", estado.ToString())
+
             };
 
+
+
             builder.OpenElement(0, "span");
+
             builder.AddAttribute(1, "class", $"badge {badgeClass}");
+
             
+
             builder.OpenElement(2, "i");
+
             builder.AddAttribute(3, "class", $"bi {iconClass} me-1");
+
             builder.CloseElement();
+
             
+
             builder.AddContent(4, text);
+
             builder.CloseElement();
+
         };
+
     }
+
 }

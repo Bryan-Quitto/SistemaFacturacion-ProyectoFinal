@@ -22,11 +22,11 @@ namespace FacturasSRI.Web.Controllers
             _invoiceService = invoiceService;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<List<InvoiceDto>>> GetInvoices()
-        {
-            return Ok(await _invoiceService.GetInvoicesAsync());
-        }
+        // [HttpGet]
+        // public async Task<ActionResult<List<InvoiceDto>>> GetInvoices()
+        // {
+        //     return Ok(await _invoiceService.GetInvoicesAsync());
+        // }
 
         [HttpPost]
         public async Task<ActionResult<InvoiceDto>> CreateInvoice([FromBody] CreateInvoiceDto invoiceDto)

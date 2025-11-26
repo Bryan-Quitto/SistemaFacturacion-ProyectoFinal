@@ -1,4 +1,5 @@
 using FacturasSRI.Application.Dtos;
+using FacturasSRI.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -7,7 +8,7 @@ namespace FacturasSRI.Application.Interfaces
 {
     public interface IInvoiceService
     {
-        Task<List<InvoiceDto>> GetInvoicesAsync();
+        Task<PaginatedList<InvoiceDto>> GetInvoicesAsync(int pageNumber, int pageSize, string? searchTerm, EstadoFactura? status, FormaDePago? formaDePago, string? paymentStatus);
         Task<InvoiceDto?> GetInvoiceByIdAsync(Guid id);
         Task<InvoiceDto> CreateInvoiceAsync(CreateInvoiceDto invoiceDto);
         Task<InvoiceDetailViewDto?> GetInvoiceDetailByIdAsync(Guid id);
