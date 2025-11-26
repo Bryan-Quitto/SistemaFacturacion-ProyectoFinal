@@ -3,13 +3,40 @@
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @inject IDashboardService DashboardService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject HttpClient Http
+@inject NavigationManager Navigation
 
 <PageTitle>Panel Principal</PageTitle>
 
-<div class="dashboard-header mb-4">
-    <h1>Panel Principal</h1>
-    <p class="text-muted">Bienvenido de nuevo, aquí tienes un resumen del estado de la empresa.</p>
+<div class="dashboard-header mb-4 d-flex justify-content-between align-items-center">
+    <div>
+        <h1>Panel Principal</h1>
+        <p class="text-muted">Bienvenido de nuevo, aquí tienes un resumen del estado de la empresa.</p>
+    </div>
+    <AuthorizeView Roles="Administrador">
+        <button class="btn btn-sm btn-primary d-flex align-items-center" @onclick="RefreshCache" disabled="@isRefreshingCache">
+            @if (isRefreshingCache)
+            {
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span>Actualizando Caché...</span>
+            }
+            else
+            {
+                <i class="bi bi-arrow-clockwise me-2"></i>
+                <span>Refrescar Caché</span>
+            }
+        </button>
+    </AuthorizeView>
 </div>
+
+@if (!string.IsNullOrEmpty(cacheRefreshMessage))
+{
+    <div class="alert @(isCacheRefreshSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+        @cacheRefreshMessage
+        <button type="button" class="btn-close" @onclick="ClearCacheMessage" aria-label="Close"></button>
+    </div>
+}
 
 @if (stats == null && errorMessage == null)
 {
@@ -205,6 +232,10 @@ else if (stats != null)
     private DashboardStatsDto? stats;
     private string? errorMessage;
 
+    private bool isRefreshingCache = false;
+    private string? cacheRefreshMessage;
+    private bool isCacheRefreshSuccess = false;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -215,5 +246,43 @@ else if (stats != null)
         {
             errorMessage = "No se pudieron cargar las estadísticas.";
         }
+    }
+
+    private async Task RefreshCache()
+    {
+        isRefreshingCache = true;
+        cacheRefreshMessage = null;
+        isCacheRefreshSuccess = false;
+
+        try
+        {
+            var requestUri = new Uri(Navigation.ToAbsoluteUri(Navigation.BaseUri), "api/admin/refresh-cache");
+            var response = await Http.PostAsync(requestUri, null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                isCacheRefreshSuccess = true;
+                cacheRefreshMessage = "Caché de datos actualizada exitosamente.";
+            }
+            else
+            {
+                isCacheRefreshSuccess = false;
+                cacheRefreshMessage = $"Error al actualizar la caché: {response.ReasonPhrase}";
+            }
+        }
+        catch (Exception ex)
+        {
+            isCacheRefreshSuccess = false;
+            cacheRefreshMessage = $"Error de red al actualizar la caché: {ex.Message}";
+        }
+        finally
+        {
+            isRefreshingCache = false;
+        }
+    }
+
+    private void ClearCacheMessage()
+    {
+        cacheRefreshMessage = null;
     }
 }

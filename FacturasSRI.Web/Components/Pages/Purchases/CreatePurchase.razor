@@ -6,7 +6,7 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Forms
 @inject IPurchaseService PurchaseService
-@inject IProductService ProductService
+@inject HttpClient Http
 @inject ITaxService TaxService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -35,21 +35,38 @@
             <div class="row">
                 <div class="col-md-6">
                     <div class="mb-3">
-                        <label for="product" class="form-label">Producto</label>
-                        <select id="product" class="form-select" @onchange="OnProductSelected" disabled="@isSubmitting">
-                            <option value="@Guid.Empty">Seleccione un producto</option>
-                            @foreach (var product in products)
+                        <label for="product-search" class="form-label">Producto</label>
+                        <div class="position-relative">
+                            <input type="text" id="product-search" class="form-control" 
+                                   placeholder="Buscar por nombre o código..."
+                                   @bind="productSearchTerm" @bind:event="oninput" 
+                                   @onkeyup="SearchProducts" 
+                                   disabled="@(isSubmitting || selectedProduct != null)" />
+
+                            @if (productSearchResults.Any())
                             {
-                                <option value="@product.Id">@product.Nombre</option>
+                                <div class="list-group position-absolute w-100 shadow-sm" style="z-index: 10;">
+                                    @foreach (var product in productSearchResults)
+                                    {
+                                        <button type="button" class="list-group-item list-group-item-action" 
+                                                @onclick="() => SelectProduct(product)">
+                                            @product.Nombre
+                                            <span class="text-muted small">(@product.CodigoPrincipal)</span>
+                                        </button>
+                                    }
+                                </div>
                             }
-                        </select>
+                        </div>
                         <ValidationMessage For="@(() => newPurchase.ProductoId)" />
                     </div>
                     @if(selectedProduct != null)
                     {
-                        <div class="alert alert-info small p-2 mb-3">
-                            <div>PVP Actual del Producto: <strong>@selectedProduct.PrecioVentaUnitario.ToString("C")</strong></div>
-                            <div>Costo Promedio Ponderado Actual: <strong>@selectedProduct.PrecioCompraPromedioPonderado.ToString("C")</strong></div>
+                        <div class="alert alert-info small p-2 mb-3 d-flex justify-content-between align-items-center">
+                           <div>
+                                <div>PVP Actual del Producto: <strong>@selectedProduct.PrecioVentaUnitario.ToString("C")</strong></div>
+                                <div>Costo Promedio Ponderado Actual: <strong>@selectedProduct.PrecioCompraPromedioPonderado.ToString("C")</strong></div>
+                           </div>
+                            <button type="button" class="btn-close" @onclick="ClearSelectedProduct" aria-label="Limpiar selección"></button>
                         </div>
                     }
 
@@ -146,11 +163,15 @@
 </div>
 
 @code {
+    private List<ProductDto> allProducts = new();
     private List<ProductDto> products = new();
     private PurchaseDto newPurchase = new();
     private string? statusMessage;
     private bool isSuccess;
     private bool isSubmitting = false;
+
+    private string productSearchTerm = string.Empty;
+    private List<ProductDto> productSearchResults = new();
 
     private IBrowserFile? comprobanteFile;
     private string? fileValidationMessage;
@@ -164,16 +185,16 @@
     {
         try
         {
-            var allProductsTask = ProductService.GetProductsAsync();
+            var baseUri = Navigation.ToAbsoluteUri(Navigation.BaseUri);
+            var productsTask = Http.GetFromJsonAsync<List<ProductDto>>(new Uri(baseUri, "cache/products.json"));
             var taxesTask = TaxService.GetActiveTaxesAsync();
 
-            await Task.WhenAll(allProductsTask, taxesTask);
+            await Task.WhenAll(productsTask, taxesTask);
 
-            var allProducts = await allProductsTask;
+            allProducts = productsTask.Result ?? new List<ProductDto>();
             products = allProducts.Where(p => p.ManejaInventario && p.IsActive).ToList();
             activeTaxes = await taxesTask;
             
-            // Pre-select the most common tax if available (e.g., IVA 15%)
             var defaultTax = activeTaxes.FirstOrDefault(t => t.Porcentaje == 15);
             if(defaultTax != null)
             {
@@ -182,32 +203,38 @@
         }
         catch (Exception ex)
         {
-            statusMessage = $"No se pudieron cargar los datos iniciales (productos o impuestos). Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            statusMessage = $"No se pudieron cargar los datos iniciales (productos o impuestos). Error: {ex.Message}";
             isSuccess = false;
         }
     }
 
-    private void OnProductSelected(ChangeEventArgs e)
+    private void SearchProducts()
     {
-        // 1. Extraemos el valor a una variable string una sola vez
-        // El operador ? asegura que si e.Value es null, valueString sea null
-        var valueString = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(productSearchTerm))
+        {
+            productSearchResults.Clear();
+            return;
+        }
+        productSearchResults = products
+            .Where(p => p.Nombre.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        p.CodigoPrincipal.Contains(productSearchTerm, StringComparison.OrdinalIgnoreCase))
+            .Take(5)
+            .ToList();
+    }
 
-        // 2. Verificamos sobre esa variable
-        if (string.IsNullOrEmpty(valueString) || valueString == Guid.Empty.ToString())
-        {
-            newPurchase.ProductoId = Guid.Empty;
-            selectedProduct = null;
-        }
-        else
-        {
-            // 3. Parseamos. Usamos el operador ! para decirle al compilador: 
-            // "Te prometo que valueString no es null aquí" (porque ya pasó el check de arriba)
-            var selectedProductId = Guid.Parse(valueString!); 
-            
-            newPurchase.ProductoId = selectedProductId;
-            selectedProduct = products.FirstOrDefault(p => p.Id == selectedProductId);
-        }
+    private void SelectProduct(ProductDto product)
+    {
+        selectedProduct = product;
+        newPurchase.ProductoId = product.Id;
+        productSearchTerm = string.Empty;
+        productSearchResults.Clear();
+        UpdateMontoTotal();
+    }
+
+    private void ClearSelectedProduct()
+    {
+        selectedProduct = null;
+        newPurchase.ProductoId = Guid.Empty;
         UpdateMontoTotal();
     }
 

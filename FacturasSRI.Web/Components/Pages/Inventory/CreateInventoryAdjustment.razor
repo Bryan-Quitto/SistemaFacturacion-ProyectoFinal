@@ -10,6 +10,7 @@
 @inject IAjusteInventarioService AjusteService 
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject HttpClient Http
 
 <PageTitle>Ajuste de Inventario</PageTitle>
 
@@ -124,7 +125,8 @@
     {
         try
         {
-            allProducts = await ProductService.GetProductsAsync();
+            var baseUri = Navigation.ToAbsoluteUri(Navigation.BaseUri);
+            allProducts = await Http.GetFromJsonAsync<List<ProductDto>>(new Uri(baseUri, "cache/products.json")) ?? new List<ProductDto>();
         }
         catch (Exception ex)
         {
