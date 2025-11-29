@@ -96,7 +96,7 @@ namespace FacturasSRI.Web.Controllers
                 await HttpContext.SignInAsync("CustomerAuth", new ClaimsPrincipal(customerIdentity), authProperties);
                 
                 // Always redirect customers to their portal dashboard
-                return LocalRedirect("/portal/dashboard");
+                return LocalRedirect("/cliente/dashboard");
             }
 
             // 3. If both fail, redirect back to login with an error

@@ -50,7 +50,7 @@ namespace FacturasSRI.Infrastructure.Services
                     Id = c.Id,
                     FacturaId = c.FacturaId,
                     NumeroFactura = c.Factura.NumeroFactura,
-                    ClienteNombre = c.Factura.Cliente.RazonSocial,
+                    ClienteNombre = c.Factura.Cliente != null ? c.Factura.Cliente.RazonSocial : "N/A",
                     FechaCobro = c.FechaCobro,
                     Monto = c.Monto,
                     MetodoDePago = c.MetodoDePago,
@@ -76,7 +76,7 @@ namespace FacturasSRI.Infrastructure.Services
                     Id = c.Id,
                     FacturaId = c.FacturaId,
                     NumeroFactura = c.Factura.NumeroFactura,
-                    ClienteNombre = c.Factura.Cliente.RazonSocial,
+                    ClienteNombre = c.Factura.Cliente != null ? c.Factura.Cliente.RazonSocial : "N/A",
                     FechaCobro = c.FechaCobro,
                     Monto = c.Monto,
                     MetodoDePago = c.MetodoDePago,
@@ -227,6 +227,34 @@ namespace FacturasSRI.Infrastructure.Services
                 });
 
             return await PaginatedList<FacturasConPagosDto>.CreateAsync(finalQuery, pageNumber, pageSize);
+        }
+
+        public async Task<PaginatedList<CobroDto>> GetCobrosByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? searchTerm)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var query = context.Cobros
+                .Where(c => c.Factura.ClienteId == clienteId)
+                .Include(c => c.Factura)
+                .Include(c => c.UsuarioCreador)
+                .AsQueryable();
+
+            var finalQuery = query
+                .OrderByDescending(c => c.FechaCobro)
+                .Select(c => new CobroDto
+                {
+                    Id = c.Id,
+                    FacturaId = c.FacturaId,
+                    NumeroFactura = c.Factura != null ? c.Factura.NumeroFactura : "N/A",
+                    ClienteNombre = c.Factura != null && c.Factura.Cliente != null ? c.Factura.Cliente.RazonSocial : "N/A",
+                    FechaCobro = c.FechaCobro,
+                    Monto = c.Monto,
+                    MetodoDePago = c.MetodoDePago,
+                    Referencia = c.Referencia,
+                    ComprobantePagoPath = c.ComprobantePagoPath,
+                    CreadoPor = c.UsuarioCreador != null ? $"{c.UsuarioCreador.PrimerNombre} {c.UsuarioCreador.PrimerApellido}" : "N/A"
+                });
+
+            return await PaginatedList<CobroDto>.CreateAsync(finalQuery, pageNumber, pageSize);
         }
     }
 }

@@ -19,5 +19,7 @@ namespace FacturasSRI.Application.Interfaces
         Task ReactivateCancelledInvoiceAsync(Guid invoiceId);
         Task<InvoiceDto?> UpdateInvoiceAsync(UpdateInvoiceDto invoiceDto);
         Task SendPaymentReminderEmailAsync(Guid invoiceId);
+
+        Task<PaginatedList<InvoiceDto>> GetInvoicesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, EstadoFactura? status, string? searchTerm);
     }
 }

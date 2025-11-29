@@ -1081,5 +1081,37 @@ namespace FacturasSRI.Infrastructure.Services
             });
             return Task.CompletedTask;
         }
+
+        public async Task<PaginatedList<InvoiceDto>> GetInvoicesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, EstadoFactura? status, string? searchTerm)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var query = context.Facturas.AsNoTracking().Where(i => i.ClienteId == clienteId);
+
+            if (status.HasValue)
+            {
+                query = query.Where(i => i.Estado == status.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(i => i.NumeroFactura.Contains(searchTerm));
+            }
+            
+            var finalQuery = query
+                .OrderByDescending(i => i.FechaCreacion)
+                .Select(i => new InvoiceDto
+                {
+                    Id = i.Id,
+                    FechaEmision = i.FechaEmision,
+                    NumeroFactura = i.NumeroFactura,
+                    Estado = i.Estado,
+                    ClienteId = i.ClienteId,
+                    ClienteNombre = i.Cliente != null ? i.Cliente.RazonSocial : "",
+                    Total = i.Total,
+                    SaldoPendiente = context.CuentasPorCobrar.Where(c => c.FacturaId == i.Id).Select(c => c.SaldoPendiente).FirstOrDefault()
+                });
+
+            return await PaginatedList<InvoiceDto>.CreateAsync(finalQuery, pageNumber, pageSize);
+        }
     }
 }

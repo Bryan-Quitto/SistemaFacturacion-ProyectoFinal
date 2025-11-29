@@ -1,5 +1,7 @@
 @page "/notfound"
 @inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Página no encontrada (404)</PageTitle>
 
@@ -12,15 +14,34 @@
     <p class="text-muted small mt-4">
         La URL solicitada: <code>@attemptedUrl</code> no fue encontrada en el servidor.
     </p>
-    <a href="/dashboard" class="btn btn-primary mt-3">Volver al Panel Principal</a>
+    <a href="@homeUrl" class="btn btn-primary mt-3">@buttonText</a>
 </div>
 
 @code {
     private string attemptedUrl = string.Empty;
+    private string homeUrl = "/";
+    private string buttonText = "Volver al Inicio";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         var absoluteUri = new Uri(Navigation.Uri);
         attemptedUrl = absoluteUri.PathAndQuery;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            if (user.HasClaim("UserType", "Cliente"))
+            {
+                homeUrl = "/cliente/dashboard";
+                buttonText = "Volver a Mi Panel";
+            }
+            else if (user.IsInRole("Administrador") || user.IsInRole("Vendedor") || user.IsInRole("Bodeguero"))
+            {
+                homeUrl = "/dashboard";
+                buttonText = "Volver al Panel Principal";
+            }
+        }
     }
 }

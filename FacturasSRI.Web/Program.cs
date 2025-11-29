@@ -140,7 +140,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminPolicy", policy => policy.RequireRole("Administrador"));
     options.AddPolicy("VendedorPolicy", policy => policy.RequireRole("Vendedor", "Administrador"));
     options.AddPolicy("BodegueroPolicy", policy => policy.RequireRole("Bodeguero", "Administrador"));
-    options.AddPolicy("IsCustomer", policy => policy.RequireClaim("UserType", "Cliente"));
+    options.AddPolicy("IsCustomer", policy => {
+        policy.AddAuthenticationSchemes("CustomerAuth", "Cookies");
+        policy.RequireClaim("UserType", "Cliente");
+    });
 });
 
 builder.Services.AddHostedService<VencimientoComprasService>();

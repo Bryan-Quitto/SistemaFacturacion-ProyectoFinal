@@ -1,0 +1,194 @@
+@page "/cliente/facturas"
+@attribute [Authorize(Policy = "IsCustomer")]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Domain.Enums
+@using FacturasSRI.Web.Components.Shared
+@inject IInvoiceService InvoiceService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Mis Facturas</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1>Mis Facturas</h1>
+        <p class="text-muted mb-0">Aquí puede ver el historial de sus facturas.</p>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <input type="text" class="form-control" placeholder="Buscar por número de factura..."
+                       @bind="searchTerm" @bind:event="oninput" @onkeyup="OnFilterChanged" />
+            </div>
+            <div class="col-md-3">
+                <InputSelect class="form-select" @bind-Value="selectedStatus" @bind-Value:after="OnFilterChanged">
+                    <option value="">Todos los Estados</option>
+                    @foreach (var status in Enum.GetValues(typeof(EstadoFactura)))
+                    {
+                        // No mostrar Borrador o Cancelada en el portal de cliente
+                        if (status.ToString() != "Borrador" && status.ToString() != "Cancelada")
+                        {
+                             <option value="@status">@status</option>
+                        }
+                    }
+                </InputSelect>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (paginatedInvoices == null && string.IsNullOrEmpty(errorMessage))
+{
+    <p><em>Cargando facturas...</em></p>
+}
+else if (paginatedInvoices != null)
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Nro. Factura</th>
+                    <th>Fecha Emisión</th>
+                    <th>Estado</th>
+                    <th class="text-end">Total</th>
+                    <th class="text-end">Saldo Pendiente</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var invoice in paginatedInvoices.Items)
+                {
+                    <tr>
+                        <td class="fw-medium">@invoice.NumeroFactura</td>
+                        <td>@invoice.FechaEmision.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <span class="badge @GetStatusBadgeClass(invoice.Estado)">@GetDisplayStatus(invoice.Estado)</span>
+                        </td>
+                        <td class="text-end">@invoice.Total.ToString("C")</td>
+                        <td class="text-end fw-bold @(invoice.SaldoPendiente > 0 ? "text-danger" : "text-success")">
+                            @invoice.SaldoPendiente.ToString("C")
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group shadow-sm" role="group">
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ViewDetails(invoice.Id)" title="Ver Detalles">
+                                    <i class="bi bi-eye-fill"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        @if (paginatedInvoices.TotalCount > 0)
+        {
+            <p class="text-muted mb-0 small">
+                Mostrando del @((currentPage - 1) * pageSize + 1) al @Math.Min(currentPage * pageSize, paginatedInvoices.TotalCount) de @paginatedInvoices.TotalCount registros.
+            </p>
+            <Pagination CurrentPage="currentPage" 
+                        TotalPages="paginatedInvoices.TotalPages" 
+                        OnPageSelected="SelectedPage" />
+        }
+        else
+        {
+            <p class="text-muted mb-0 small">No se encontraron facturas con los filtros seleccionados.</p>
+        }
+    </div>
+}
+
+@code {
+    private PaginatedList<InvoiceDto>? paginatedInvoices;
+    private string? errorMessage;
+    private Guid clienteId;
+
+    private int currentPage = 1;
+    private int pageSize = 15;
+
+    private string searchTerm = string.Empty;
+    private EstadoFactura? selectedStatus;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            var clienteIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if(clienteIdClaim != null && Guid.TryParse(clienteIdClaim.Value, out clienteId))
+            {
+                await LoadInvoices(1);
+            }
+            else
+            {
+                errorMessage = "No se pudo identificar su cuenta de cliente.";
+            }
+        }
+        else
+        {
+            errorMessage = "Debe iniciar sesión para ver sus facturas.";
+        }
+    }
+
+    private async Task LoadInvoices(int page)
+    {
+        currentPage = page;
+        errorMessage = null;
+        try
+        {
+            paginatedInvoices = await InvoiceService.GetInvoicesByClientIdAsync(clienteId, currentPage, pageSize, selectedStatus, searchTerm);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar las facturas: {ex.Message}";
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnFilterChanged()
+    {
+        await LoadInvoices(1);
+    }
+
+    private async Task SelectedPage(int page)
+    {
+        await LoadInvoices(page);
+    }
+
+    private void ViewDetails(Guid invoiceId)
+    {
+        Navigation.NavigateTo($"/cliente/facturas/{invoiceId}");
+    }
+    
+    private string GetDisplayStatus(EstadoFactura status)
+    {
+        return status switch
+        {
+            EstadoFactura.EnviadaSRI => "Enviada al SRI",
+            EstadoFactura.RechazadaSRI => "Rechazada por SRI",
+            _ => status.ToString(),
+        };
+    }
+
+    private string GetStatusBadgeClass(EstadoFactura status)
+    {
+        return status switch
+        {
+            EstadoFactura.Pendiente => "bg-warning text-dark",
+            EstadoFactura.EnviadaSRI => "bg-info text-dark",
+            EstadoFactura.Autorizada => "bg-success",
+            EstadoFactura.RechazadaSRI => "bg-danger",
+            _ => "bg-secondary",
+        };
+    }
+}

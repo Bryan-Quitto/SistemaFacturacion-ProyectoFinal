@@ -1,7 +1,0 @@
-Hola Gemini, ayudame por favor con este sistema de facturacion que ocupa blazor server, netcore 8, y supabase.
-
-Actualmente estoy haciendo el portal de cliente, necesito que me ayudes por favor pensando que puedo poner en el navmenu del que tenga sentido para un cliente. De momento pensaba en una lista de las facturas pagadas, que las pueda descargar, y ver sus detalles. Y una lista de las facturas que tiene por pagar, pero no se que mas poner, notas de credito tambien?
-
-Puedes revisar por favor el proyecto en general para ver que puede ser una buena idea para que tenga el portal del cliente porfa
-
-Y me lo pones en un .txt para decirte si apruebo o no hacer esto, y si lo apruebo hagas otro .txt con un plan de accion para realizar esto

@@ -7,19 +7,21 @@ using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using FacturasSRI.Domain.Enums;
 
 namespace FacturasSRI.Web.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "VendedorPolicy")]
     public class InvoicesController : ControllerBase
     {
         private readonly IInvoiceService _invoiceService;
+        private readonly ILogger<InvoicesController> _logger;
 
-        public InvoicesController(IInvoiceService invoiceService)
+        public InvoicesController(IInvoiceService invoiceService, ILogger<InvoicesController> logger)
         {
             _invoiceService = invoiceService;
+            _logger = logger;
         }
 
         // [HttpGet]
@@ -29,6 +31,7 @@ namespace FacturasSRI.Web.Controllers
         // }
 
         [HttpPost]
+        [Authorize(Policy = "VendedorPolicy")]
         public async Task<ActionResult<InvoiceDto>> CreateInvoice([FromBody] CreateInvoiceDto invoiceDto)
         {
             var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -49,6 +52,7 @@ namespace FacturasSRI.Web.Controllers
         }
 
         [HttpGet("{id}")]
+        [Authorize(Policy = "VendedorPolicy")]
         public async Task<ActionResult<InvoiceDto>> GetInvoice(Guid id)
         {
             var invoice = await _invoiceService.GetInvoiceByIdAsync(id);
@@ -56,6 +60,61 @@ namespace FacturasSRI.Web.Controllers
             {
                 return NotFound();
             }
+            return Ok(invoice);
+        }
+
+        [HttpGet("cliente")]
+        [Authorize(AuthenticationSchemes = "CustomerAuth", Policy = "IsCustomer")]
+        public async Task<ActionResult<PaginatedList<InvoiceDto>>> GetClientInvoices([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] EstadoFactura? status = null, [FromQuery] string? searchTerm = null)
+        {
+            _logger.LogWarning("[API /api/invoices/cliente] Request received.");
+            if (User.Identity?.IsAuthenticated ?? false)
+            {
+                _logger.LogInformation("[API] User is AUTHENTICATED.");
+                foreach (var claim in User.Claims)
+                {
+                    _logger.LogInformation("[API] Claim -> Type: {Type}, Value: {Value}", claim.Type, claim.Value);
+                }
+            }
+            else
+            {
+                _logger.LogError("[API] User is NOT AUTHENTICATED.");
+            }
+
+            var clienteIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (clienteIdClaim == null || !Guid.TryParse(clienteIdClaim, out var clienteId))
+            {
+                _logger.LogError("[API] Could not find or parse ClienteId claim.");
+                return Unauthorized("No se pudo identificar al cliente.");
+            }
+            _logger.LogInformation("[API] ClienteId found: {ClienteId}", clienteId);
+
+            var invoices = await _invoiceService.GetInvoicesByClientIdAsync(clienteId, pageNumber, pageSize, status, searchTerm);
+            return Ok(invoices);
+        }
+
+        [HttpGet("cliente/{id:guid}")]
+        [Authorize(AuthenticationSchemes = "CustomerAuth", Policy = "IsCustomer")]
+        public async Task<ActionResult<InvoiceDetailViewDto>> GetClientInvoiceDetail(Guid id)
+        {
+            var clienteIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (clienteIdClaim == null || !Guid.TryParse(clienteIdClaim, out var clienteId))
+            {
+                return Unauthorized("No se pudo identificar al cliente.");
+            }
+
+            var invoice = await _invoiceService.GetInvoiceDetailByIdAsync(id);
+
+            if (invoice == null)
+            {
+                return NotFound();
+            }
+
+            if (invoice.ClienteId != clienteId)
+            {
+                return Forbid("No tiene permiso para ver esta factura.");
+            }
+
             return Ok(invoice);
         }
     }

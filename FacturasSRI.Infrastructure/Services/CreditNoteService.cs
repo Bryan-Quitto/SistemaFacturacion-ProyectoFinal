@@ -829,5 +829,35 @@ namespace FacturasSRI.Infrastructure.Services
             var resultDto = await GetCreditNoteDetailByIdAsync(nc.Id);
             return resultDto != null ? new CreditNoteDto { Id = resultDto.Id, NumeroNotaCredito = resultDto.NumeroNotaCredito } : null;
         }
+
+        public async Task<PaginatedList<CreditNoteDto>> GetCreditNotesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? searchTerm)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var query = context.NotasDeCredito
+                .AsNoTracking()
+                .Where(nc => nc.ClienteId == clienteId)
+                .Include(nc => nc.Factura)
+                .OrderByDescending(nc => nc.FechaEmision)
+                .Select(nc => new CreditNoteDto
+                {
+                    Id = nc.Id,
+                    NumeroNotaCredito = nc.NumeroNotaCredito,
+                    FechaEmision = nc.FechaEmision,
+                    ClienteNombre = nc.Cliente != null ? nc.Cliente.RazonSocial : "N/A",
+                    NumeroFacturaModificada = nc.Factura != null ? nc.Factura.NumeroFactura : "N/A",
+                    Total = nc.Total,
+                    Estado = nc.Estado,
+                    RazonModificacion = nc.RazonModificacion
+                });
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(nc => 
+                    (nc.NumeroNotaCredito != null && nc.NumeroNotaCredito.Contains(searchTerm)) ||
+                    (nc.NumeroFacturaModificada != null && nc.NumeroFacturaModificada.Contains(searchTerm)));
+            }
+
+            return await PaginatedList<CreditNoteDto>.CreateAsync(query, pageNumber, pageSize);
+        }
     }
 }

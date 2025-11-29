@@ -1,13 +1,42 @@
 @page "/forbidden"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Acceso Denegado</PageTitle>
 
-<div class="text-center">
-    <h1 class="display-4 text-danger">Acceso Denegado (403)</h1>
+<div class="text-center mt-5">
+    <h1 class="display-1 fw-bold text-danger">403</h1>
+    <p class="fs-3"> <span class="text-danger">¡Acceso Denegado!</span></p>
     <p class="lead">
         No tienes los permisos necesarios para ver esta página.
     </p>
-    <p>
-        <a href="/dashboard" class="btn btn-primary">Volver al Panel Principal</a>
-    </p>
+    <a href="@homeUrl" class="btn btn-primary mt-3">@buttonText</a>
 </div>
+
+@code {
+    private string homeUrl = "/";
+    private string buttonText = "Volver al Inicio";
+
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authenticationStateTask;
+        var user = authState.User;
+
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            if (user.HasClaim("UserType", "Cliente"))
+            {
+                homeUrl = "/cliente/dashboard";
+                buttonText = "Volver a Mi Panel";
+            }
+            else if (user.IsInRole("Administrador") || user.IsInRole("Vendedor") || user.IsInRole("Bodeguero"))
+            {
+                homeUrl = "/dashboard";
+                buttonText = "Volver al Panel Principal";
+            }
+        }
+    }
+}

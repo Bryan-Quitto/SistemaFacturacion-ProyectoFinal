@@ -12,5 +12,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<List<CobroDto>> GetCobrosByFacturaIdAsync(Guid facturaId);
         Task<PaginatedList<CobroDto>> GetAllCobrosAsync(int pageNumber, int pageSize, string? searchTerm);
         Task<PaginatedList<FacturasConPagosDto>> GetFacturasConPagosAsync(int pageNumber, int pageSize, string? searchTerm, FormaDePago? formaDePago, EstadoFactura? estadoFactura);
+        Task<PaginatedList<CobroDto>> GetCobrosByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? searchTerm);
     }
 }

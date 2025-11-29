@@ -1,0 +1,171 @@
+@page "/cliente/facturas/{InvoiceId:guid}"
+@attribute [Authorize(Policy = "IsCustomer")]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@inject IInvoiceService InvoiceService
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Detalle de Factura - @(invoice?.NumeroFactura ?? "...")</PageTitle>
+
+@if (invoice == null && !string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (invoice == null)
+{
+    <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+        <p class="mt-3">Cargando detalles de la factura...</p>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title mb-0">Detalle de Factura</h1>
+        <div>
+            <button class="btn btn-outline-secondary me-2" @onclick="GoBack">
+                <i class="bi bi-arrow-left-circle me-2"></i>Volver a Mis Facturas
+            </button>
+            <a href="/api/public/invoice-ride/@invoice.Id" target="_blank" class="btn btn-danger">
+                <i class="bi bi-file-earmark-pdf me-2"></i>Descargar PDF
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card invoice-card">
+                <div class="card-body p-5">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <img src="/logo.png" alt="Logo" style="max-height: 80px;"/>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <h2>FACTURA</h2>
+                            <h5 class="text-danger">@Configuration["CompanyInfo:EstablishmentCode"]-@Configuration["CompanyInfo:EmissionPointCode"]-@invoice.NumeroFactura</h5>
+                            <p class="mb-0"><strong>Fecha de Emisión:</strong> @invoice.FechaEmision.ToString("dd/MM/yyyy")</p>
+                        </div>
+                    </div>
+                    <hr/>
+                    <div class="row my-4">
+                        <div class="col-md-12">
+                             <p class="mb-1"><strong>Sr(es):</strong> @invoice.ClienteNombre</p>
+                             <p class="mb-1"><strong>RUC/CI:</strong> @invoice.ClienteIdentificacion</p>
+                             <p class="mb-0"><strong>Email:</strong> @invoice.ClienteEmail</p>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center">Cant.</th>
+                                    <th>Descripción</th>
+                                    <th class="text-end">Precio Unitario</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in invoice.Items)
+                                {
+                                    <tr>
+                                        <td class="text-center">@item.Cantidad</td>
+                                        <td><strong>@item.ProductName</strong></td>
+                                        <td class="text-end">@item.PrecioVentaUnitario.ToString("C")</td>
+                                        <td class="text-end">@item.Subtotal.ToString("C")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="row mt-4 justify-content-end">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tbody>
+                                    <tr>
+                                        <td class="text-end"><strong>Subtotal:</strong></td>
+                                        <td class="text-end" style="width: 150px;">@invoice.SubtotalSinImpuestos.ToString("C")</td>
+                                    </tr>
+                                    @foreach (var summary in invoice.TaxSummaries)
+                                    {
+                                        <tr>
+                                            <td class="text-end"><strong>@summary.TaxName (@summary.TaxRate.ToString("0.##")%):</strong></td>
+                                            <td class="text-end">@summary.Amount.ToString("C")</td>
+                                        </tr>
+                                    }
+                                    <tr class="fs-5 table-light">
+                                        <td class="text-end"><strong>Total:</strong></td>
+                                        <td class="text-end"><strong>@invoice.Total.ToString("C")</strong></td>
+                                    </tr>
+                                    <tr class="fs-5">
+                                        <td class="text-end"><strong>Saldo Pendiente:</strong></td>
+                                        <td class="text-end text-danger"><strong>@invoice.SaldoPendiente.ToString("C")</strong></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid InvoiceId { get; set; }
+
+    private InvoiceDetailViewDto? invoice;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            errorMessage = "Debe iniciar sesión para ver esta página.";
+            return;
+        }
+
+        var clienteIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (clienteIdClaim == null || !Guid.TryParse(clienteIdClaim.Value, out var clienteId))
+        {
+            errorMessage = "No se pudo verificar su identidad de cliente.";
+            return;
+        }
+
+        try
+        {
+            var tempInvoice = await InvoiceService.GetInvoiceDetailByIdAsync(InvoiceId);
+            if (tempInvoice == null)
+            {
+                errorMessage = "No se encontró la factura solicitada.";
+            }
+            else if (tempInvoice.ClienteId != clienteId)
+            {
+                errorMessage = "No tiene permiso para ver esta factura.";
+                Navigation.NavigateTo("/forbidden");
+            }
+            else
+            {
+                invoice = tempInvoice;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ocurrió un error al cargar la factura: {ex.Message}";
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/cliente/facturas");
+    }
+}

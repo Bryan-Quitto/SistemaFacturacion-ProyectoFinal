@@ -149,9 +149,27 @@
                 <AuthorizeView Policy="IsCustomer" Context="customerContext">
                     <Authorized>
                         <div class="nav-item">
-                            <NavLink class="nav-link" href="/portal/dashboard" Match="NavLinkMatch.All">
-                                <i class="bi bi-house-door-fill"></i>
+                            <NavLink class="nav-link" href="/cliente/dashboard" Match="NavLinkMatch.All">
+                                <i class="bi bi-grid-1x2-fill"></i>
                                 @if (!IsCollapsed) { <span>Mi Panel</span> }
+                            </NavLink>
+                        </div>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="/cliente/facturas">
+                                <i class="bi bi-file-earmark-text-fill"></i>
+                                @if (!IsCollapsed) { <span>Mis Facturas</span> }
+                            </NavLink>
+                        </div>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="/cliente/notas-credito">
+                                <i class="bi bi-arrow-return-left"></i>
+                                @if (!IsCollapsed) { <span>Mis Notas de Crédito</span> }
+                            </NavLink>
+                        </div>
+                        <div class="nav-item">
+                            <NavLink class="nav-link" href="/cliente/pagos">
+                                <i class="bi bi-wallet-fill"></i>
+                                @if (!IsCollapsed) { <span>Mis Pagos</span> }
                             </NavLink>
                         </div>
                     </Authorized>

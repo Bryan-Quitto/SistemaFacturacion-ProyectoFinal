@@ -1,0 +1,131 @@
+@page "/cliente/pagos"
+@attribute [Authorize(Policy = "IsCustomer")]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@using FacturasSRI.Web.Components.Shared
+@inject ICobroService CobroService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Mis Pagos</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1>Historial de Pagos</h1>
+        <p class="text-muted mb-0">Aquí puede ver todos los pagos que ha realizado.</p>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <input type="text" class="form-control" placeholder="Buscar por Nro. de Factura o Referencia..."
+                       @bind="searchTerm" @bind:event="oninput" @onkeyup="OnFilterChanged" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (paginatedPayments == null && string.IsNullOrEmpty(errorMessage))
+{
+    <p><em>Cargando pagos...</em></p>
+}
+else if (paginatedPayments != null)
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Fecha de Pago</th>
+                    <th>Factura</th>
+                    <th>Método de Pago</th>
+                    <th>Referencia</th>
+                    <th class="text-end">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var payment in paginatedPayments.Items)
+                {
+                    <tr>
+                        <td>@payment.FechaCobro.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="fw-medium">@payment.NumeroFactura</td>
+                        <td>@payment.MetodoDePago</td>
+                        <td>@payment.Referencia</td>
+                        <td class="text-end fw-bold">@payment.Monto.ToString("C")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        @if (paginatedPayments.TotalCount > 0)
+        {
+            <p class="text-muted mb-0 small">
+                Mostrando del @((currentPage - 1) * pageSize + 1) al @Math.Min(currentPage * pageSize, paginatedPayments.TotalCount) de @paginatedPayments.TotalCount registros.
+            </p>
+            <Pagination CurrentPage="currentPage" 
+                        TotalPages="paginatedPayments.TotalPages" 
+                        OnPageSelected="SelectedPage" />
+        }
+        else
+        {
+            <p class="text-muted mb-0 small">No se encontraron pagos.</p>
+        }
+    </div>
+}
+
+@code {
+    private PaginatedList<CobroDto>? paginatedPayments;
+    private string? errorMessage;
+    private Guid clienteId;
+
+    private int currentPage = 1;
+    private int pageSize = 15;
+    private string searchTerm = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            var clienteIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if(clienteIdClaim != null && Guid.TryParse(clienteIdClaim.Value, out clienteId))
+            {
+                await LoadPayments(1);
+            }
+            else
+            {
+                errorMessage = "No se pudo identificar su cuenta de cliente.";
+            }
+        }
+        else
+        {
+            errorMessage = "Debe iniciar sesión para ver sus pagos.";
+        }
+    }
+
+    private async Task LoadPayments(int page)
+    {
+        currentPage = page;
+        errorMessage = null;
+        try
+        {
+            paginatedPayments = await CobroService.GetCobrosByClientIdAsync(clienteId, currentPage, pageSize, searchTerm);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar los pagos: {ex.Message}";
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnFilterChanged() => await LoadPayments(1);
+    private async Task SelectedPage(int page) => await LoadPayments(page);
+}
