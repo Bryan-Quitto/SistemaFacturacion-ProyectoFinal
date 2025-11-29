@@ -1,9 +1,14 @@
-Hola Gemini, por favor ayúdame a hacer un portal de clientes para un sistema que es un sistema de facturación para una empresa ficticia
+Vale hay algunas correcciones que hacer, primero no valio el registrarme, dice:
 
-Primero que nada, necesitamos crear una opción para registrarse (no exisita hasta ahora porque la aplicación tenia un admin que podía crear vendedores, bodegueros, otros admin, y clientes)
+fail: FacturasSRI.Web.Components.Layout.MainLayout[0]
+      ErrorBoundary capturó una excepción en la UI.
+      System.InvalidOperationException: An invalid request URI was provided. Either the request URI must be an absolute URI or BaseAddress must be set.
+         at System.Net.Http.HttpClient.PrepareRequestMessage(HttpRequestMessage request)
+         at System.Net.Http.HttpClient.SendAsync(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationToken cancellationToken)
+         at FacturasSRI.Web.Components.Pages.PortalAuth.Registro.HandleRegistration() in C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Web\Components\Pages\PortalAuth\Registro.razor:line 82
+         at Microsoft.AspNetCore.Components.ComponentBase.CallStateHasChangedOnAsyncCompletion(Task task)
+         at Microsoft.AspNetCore.Components.Forms.EditForm.HandleSubmitAsync()
+         at Microsoft.AspNetCore.Components.ComponentBase.CallStateHasChangedOnAsyncCompletion(Task task)
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState
 
-Pero ahora que se va a hacer un portal de clientes, es necesario un registro (que va a tener un aviso de que es solo para clientes). Para los campos debes de basarte necesariamente en como esta el crear clientes actual.
-
-Ademas también es prudente que revises que es lo que existe en la vista de otro usuario (como admin por ejemplo), porque hay cosas que se pueden ocupar, como la sección de mi perfil.
-
-Pero primero analiza CORRECTAMENTE lo necesario para poder tener un plan de accion inicial para la creación del register, dashboard y navmenu (todavía no funcional) del portal del cliente por favor, necesito que realices el plan de accion considerando los elementos reutilizables del código (como la sección de mi perfil que te mencione), yo te digo que me parece un buen plan y puedes proceder a la implementación, o si es necesario correcciones yo te aviso. Todo el plan de accion ingresalo a un txt por favor
+2. La pagina de registro es fea, ocupa toda la pagina cuando deberia estar en un contenedor, y opino que deberia tener el mismo fondo que el login. Revisa C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Web\wwwroot\app.css, que ahi esta todo el css, y puedes poner el css para la pagina de registro tambien

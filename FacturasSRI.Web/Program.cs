@@ -70,6 +70,28 @@ builder.Services.AddScoped<AuthenticationStateProvider, CookieAuthenticationStat
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
+// This is the correct way to get the base URI for an outgoing HttpClient
+// in a server-side Blazor app when you need to call your own API.
+builder.Services.AddScoped(sp => 
+{
+    var httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+    var httpContext = httpContextAccessor.HttpContext;
+
+    if (httpContext == null)
+    {
+        throw new InvalidOperationException("No se puede construir la URI base para HttpClient en un contexto sin HTTP.");
+    }
+    
+    var request = httpContext.Request;
+    var uriBuilder = new UriBuilder
+    {
+        Scheme = request.Scheme,
+        Host = request.Host.Host,
+        Port = request.Host.Port ?? (request.Scheme == "https" ? 443 : 80)
+    };
+    return new HttpClient { BaseAddress = uriBuilder.Uri };
+});
+
 builder.Services.AddHttpClient<FacturasSRI.Core.Services.SriApiClientService>(client => 
 {
     client.Timeout = TimeSpan.FromSeconds(60);

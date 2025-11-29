@@ -4,9 +4,11 @@ using FacturasSRI.Domain.Entities;
 using FacturasSRI.Domain.Enums;
 using FacturasSRI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 
 namespace FacturasSRI.Infrastructure.Services
@@ -15,11 +17,19 @@ namespace FacturasSRI.Infrastructure.Services
     {
         private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private readonly IValidationService _validationService;
+        private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
 
-        public CustomerService(IDbContextFactory<FacturasSRIDbContext> contextFactory, IValidationService validationService)
+        public CustomerService(
+            IDbContextFactory<FacturasSRIDbContext> contextFactory, 
+            IValidationService validationService,
+            IEmailService emailService,
+            IConfiguration configuration)
         {
             _contextFactory = contextFactory;
             _validationService = validationService;
+            _emailService = emailService;
+            _configuration = configuration;
         }
 
         public async Task<CustomerDto> CreateCustomerAsync(CustomerDto customerDto)
@@ -223,6 +233,7 @@ namespace FacturasSRI.Infrastructure.Services
                 throw new InvalidOperationException("Ya existe un cliente con el mismo número de identificación o correo electrónico.");
             }
 
+            var confirmationToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
             var customer = new Cliente
             {
                 Id = Guid.NewGuid(),
@@ -234,11 +245,17 @@ namespace FacturasSRI.Infrastructure.Services
                 Telefono = dto.Telefono,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 FechaCreacion = DateTime.UtcNow,
-                EstaActivo = true
+                EstaActivo = false, // The account is inactive until confirmed
+                IsEmailConfirmed = false,
+                EmailConfirmationToken = confirmationToken
             };
 
             context.Clientes.Add(customer);
             await context.SaveChangesAsync();
+
+            var baseUrl = _configuration["App:BaseUrl"] ?? "https://localhost:7123";
+            var confirmationLink = $"{baseUrl}/api/customer-registration/confirm-email?token={Uri.EscapeDataString(confirmationToken)}";
+            await _emailService.SendCustomerConfirmationEmailAsync(customer.Email, customer.RazonSocial, confirmationLink);
 
             return new CustomerDto
             {
@@ -258,7 +275,7 @@ namespace FacturasSRI.Infrastructure.Services
             await using var context = await _contextFactory.CreateDbContextAsync();
             var customer = await context.Clientes.FirstOrDefaultAsync(c => c.Email == dto.Email);
 
-            if (customer == null || !customer.EstaActivo || !BCrypt.Net.BCrypt.Verify(dto.Password, customer.PasswordHash))
+            if (customer == null || !customer.EstaActivo || !customer.IsEmailConfirmed || !BCrypt.Net.BCrypt.Verify(dto.Password, customer.PasswordHash))
             {
                 return null;
             }
@@ -274,6 +291,23 @@ namespace FacturasSRI.Infrastructure.Services
                 Telefono = customer.Telefono,
                 EstaActivo = customer.EstaActivo
             };
+        }
+
+        public async Task<bool> ConfirmEmailAsync(string token)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var customer = await context.Clientes.FirstOrDefaultAsync(c => c.EmailConfirmationToken == token);
+
+            if (customer == null)
+            {
+                return false;
+            }
+
+            customer.IsEmailConfirmed = true;
+            customer.EstaActivo = true;
+            customer.EmailConfirmationToken = null; // Token is used, nullify it
+            await context.SaveChangesAsync();
+            return true;
         }
     }
 }

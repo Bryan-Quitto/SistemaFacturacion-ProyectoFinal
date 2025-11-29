@@ -16,6 +16,8 @@ namespace FacturasSRI.Domain.Entities
         public string PasswordHash { get; set; } = string.Empty;
         public string? PasswordResetToken { get; set; }
         public DateTime? PasswordResetTokenExpiry { get; set; }
+        public string? EmailConfirmationToken { get; set; }
+        public bool IsEmailConfirmed { get; set; } = false;
         public bool EstaActivo { get; set; } = true;
         public Guid UsuarioIdCreador { get; set; }
         public DateTime FechaCreacion { get; set; }

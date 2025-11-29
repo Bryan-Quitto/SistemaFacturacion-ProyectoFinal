@@ -1,74 +1,94 @@
 @page "/portal/register"
+@layout EmptyLayout
 @using FacturasSRI.Domain.Enums
 @using FacturasSRI.Application.Dtos
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
-<h3>Registro de Nuevo Cliente</h3>
-<p class="text-muted">Este registro es exclusivo para clientes.</p>
+<PageTitle>Registro de Cliente</PageTitle>
 
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-@if (successMessage != null)
-{
-    <div class="alert alert-success">@successMessage</div>
-}
-
-<EditForm Model="@registerModel" OnValidSubmit="HandleRegistration">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
-
-    <div class="row">
-        <div class="col-md-6">
-            <div class="form-group">
-                <label>Tipo de Identificación</label>
-                <InputSelect class="form-control" @bind-Value="registerModel.TipoIdentificacion">
-                    @foreach (var type in Enum.GetValues(typeof(TipoIdentificacion)))
-                    {
-                        <option value="@type">@type</option>
-                    }
-                </InputSelect>
+<div class="login-container">
+    <div class="card login-card" style="max-width: 600px;">
+        <div class="card-body">
+            <div class="text-center mb-4">
+                <img src="logo.png" alt="Logo Aether Tech" style="max-width: 100px; margin-bottom: 1rem;" />
+                <h1 class="h3 mb-3 fw-normal">Registro de Nuevo Cliente</h1>
+                <p class="text-muted">Este registro es exclusivo para clientes.</p>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="form-group">
-                <label>Número de Identificación</label>
-                <InputText class="form-control" @bind-Value="registerModel.NumeroIdentificacion" />
-            </div>
-        </div>
-    </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">@errorMessage</div>
+            }
+            @if (successMessage != null)
+            {
+                <div class="alert alert-success">@successMessage</div>
+            }
+
+            <EditForm Model="@registerModel" OnValidSubmit="HandleRegistration">
+                <DataAnnotationsValidator />
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-floating mb-3">
+                            <InputSelect class="form-select" id="tipoId" @bind-Value="registerModel.TipoIdentificacion">
+                                @foreach (var type in Enum.GetValues(typeof(TipoIdentificacion)))
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            </InputSelect>
+                            <label for="tipoId">Tipo de Identificación</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-floating mb-3">
+                            <InputText id="numId" class="form-control" @bind-Value="registerModel.NumeroIdentificacion" />
+                            <label for="numId">Número de Identificación</label>
+                        </div>
+                    </div>
+                </div>
     
-    <div class="form-group">
-        <label>Razón Social (Nombre Completo o de Empresa)</label>
-        <InputText class="form-control" @bind-Value="registerModel.RazonSocial" />
-    </div>
+                <div class="form-floating mb-3">
+                    <InputText id="razonSocial" class="form-control" @bind-Value="registerModel.RazonSocial" />
+                    <label for="razonSocial">Razón Social (Nombre Completo o de Empresa)</label>
+                </div>
 
-    <div class="form-group">
-        <label>Correo Electrónico</label>
-        <InputText type="email" class="form-control" @bind-Value="registerModel.Email" />
-    </div>
+                <div class="form-floating mb-3">
+                    <InputText id="email" type="email" class="form-control" @bind-Value="registerModel.Email" />
+                    <label for="email">Correo Electrónico</label>
+                </div>
 
-    <div class="form-group">
-        <label>Dirección</label>
-        <InputText class="form-control" @bind-Value="registerModel.Direccion" />
-    </div>
+                <div class="form-floating mb-3">
+                    <InputText id="direccion" class="form-control" @bind-Value="registerModel.Direccion" />
+                    <label for="direccion">Dirección</label>
+                </div>
 
-    <div class="form-group">
-        <label>Teléfono</label>
-        <InputText class="form-control" @bind-Value="registerModel.Telefono" />
-    </div>
+                <div class="form-floating mb-3">
+                    <InputText id="telefono" class="form-control" @bind-Value="registerModel.Telefono" />
+                    <label for="telefono">Teléfono</label>
+                </div>
 
-    <div class="form-group">
-        <label>Contraseña</label>
-        <InputText type="password" class="form-control" @bind-Value="registerModel.Password" />
-        <small class="form-text text-muted">Debe tener al menos 8 caracteres.</small>
-    </div>
+                <div class="form-floating mb-3">
+                    <InputText id="password" type="password" class="form-control" @bind-Value="registerModel.Password" />
+                    <label for="password">Contraseña</label>
+                </div>
 
-    <button type="submit" class="btn btn-primary mt-3">Registrarse</button>
-    <a href="/portal/login" class="btn btn-link mt-3">¿Ya tienes cuenta? Inicia Sesión</a>
-</EditForm>
+                <div class="form-floating mb-3">
+                    <InputText id="confirmPassword" type="password" class="form-control" @bind-Value="registerModel.ConfirmPassword" />
+                    <label for="confirmPassword">Confirmar Contraseña</label>
+                    <small class="form-text text-muted">La contraseña debe tener al menos 8 caracteres.</small>
+                </div>
+                
+                <ValidationSummary />
+
+                <button type="submit" class="w-100 btn btn-lg btn-primary mt-3">Registrarse</button>
+                <div class="text-center mt-3">
+                    <a href="/login">¿Ya tienes cuenta? Inicia Sesión</a>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
 
 @code {
     private ClienteRegistroDto registerModel = new();
@@ -79,13 +99,14 @@
     {
         errorMessage = null;
         successMessage = null;
-        var response = await Http.PostAsJsonAsync("api/PortalAuth/register", registerModel);
+        var response = await Http.PostAsJsonAsync("api/customer-registration/register", registerModel);
 
         if (response.IsSuccessStatusCode)
         {
-            successMessage = "¡Registro exitoso! Serás redirigido a la página de inicio de sesión.";
-            await Task.Delay(2000);
-            Navigation.NavigateTo("/portal/login");
+            successMessage = "¡Registro casi completo! Revisa tu correo electrónico para activar tu cuenta.";
+            // Clear the form by creating a new model, but don't redirect
+            registerModel = new();
+            StateHasChanged(); // Rerender the component with the success message and cleared form
         }
         else
         {

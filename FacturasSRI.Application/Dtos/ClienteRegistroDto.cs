@@ -29,5 +29,9 @@ namespace FacturasSRI.Application.Dtos
         [Required]
         [MinLength(8)]
         public string Password { get; set; } = string.Empty;
+
+        [Required]
+        [Compare("Password", ErrorMessage = "La contraseña y la contraseña de confirmación no coinciden.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
     }
 }

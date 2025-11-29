@@ -28,10 +28,12 @@ namespace FacturasSRI.Web.Services
 
         public override Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            if (_httpContext?.User.Identity?.IsAuthenticated ?? false)
+            if (_httpContext?.User?.Identities.Any(i => i.IsAuthenticated) ?? false)
             {
                 var user = _httpContext.User;
-                _logger.LogInformation("CookieAuthenticationStateProvider: Usuario AUTENTICADO encontrado en HttpContext. Usuario: {UserName}", user.Identity.Name);
+                var primaryIdentity = user.Identities.FirstOrDefault(i => i.IsAuthenticated);
+                _logger.LogInformation("CookieAuthenticationStateProvider: Usuario AUTENTICADO encontrado. Esquema: {AuthenticationType}, Usuario: {UserName}", 
+                    primaryIdentity?.AuthenticationType, primaryIdentity?.Name);
                 return Task.FromResult(new AuthenticationState(user));
             }
             

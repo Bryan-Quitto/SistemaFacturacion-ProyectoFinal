@@ -16,5 +16,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<List<CustomerDto>> GetActiveCustomersAsync();
         Task<CustomerDto> RegistrarNuevoClienteAsync(ClienteRegistroDto dto);
         Task<CustomerDto?> AutenticarClienteAsync(ClienteLoginDto dto);
+        Task<bool> ConfirmEmailAsync(string token);
     }
 }

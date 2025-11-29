@@ -188,6 +188,20 @@ namespace FacturasSRI.Infrastructure.Services
             await SendEmailAsync(toEmail, subject, htmlContent, plainTextContent);
         }
 
+        public async Task SendCustomerConfirmationEmailAsync(string toEmail, string customerName, string confirmationLink)
+        {
+            var subject = $"Confirma tu cuenta en {_fromName}";
+
+            var plainTextContent = $"Hola {customerName},\n\nGracias por registrarte. Por favor, haz clic en el siguiente enlace para activar tu cuenta:\n{confirmationLink}\n\nSi no te registraste, puedes ignorar este correo.";
+
+            var htmlContent = BuildEmailTemplate("¡Casi listo! Confirma tu correo electrónico",
+                $"<p>Hola <strong>{customerName}</strong>,</p>" +
+                "<p>Gracias por registrarte en nuestro portal. Solo queda un paso más: por favor, haz clic en el botón de abajo para activar tu cuenta.</p>",
+                confirmationLink, "Activar Mi Cuenta");
+
+            await SendEmailAsync(toEmail, subject, htmlContent, plainTextContent);
+        }
+
         private string BuildEmailTemplate(string title, string bodyContent, string buttonUrl, string buttonText)
         {
             string companyName = _configuration["CompanyInfo:DisplayName"] ?? _fromName;
