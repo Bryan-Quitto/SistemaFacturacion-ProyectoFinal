@@ -19,17 +19,20 @@ namespace FacturasSRI.Infrastructure.Services
         private readonly IValidationService _validationService;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
+        private readonly DataCacheService _dataCacheService;
 
         public CustomerService(
             IDbContextFactory<FacturasSRIDbContext> contextFactory, 
             IValidationService validationService,
             IEmailService emailService,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            DataCacheService dataCacheService)
         {
             _contextFactory = contextFactory;
             _validationService = validationService;
             _emailService = emailService;
             _configuration = configuration;
+            _dataCacheService = dataCacheService;
         }
 
         public async Task<CustomerDto> CreateCustomerAsync(CustomerDto customerDto)
@@ -64,6 +67,10 @@ namespace FacturasSRI.Infrastructure.Services
             };
             context.Clientes.Add(customer);
             await context.SaveChangesAsync();
+
+            // Regenerate cache
+            await _dataCacheService.GenerateCustomerCache();
+
             customerDto.Id = customer.Id;
             return customerDto;
         }
@@ -76,6 +83,9 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 customer.EstaActivo = !customer.EstaActivo; // Toggle the active status
                 await context.SaveChangesAsync();
+                
+                // Regenerate cache
+                await _dataCacheService.GenerateCustomerCache();
             }
         }
 
@@ -214,6 +224,9 @@ namespace FacturasSRI.Infrastructure.Services
                 customer.UsuarioModificadorId = customerDto.UsuarioIdCreador; // Assuming UsuarioIdCreador in DTO is the modifier's ID
                 customer.UltimaModificacionPor = customerDto.UltimaModificacionPor; // Assuming UltimaModificacionPor in DTO is the modifier's name
                 await context.SaveChangesAsync();
+
+                // Regenerate cache
+                await _dataCacheService.GenerateCustomerCache();
             }
         }
 
@@ -306,6 +319,87 @@ namespace FacturasSRI.Infrastructure.Services
             customer.IsEmailConfirmed = true;
             customer.EstaActivo = true;
             customer.EmailConfirmationToken = null; // Token is used, nullify it
+            await context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> ChangePasswordAsync(string customerId, ChangePasswordDto passwordDto)
+        {
+            if (!Guid.TryParse(customerId, out var customerGuid))
+            {
+                return false;
+            }
+
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var customer = await context.Clientes.FindAsync(customerGuid);
+
+            if (customer == null || !BCrypt.Net.BCrypt.Verify(passwordDto.OldPassword, customer.PasswordHash))
+            {
+                return false;
+            }
+
+            customer.PasswordHash = BCrypt.Net.BCrypt.HashPassword(passwordDto.NewPassword);
+            customer.FechaModificacion = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> GeneratePasswordResetTokenAsync(string email)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var customer = await context.Clientes.FirstOrDefaultAsync(c => c.Email == email);
+            if (customer == null || !customer.EstaActivo || !customer.IsEmailConfirmed)
+            {
+                // Don't reveal that the user does not exist or is not active.
+                return true;
+            }
+
+            var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            
+            customer.PasswordResetToken = BCrypt.Net.BCrypt.HashPassword(token);
+            customer.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(30);
+
+            await context.SaveChangesAsync();
+
+            var baseUrl = _configuration["App:BaseUrl"] ?? "https://localhost:7123";
+            var resetLink = $"{baseUrl}/reset-password?token={Uri.EscapeDataString(token)}";
+
+            // Re-use the existing password reset email service method
+            await _emailService.SendPasswordResetEmailAsync(customer.Email, customer.RazonSocial, resetLink);
+
+            return true;
+        }
+
+        public async Task<bool> ResetPasswordAsync(string token, string newPassword)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            
+            // This is inefficient, but necessary because we've hashed the token in the DB.
+            var customers = await context.Clientes
+                .Where(u => u.PasswordResetToken != null && u.PasswordResetTokenExpiry > DateTime.UtcNow)
+                .ToListAsync();
+
+            Cliente? customerToUpdate = null;
+            foreach (var customer in customers)
+            {
+                if (BCrypt.Net.BCrypt.Verify(token, customer.PasswordResetToken))
+                {
+                    customerToUpdate = customer;
+                    break;
+                }
+            }
+
+            if (customerToUpdate == null)
+            {
+                return false;
+            }
+
+            customerToUpdate.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            customerToUpdate.PasswordResetToken = null;
+            customerToUpdate.PasswordResetTokenExpiry = null;
+            customerToUpdate.FechaModificacion = DateTime.UtcNow;
+
             await context.SaveChangesAsync();
             return true;
         }

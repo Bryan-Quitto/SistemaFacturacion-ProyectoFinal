@@ -1,38 +1,93 @@
+@using FacturasSRI.Web.Services
 @inherits LayoutComponentBase
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<MainLayout> Logger
 
-<div class="page">
-    <div class="sidebar">
-        <nav class="navbar navbar-dark bg-dark">
-            <a class="navbar-brand" href="/portal/dashboard">Portal Cliente</a>
-            <ul class="navbar-nav px-3">
-                <li class="nav-item">
-                    <a class="nav-link" href="/portal/dashboard">
-                        <span class="oi oi-home" aria-hidden="true"></span> Dashboard
-                    </a>
-                </li>
-                <li class="nav-item">
-                     <a class="nav-link" href="/portal/my-profile">
-                        <span class="oi oi-person" aria-hidden="true"></span> Mi Perfil
-                    </a>
-                </li>
-                 <li class="nav-item">
-                    <form action="/api/PortalAuth/logout" method="post">
-                        <button type="submit" class="nav-link btn btn-link">
-                            <span class="oi oi-account-logout" aria-hidden="true"></span> Cerrar Sesión
-                        </button>
-                    </form>
-                </li>
-            </ul>
-        </nav>
-    </div>
+<div class="page @(isNavMenuCollapsed ? "nav-menu-collapsed" : "")">
+    <AuthorizeView>
+        <Authorized>
+            <div class="sidebar">
+                <NavMenu IsCollapsed="isNavMenuCollapsed" />
+            </div>
+        </Authorized>
+    </AuthorizeView>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a>
+    <main class="main-content">
+        <div class="top-bar">
+            <button class="btn btn-link nav-menu-toggle" @onclick="ToggleNavMenu">
+                <i class="bi @(isNavMenuCollapsed ? "bi-list" : "bi-list")"></i>
+            </button>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="dropdown">
+                        <a href="#" class="btn btn-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-fill me-2"></i>
+                            Hola, @context.User.Identity?.Name
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/profile">Mi Perfil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form action="/account/logout" method="post">
+                                    <button type="submit" class="dropdown-item">Cerrar Sesión</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login" class="btn btn-link">Iniciar Sesión</a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
-
+        
         <article class="content px-4">
-            @Body
+            <div class="container-fluid">
+                
+                <ErrorBoundary @ref="errorBoundary">
+                    <ChildContent>
+                        @Body
+                    </ChildContent>
+                    <ErrorContent Context="ex">
+                        @{
+                            Logger.LogError(ex, "ErrorBoundary capturó una excepción en la UI.");
+                        }
+                        <div class="alert alert-danger">
+                            <h4>Ha ocurrido un error inesperado.</h4>
+                            <p>Un problema ha impedido que la página se cargue correctamente. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico.</p>
+                        </div>
+                    </ErrorContent>
+                </ErrorBoundary>
+
+            </div>
         </article>
+        
+        <footer class="footer mt-auto py-3 bg-light">
+            <div class="container-fluid text-center">
+                <span class="text-muted">© @DateTime.Now.Year Aether Tecnologías. Todos los derechos reservados.</span>
+            </div>
+        </footer>
     </main>
 </div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Se ha producido un error no controlado.
+    <a href="." class="reload">Recargando</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private ErrorBoundary? errorBoundary;
+    private bool isNavMenuCollapsed = false;
+
+    protected override void OnParametersSet()
+    {
+        errorBoundary?.Recover();
+    }
+
+    private void ToggleNavMenu()
+    {
+        isNavMenuCollapsed = !isNavMenuCollapsed;
+    }
+}

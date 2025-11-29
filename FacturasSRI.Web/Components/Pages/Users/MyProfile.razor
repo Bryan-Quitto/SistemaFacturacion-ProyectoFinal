@@ -4,6 +4,7 @@
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @inject IUserService UserService
+@inject ICustomerService CustomerService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
 
@@ -19,7 +20,7 @@
     </div>
 }
 
-@if (userProfile == null)
+@if (profile == null)
 {
     <p><em>Cargando perfil...</em></p>
 }
@@ -32,36 +33,63 @@ else
                     Información del Perfil
                 </div>
                 <div class="card-body">
-                    <EditForm Model="@updateProfileDto" OnValidSubmit="HandleUpdateProfile">
-                        <DataAnnotationsValidator />
-                        <div class="mb-3">
-                            <label class="form-label">Correo Electrónico</label>
-                            <input type="email" class="form-control" value="@userProfile.Email" readonly />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Primer Nombre</label>
-                            <InputText class="form-control" @bind-Value="updateProfileDto.PrimerNombre" />
-                            <ValidationMessage For="@(() => updateProfileDto.PrimerNombre)" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Segundo Nombre</label>
-                            <InputText class="form-control" @bind-Value="updateProfileDto.SegundoNombre" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Primer Apellido</label>
-                            <InputText class="form-control" @bind-Value="updateProfileDto.PrimerApellido" />
-                            <ValidationMessage For="@(() => updateProfileDto.PrimerApellido)" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Segundo Apellido</label>
-                            <InputText class="form-control" @bind-Value="updateProfileDto.SegundoApellido" />
-                        </div>
-                        <button type="submit" class="btn btn-primary">Actualizar Perfil</button>
-                        @if (!string.IsNullOrEmpty(profileMessage))
-                        {
-                            <div class="alert alert-success mt-3">@profileMessage</div>
-                        }
-                    </EditForm>
+                    @if (profile.UserType == "User")
+                    {
+                        <EditForm Model="@updateProfileDto" OnValidSubmit="HandleUpdateUserProfile">
+                            <DataAnnotationsValidator />
+                            <div class="mb-3">
+                                <label class="form-label">Correo Electrónico</label>
+                                <input type="email" class="form-control" value="@profile.Email" readonly />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Primer Nombre</label>
+                                <InputText class="form-control" @bind-Value="updateProfileDto.PrimerNombre" />
+                                <ValidationMessage For="@(() => updateProfileDto.PrimerNombre)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Segundo Nombre</label>
+                                <InputText class="form-control" @bind-Value="updateProfileDto.SegundoNombre" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Primer Apellido</label>
+                                <InputText class="form-control" @bind-Value="updateProfileDto.PrimerApellido" />
+                                <ValidationMessage For="@(() => updateProfileDto.PrimerApellido)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Segundo Apellido</label>
+                                <InputText class="form-control" @bind-Value="updateProfileDto.SegundoApellido" />
+                            </div>
+                            <button type="submit" class="btn btn-primary">Actualizar Perfil</button>
+                        </EditForm>
+                    }
+                    else if (profile.UserType == "Customer")
+                    {
+                        <EditForm Model="@updateCustomerDto" OnValidSubmit="HandleUpdateCustomerProfile">
+                            <DataAnnotationsValidator />
+                            <div class="mb-3">
+                                <label class="form-label">Correo Electrónico</label>
+                                <input type="email" class="form-control" value="@profile.Email" readonly />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Razón Social</label>
+                                <InputText class="form-control" @bind-Value="updateCustomerDto.RazonSocial" />
+                                <ValidationMessage For="@(() => updateCustomerDto.RazonSocial)" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Dirección</label>
+                                <InputText class="form-control" @bind-Value="updateCustomerDto.Direccion" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Teléfono</label>
+                                <InputText class="form-control" @bind-Value="updateCustomerDto.Telefono" />
+                            </div>
+                            <button type="submit" class="btn btn-primary">Actualizar Perfil</button>
+                        </EditForm>
+                    }
+                    @if (!string.IsNullOrEmpty(profileMessage))
+                    {
+                        <div class="alert alert-success mt-3">@profileMessage</div>
+                    }
                 </div>
             </div>
         </div>
@@ -101,14 +129,16 @@ else
 }
 
 @code {
-    private UserDto? userProfile;
+    private ProfileViewModel? profile;
     private UpdateProfileDto updateProfileDto = new();
+    private CustomerDto updateCustomerDto = new();
     private ChangePasswordDto changePasswordDto = new();
+    
     private string? profileMessage;
     private string? passwordMessage;
     private bool passwordChangeSuccess = false;
     private string? userId;
-    private string? errorMessage; // New property
+    private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -118,11 +148,48 @@ else
             var user = authState.User;
             userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            if (!string.IsNullOrEmpty(userId))
+            if (string.IsNullOrEmpty(userId))
             {
-                userProfile = await UserService.GetUserProfileAsync(userId);
+                errorMessage = "No se pudo identificar al usuario actual.";
+                return;
+            }
+
+            if (user.HasClaim(c => c.Type == "UserType" && c.Value == "Cliente"))
+            {
+                // It's a Customer
+                var customer = await CustomerService.GetCustomerByIdAsync(Guid.Parse(userId));
+                if (customer != null)
+                {
+                    profile = new ProfileViewModel
+                    {
+                        UserType = "Customer",
+                        Email = customer.Email,
+                        RazonSocial = customer.RazonSocial,
+                        Direccion = customer.Direccion,
+                        Telefono = customer.Telefono
+                    };
+                    updateCustomerDto = customer; // Use the full DTO for updates
+                }
+                else
+                {
+                    errorMessage = "No se pudo cargar la información del perfil del cliente. El cliente podría no existir o estar inactivo.";
+                }
+            }
+            else
+            {
+                // It's a staff User
+                var userProfile = await UserService.GetUserProfileAsync(userId);
                 if (userProfile != null)
                 {
+                    profile = new ProfileViewModel
+                    {
+                        UserType = "User",
+                        Email = userProfile.Email,
+                        PrimerNombre = userProfile.PrimerNombre,
+                        SegundoNombre = userProfile.SegundoNombre,
+                        PrimerApellido = userProfile.PrimerApellido,
+                        SegundoApellido = userProfile.SegundoApellido
+                    };
                     updateProfileDto = new UpdateProfileDto
                     {
                         PrimerNombre = userProfile.PrimerNombre,
@@ -136,55 +203,61 @@ else
                     errorMessage = "No se pudo cargar la información del perfil del usuario. El usuario podría no existir o estar inactivo.";
                 }
             }
-            else
-            {
-                errorMessage = "No se pudo identificar al usuario actual.";
-            }
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ocurrió un error al cargar el perfil. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            errorMessage = $"Ocurrió un error al cargar el perfil: {ex.Message}";
         }
     }
 
-    private async Task HandleUpdateProfile()
+    private async Task HandleUpdateUserProfile()
     {
-        errorMessage = null; // Clear any previous error messages
-        profileMessage = null; // Clear any previous success messages
-        if (string.IsNullOrEmpty(userId))
-        {
-            errorMessage = "No se pudo identificar al usuario para actualizar el perfil.";
-            return;
-        }
-
+        // Logic for updating staff user
+        if (string.IsNullOrEmpty(userId)) return;
         try
         {
             await UserService.UpdateUserProfileAsync(userId, updateProfileDto);
             profileMessage = "Perfil actualizado correctamente.";
-            await InvokeAsync(() => StateHasChanged());
+            StateHasChanged();
             await Task.Delay(3000);
             profileMessage = null;
-            await InvokeAsync(() => StateHasChanged());
+            StateHasChanged();
         }
-        catch (Exception ex)
+        catch (Exception ex) { errorMessage = $"Error al actualizar: {ex.Message}"; }
+    }
+    
+    private async Task HandleUpdateCustomerProfile()
+    {
+        // Logic for updating customer
+        if (string.IsNullOrEmpty(userId)) return;
+        try
         {
-            errorMessage = $"Ocurrió un error al actualizar el perfil. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            // We need to use the full CustomerDto for the update method
+            await CustomerService.UpdateCustomerAsync(updateCustomerDto);
+            profileMessage = "Perfil actualizado correctamente.";
+            StateHasChanged();
+            await Task.Delay(3000);
+            profileMessage = null;
+            StateHasChanged();
         }
+        catch (Exception ex) { errorMessage = $"Error al actualizar: {ex.Message}"; }
     }
 
     private async Task HandleChangePassword()
     {
-        errorMessage = null; // Clear any previous error messages
-        passwordMessage = null; // Clear any previous password messages
-        if (string.IsNullOrEmpty(userId))
-        {
-            errorMessage = "No se pudo identificar al usuario para cambiar la contraseña.";
-            return;
-        }
-
+        if (string.IsNullOrEmpty(userId) || profile == null) return;
+        
         try
         {
-            passwordChangeSuccess = await UserService.ChangePasswordAsync(userId, changePasswordDto);
+            if (profile.UserType == "Customer")
+            {
+                passwordChangeSuccess = await CustomerService.ChangePasswordAsync(userId, changePasswordDto);
+            }
+            else
+            {
+                passwordChangeSuccess = await UserService.ChangePasswordAsync(userId, changePasswordDto);
+            }
+
             if (passwordChangeSuccess)
             {
                 passwordMessage = "Contraseña cambiada correctamente.";
@@ -197,19 +270,18 @@ else
         }
         catch (Exception ex)
         {
-            passwordChangeSuccess = false; // Ensure it shows as an error
-            passwordMessage = $"Ocurrió un error al cambiar la contraseña. Por favor, inténtelo de nuevo. Si el problema persiste, contacte a soporte técnico. Detalles: {ex.Message}";
+            passwordChangeSuccess = false;
+            passwordMessage = $"Error al cambiar la contraseña: {ex.Message}";
         }
         
-        await InvokeAsync(() => StateHasChanged());
+        StateHasChanged();
         await Task.Delay(5000);
         passwordMessage = null;
-        await InvokeAsync(() => StateHasChanged());
+        StateHasChanged();
     }
 
     private void ClearErrorMessage()
     {
         errorMessage = null;
-        StateHasChanged();
     }
 }

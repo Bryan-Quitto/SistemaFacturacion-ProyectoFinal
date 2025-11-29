@@ -59,6 +59,11 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IValidationService, ValidationService>();
 builder.Services.AddScoped<ICobroService, CobroService>();
 
+builder.Services.AddSingleton<DataCacheService>();
+builder.Services.AddHostedService<VencimientoComprasService>();
+builder.Services.AddSingleton<DataCacheService>();
+builder.Services.AddHostedService<DataCacheService>(provider => provider.GetRequiredService<DataCacheService>());
+
 builder.Services.AddScoped<FacturasSRI.Core.Services.FirmaDigitalService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.XmlGeneratorService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.SriResponseParserService>();
@@ -135,7 +140,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminPolicy", policy => policy.RequireRole("Administrador"));
     options.AddPolicy("VendedorPolicy", policy => policy.RequireRole("Vendedor", "Administrador"));
     options.AddPolicy("BodegueroPolicy", policy => policy.RequireRole("Bodeguero", "Administrador"));
-    options.AddPolicy("IsCustomer", policy => policy.RequireClaim("UserType", "Cliente").AddAuthenticationSchemes("CustomerAuth"));
+    options.AddPolicy("IsCustomer", policy => policy.RequireClaim("UserType", "Cliente"));
 });
 
 builder.Services.AddHostedService<VencimientoComprasService>();

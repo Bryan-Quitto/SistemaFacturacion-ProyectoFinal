@@ -19,7 +19,14 @@
                 <div>
                     <AuthorizeView>
                         <Authorized>
-                            <a href="/dashboard" class="btn btn-outline-light">Ir a mi Panel</a>
+                            <AuthorizeView Policy="IsCustomer" Context="customerAuthContext">
+                                <Authorized>
+                                    <a href="/portal/dashboard" class="btn btn-outline-light">Ir a mi Panel</a>
+                                </Authorized>
+                                <NotAuthorized>
+                                    <a href="/dashboard" class="btn btn-outline-light">Ir a mi Panel</a>
+                                </NotAuthorized>
+                            </AuthorizeView>
                         </Authorized>
                         <NotAuthorized>
                             <a href="/login" class="btn btn-light fw-bold">Iniciar Sesión</a>

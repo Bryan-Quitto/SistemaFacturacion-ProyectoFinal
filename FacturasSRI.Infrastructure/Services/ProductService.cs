@@ -15,11 +15,13 @@ namespace FacturasSRI.Infrastructure.Services
     {
         private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private readonly ILogger<ProductService> _logger;
+        private readonly DataCacheService _dataCacheService;
 
-        public ProductService(IDbContextFactory<FacturasSRIDbContext> contextFactory, ILogger<ProductService> logger)
+        public ProductService(IDbContextFactory<FacturasSRIDbContext> contextFactory, ILogger<ProductService> logger, DataCacheService dataCacheService)
         {
             _contextFactory = contextFactory;
             _logger = logger;
+            _dataCacheService = dataCacheService;
         }
 
         public async Task<ProductDto> CreateProductAsync(ProductDto productDto)
@@ -61,6 +63,9 @@ namespace FacturasSRI.Infrastructure.Services
 
             context.Productos.Add(product);
             await context.SaveChangesAsync();
+            
+            await _dataCacheService.GenerateProductCache();
+            
             productDto.Id = product.Id;
             return productDto;
         }
@@ -238,6 +243,8 @@ namespace FacturasSRI.Infrastructure.Services
                 product.Marca = productDto.Marca;
                 product.CategoriaId = productDto.CategoriaId;
                 await context.SaveChangesAsync();
+                
+                await _dataCacheService.GenerateProductCache();
             }
         }
 
@@ -249,6 +256,8 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 product.EstaActivo = !product.EstaActivo; // Toggle the active status
                 await context.SaveChangesAsync();
+                
+                await _dataCacheService.GenerateProductCache();
             }
         }
 
