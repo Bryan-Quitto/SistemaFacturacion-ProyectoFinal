@@ -27,7 +27,9 @@ namespace FacturasSRI.Web.Controllers
         public async Task<ActionResult<PaginatedList<CreditNoteDto>>> GetClientCreditNotes(
             [FromQuery] int pageNumber = 1, 
             [FromQuery] int pageSize = 10, 
-            [FromQuery] string? searchTerm = null)
+            [FromQuery] string? searchTerm = null,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null)
         {
             _logger.LogWarning("[API /api/creditnotes/cliente] Request received.");
             if (User.Identity?.IsAuthenticated ?? false)
@@ -46,8 +48,33 @@ namespace FacturasSRI.Web.Controllers
                 return Unauthorized("No se pudo identificar al cliente.");
             }
 
-            var creditNotes = await _creditNoteService.GetCreditNotesByClientIdAsync(clienteId, pageNumber, pageSize, searchTerm);
+            var creditNotes = await _creditNoteService.GetCreditNotesByClientIdAsync(clienteId, pageNumber, pageSize, searchTerm, startDate, endDate);
             return Ok(creditNotes);
+        }
+
+        [HttpGet("cliente/{id:guid}")]
+        [Authorize(AuthenticationSchemes = "CustomerAuth", Policy = "IsCustomer")]
+        public async Task<ActionResult<CreditNoteDetailViewDto>> GetClientCreditNoteDetail(Guid id)
+        {
+            var clienteIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (clienteIdClaim == null || !Guid.TryParse(clienteIdClaim, out var clienteId))
+            {
+                return Unauthorized("No se pudo identificar al cliente.");
+            }
+
+            var creditNote = await _creditNoteService.GetCreditNoteDetailByIdAsync(id);
+
+            if (creditNote == null)
+            {
+                return NotFound();
+            }
+
+            if (creditNote.ClienteId != clienteId)
+            {
+                return Forbid("No tiene permiso para ver esta nota de crédito.");
+            }
+
+            return Ok(creditNote);
         }
     }
 }

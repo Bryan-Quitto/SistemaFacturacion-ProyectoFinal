@@ -18,6 +18,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<CreditNoteDetailViewDto?> IssueDraftCreditNoteAsync(Guid creditNoteId);
         Task<CreditNoteDto?> UpdateCreditNoteAsync(UpdateCreditNoteDto dto);
         Task ResendCreditNoteEmailAsync(Guid creditNoteId);
-        Task<PaginatedList<CreditNoteDto>> GetCreditNotesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? searchTerm);
+        Task<PaginatedList<CreditNoteDto>> GetCreditNotesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? searchTerm, DateTime? startDate, DateTime? endDate);
     }
 }

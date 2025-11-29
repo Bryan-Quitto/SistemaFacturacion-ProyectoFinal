@@ -12,6 +12,6 @@ namespace FacturasSRI.Application.Dtos
         public DateTime FechaEmision { get; set; }
         public decimal Total { get; set; }
         public EstadoNotaDeCredito Estado { get; set; }
-        public string? RazonModificacion { get; set; }
+        public required string RazonModificacion { get; set; }
     }
 }

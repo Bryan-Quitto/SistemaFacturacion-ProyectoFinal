@@ -20,22 +20,32 @@
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
         <div class="row g-2">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <input type="text" class="form-control" placeholder="Buscar por número de factura..."
                        @bind="searchTerm" @bind:event="oninput" @onkeyup="OnFilterChanged" />
             </div>
-            <div class="col-md-3">
-                <InputSelect class="form-select" @bind-Value="selectedStatus" @bind-Value:after="OnFilterChanged">
-                    <option value="">Todos los Estados</option>
-                    @foreach (var status in Enum.GetValues(typeof(EstadoFactura)))
-                    {
-                        // No mostrar Borrador o Cancelada en el portal de cliente
-                        if (status.ToString() != "Borrador" && status.ToString() != "Cancelada")
-                        {
-                             <option value="@status">@status</option>
-                        }
-                    }
+            <div class="col-md-2">
+                <InputSelect class="form-select" @bind-Value="paymentStatus" @bind-Value:after="OnFilterChanged">
+                    <option value="All">Todos los Pagos</option>
+                    <option value="Pending">Pendientes</option>
+                    <option value="Paid">Pagadas</option>
                 </InputSelect>
+            </div>
+            <div class="col-md-2">
+                <InputSelect class="form-select" @bind-Value="selectedFormaDePago" @bind-Value:after="OnFilterChanged">
+                    <option value="">Toda Forma de Pago</option>
+                    <option value="@FormaDePago.Contado">Contado</option>
+                    <option value="@FormaDePago.Credito">Crédito</option>
+                </InputSelect>
+            </div>
+            <div class="col-md-2">
+                <InputDate class="form-control" placeholder="Fecha de inicio" @bind-Value="startDate" @bind-Value:after="OnFilterChanged" />
+            </div>
+            <div class="col-md-2">
+                <InputDate class="form-control" placeholder="Fecha de fin" @bind-Value="endDate" @bind-Value:after="OnFilterChanged" />
+            </div>
+             <div class="col-md-1">
+                <button class="btn btn-outline-secondary" @onclick="ClearFilters">Limpiar</button>
             </div>
         </div>
     </div>
@@ -82,6 +92,9 @@ else if (paginatedInvoices != null)
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => ViewDetails(invoice.Id)" title="Ver Detalles">
                                     <i class="bi bi-eye-fill"></i>
                                 </button>
+                                <a href="/api/public/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
+                                    <i class="bi bi-file-earmark-pdf-fill"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>
@@ -115,8 +128,12 @@ else if (paginatedInvoices != null)
     private int currentPage = 1;
     private int pageSize = 15;
 
+    // Nuevos filtros
     private string searchTerm = string.Empty;
-    private EstadoFactura? selectedStatus;
+    private string paymentStatus = "All";
+    private FormaDePago? selectedFormaDePago;
+    private DateTime? startDate;
+    private DateTime? endDate;
 
     protected override async Task OnInitializedAsync()
     {
@@ -146,7 +163,7 @@ else if (paginatedInvoices != null)
         errorMessage = null;
         try
         {
-            paginatedInvoices = await InvoiceService.GetInvoicesByClientIdAsync(clienteId, currentPage, pageSize, selectedStatus, searchTerm);
+            paginatedInvoices = await InvoiceService.GetInvoicesByClientIdAsync(clienteId, currentPage, pageSize, paymentStatus, selectedFormaDePago, startDate, endDate, searchTerm);
         }
         catch (Exception ex)
         {
@@ -157,6 +174,16 @@ else if (paginatedInvoices != null)
 
     private async Task OnFilterChanged()
     {
+        await LoadInvoices(1);
+    }
+    
+    private async Task ClearFilters()
+    {
+        searchTerm = string.Empty;
+        paymentStatus = "All";
+        selectedFormaDePago = null;
+        startDate = null;
+        endDate = null;
         await LoadInvoices(1);
     }
 

@@ -1082,33 +1082,60 @@ namespace FacturasSRI.Infrastructure.Services
             return Task.CompletedTask;
         }
 
-        public async Task<PaginatedList<InvoiceDto>> GetInvoicesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, EstadoFactura? status, string? searchTerm)
+        public async Task<PaginatedList<InvoiceDto>> GetInvoicesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? paymentStatus, FormaDePago? formaDePago, DateTime? startDate, DateTime? endDate, string? searchTerm)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            var query = context.Facturas.AsNoTracking().Where(i => i.ClienteId == clienteId);
-
-            if (status.HasValue)
-            {
-                query = query.Where(i => i.Estado == status.Value);
-            }
+            
+            var query = from invoice in context.Facturas.AsNoTracking()
+                        join cpc in context.CuentasPorCobrar on invoice.Id equals cpc.FacturaId into cpcJoin
+                        from cpc in cpcJoin.DefaultIfEmpty()
+                        where invoice.ClienteId == clienteId
+                        select new { invoice, cpc };
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                query = query.Where(i => i.NumeroFactura.Contains(searchTerm));
+                query = query.Where(x => x.invoice.NumeroFactura.Contains(searchTerm));
+            }
+
+            if (formaDePago.HasValue)
+            {
+                query = query.Where(x => x.invoice.FormaDePago == formaDePago.Value);
+            }
+
+            if (!string.IsNullOrEmpty(paymentStatus) && paymentStatus != "All")
+            {
+                if (paymentStatus == "Pending")
+                {
+                    query = query.Where(x => x.cpc != null && x.cpc.SaldoPendiente > 0);
+                }
+                else if (paymentStatus == "Paid")
+                {
+                    query = query.Where(x => x.cpc == null || x.cpc.SaldoPendiente <= 0);
+                }
+            }
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(x => x.invoice.FechaEmision.Date >= startDate.Value.Date);
+            }
+
+            if (endDate.HasValue)
+            {
+                query = query.Where(x => x.invoice.FechaEmision.Date <= endDate.Value.Date);
             }
             
             var finalQuery = query
-                .OrderByDescending(i => i.FechaCreacion)
-                .Select(i => new InvoiceDto
+                .OrderByDescending(x => x.invoice.FechaCreacion)
+                .Select(x => new InvoiceDto
                 {
-                    Id = i.Id,
-                    FechaEmision = i.FechaEmision,
-                    NumeroFactura = i.NumeroFactura,
-                    Estado = i.Estado,
-                    ClienteId = i.ClienteId,
-                    ClienteNombre = i.Cliente != null ? i.Cliente.RazonSocial : "",
-                    Total = i.Total,
-                    SaldoPendiente = context.CuentasPorCobrar.Where(c => c.FacturaId == i.Id).Select(c => c.SaldoPendiente).FirstOrDefault()
+                    Id = x.invoice.Id,
+                    FechaEmision = x.invoice.FechaEmision,
+                    NumeroFactura = x.invoice.NumeroFactura,
+                    Estado = x.invoice.Estado,
+                    ClienteId = x.invoice.ClienteId,
+                    ClienteNombre = x.invoice.Cliente != null ? x.invoice.Cliente.RazonSocial : "",
+                    Total = x.invoice.Total,
+                    SaldoPendiente = x.cpc != null ? x.cpc.SaldoPendiente : 0
                 });
 
             return await PaginatedList<InvoiceDto>.CreateAsync(finalQuery, pageNumber, pageSize);

@@ -24,6 +24,15 @@
                 <input type="text" class="form-control" placeholder="Buscar por Nro. de NC o Factura..."
                        @bind="searchTerm" @bind:event="oninput" @onkeyup="OnFilterChanged" />
             </div>
+            <div class="col-md-3">
+                <InputDate class="form-control" placeholder="Fecha de inicio" @bind-Value="startDate" @bind-Value:after="OnFilterChanged" />
+            </div>
+            <div class="col-md-3">
+                <InputDate class="form-control" placeholder="Fecha de fin" @bind-Value="endDate" @bind-Value:after="OnFilterChanged" />
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-secondary" @onclick="ClearFilters">Limpiar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -67,6 +76,9 @@ else if (paginatedCreditNotes != null)
                                 <button class="btn btn-sm btn-outline-secondary" @onclick="() => ViewDetails(nc.Id)" title="Ver Detalles">
                                     <i class="bi bi-eye-fill"></i>
                                 </button>
+                                <a href="/api/public/nc-ride/@nc.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
+                                    <i class="bi bi-file-earmark-pdf-fill"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>
@@ -100,6 +112,8 @@ else if (paginatedCreditNotes != null)
     private int currentPage = 1;
     private int pageSize = 15;
     private string searchTerm = string.Empty;
+    private DateTime? startDate;
+    private DateTime? endDate;
 
     protected override async Task OnInitializedAsync()
     {
@@ -129,7 +143,7 @@ else if (paginatedCreditNotes != null)
         errorMessage = null;
         try
         {
-            paginatedCreditNotes = await CreditNoteService.GetCreditNotesByClientIdAsync(clienteId, currentPage, pageSize, searchTerm);
+            paginatedCreditNotes = await CreditNoteService.GetCreditNotesByClientIdAsync(clienteId, currentPage, pageSize, searchTerm, startDate, endDate);
         }
         catch (Exception ex)
         {
@@ -139,11 +153,20 @@ else if (paginatedCreditNotes != null)
     }
 
     private async Task OnFilterChanged() => await LoadCreditNotes(1);
+    
+    private async Task ClearFilters()
+    {
+        searchTerm = string.Empty;
+        startDate = null;
+        endDate = null;
+        await LoadCreditNotes(1);
+    }
+
     private async Task SelectedPage(int page) => await LoadCreditNotes(page);
 
     private void ViewDetails(Guid creditNoteId)
     {
-        // Navigation.NavigateTo($"/cliente/notas-credito/{creditNoteId}");
+        Navigation.NavigateTo($"/cliente/notas-credito/{creditNoteId}");
     }
 
     private string GetStatusBadgeClass(EstadoNotaDeCredito status)

@@ -65,7 +65,14 @@ namespace FacturasSRI.Web.Controllers
 
         [HttpGet("cliente")]
         [Authorize(AuthenticationSchemes = "CustomerAuth", Policy = "IsCustomer")]
-        public async Task<ActionResult<PaginatedList<InvoiceDto>>> GetClientInvoices([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10, [FromQuery] EstadoFactura? status = null, [FromQuery] string? searchTerm = null)
+        public async Task<ActionResult<PaginatedList<InvoiceDto>>> GetClientInvoices(
+            [FromQuery] int pageNumber = 1, 
+            [FromQuery] int pageSize = 10, 
+            [FromQuery] string? paymentStatus = null,
+            [FromQuery] FormaDePago? formaDePago = null,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null,
+            [FromQuery] string? searchTerm = null)
         {
             _logger.LogWarning("[API /api/invoices/cliente] Request received.");
             if (User.Identity?.IsAuthenticated ?? false)
@@ -89,7 +96,7 @@ namespace FacturasSRI.Web.Controllers
             }
             _logger.LogInformation("[API] ClienteId found: {ClienteId}", clienteId);
 
-            var invoices = await _invoiceService.GetInvoicesByClientIdAsync(clienteId, pageNumber, pageSize, status, searchTerm);
+            var invoices = await _invoiceService.GetInvoicesByClientIdAsync(clienteId, pageNumber, pageSize, paymentStatus, formaDePago, startDate, endDate, searchTerm);
             return Ok(invoices);
         }
 

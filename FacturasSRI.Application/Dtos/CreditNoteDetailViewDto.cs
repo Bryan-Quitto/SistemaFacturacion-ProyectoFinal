@@ -7,10 +7,9 @@ namespace FacturasSRI.Application.Dtos
     public class CreditNoteDetailViewDto
     {
         public Guid Id { get; set; }
-        public string NumeroNotaCredito { get; set; } = string.Empty;
+        public Guid? ClienteId { get; set; }
+        public string? NumeroNotaCredito { get; set; }
         public DateTime FechaEmision { get; set; }
-        
-        // Datos Cliente
         public string ClienteNombre { get; set; } = string.Empty;
         public string ClienteIdentificacion { get; set; } = string.Empty;
         public string ClienteDireccion { get; set; } = string.Empty;
