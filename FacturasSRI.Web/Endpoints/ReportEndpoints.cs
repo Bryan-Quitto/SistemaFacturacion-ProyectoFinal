@@ -136,6 +136,44 @@ namespace FacturasSRI.Web.Endpoints
             })
             .WithName("GetCurrentStockReport")
             .Produces(200, typeof(IEnumerable<FacturasSRI.Application.Dtos.Reports.StockActualDto>));
+
+            reportGroup.MapGet("/warehouse/inventory-movements", async (IReportService reportService, DateTime? startDate, DateTime? endDate) =>
+            {
+                var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
+                var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
+                var result = await reportService.GetMovimientosInventarioAsync(finalStartDate, finalEndDate);
+                return Results.Ok(result);
+            })
+            .WithName("GetInventoryMovementsReport")
+            .Produces(200, typeof(IEnumerable<FacturasSRI.Application.Dtos.Reports.MovimientoInventarioDto>));
+
+            reportGroup.MapGet("/warehouse/purchases-by-period", async (IReportService reportService, DateTime? startDate, DateTime? endDate) =>
+            {
+                var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
+                var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
+                var result = await reportService.GetComprasPorPeriodoAsync(finalStartDate, finalEndDate);
+                return Results.Ok(result);
+            })
+            .WithName("GetPurchasesByPeriodReport")
+            .Produces(200, typeof(IEnumerable<FacturasSRI.Application.Dtos.Reports.ComprasPorPeriodoDto>));
+
+            reportGroup.MapGet("/warehouse/low-stock-products", async (IReportService reportService) =>
+            {
+                var result = await reportService.GetProductosBajoStockMinimoAsync();
+                return Results.Ok(result);
+            })
+            .WithName("GetLowStockProductsReport")
+            .Produces(200, typeof(IEnumerable<FacturasSRI.Application.Dtos.Reports.ProductoStockMinimoDto>));
+
+            reportGroup.MapGet("/warehouse/inventory-adjustments", async (IReportService reportService, DateTime? startDate, DateTime? endDate) =>
+            {
+                var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
+                var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
+                var result = await reportService.GetAjustesInventarioAsync(finalStartDate, finalEndDate);
+                return Results.Ok(result);
+            })
+            .WithName("GetInventoryAdjustmentsReport")
+            .Produces(200, typeof(IEnumerable<FacturasSRI.Application.Dtos.Reports.AjusteInventarioReportDto>));
         }
     }
 }

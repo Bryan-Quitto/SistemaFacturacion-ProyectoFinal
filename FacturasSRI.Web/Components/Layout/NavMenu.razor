@@ -133,6 +133,10 @@
                                 </AuthorizeView>
                                 <AuthorizeView Roles="Administrador, Bodeguero" Context="warehouseContext">
                                     <li><NavLink href="reports/warehouse/current-stock" Match="NavLinkMatch.All"><i class="bi bi-boxes submenu-icon"></i><span>Stock Actual</span></NavLink></li>
+                                    <li><NavLink href="reports/warehouse/inventory-movements" Match="NavLinkMatch.All"><i class="bi bi-arrows-expand-vertical submenu-icon"></i><span>Movimientos de Inventario</span></NavLink></li>
+                                    <li><NavLink href="reports/warehouse/purchases-by-period" Match="NavLinkMatch.All"><i class="bi bi-cart-check submenu-icon"></i><span>Compras por Período</span></NavLink></li>
+                                    <li><NavLink href="reports/warehouse/low-stock-products" Match="NavLinkMatch.All"><i class="bi bi-exclamation-triangle submenu-icon"></i><span>Productos Bajo Stock Mínimo</span></NavLink></li>
+                                    <li><NavLink href="reports/warehouse/inventory-adjustments" Match="NavLinkMatch.All"><i class="bi bi-tools submenu-icon"></i><span>Ajustes de Inventario</span></NavLink></li>
                                 </AuthorizeView>
                             </ul>
                         }

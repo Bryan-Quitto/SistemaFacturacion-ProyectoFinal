@@ -157,6 +157,117 @@ namespace FacturasSRI.Infrastructure.Services
             return reportData;
         }
 
+        public async Task<IEnumerable<MovimientoInventarioDto>> GetMovimientosInventarioAsync(DateTime fechaInicio, DateTime fechaFin)
+        {
+            var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
+            var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+
+            // 1. Sales (Salidas)
+            var salesMovements = await _context.FacturaDetalles
+                .AsNoTracking()
+                .Where(d => d.Factura.FechaEmision >= startDate && d.Factura.FechaEmision <= endDate && d.Factura.Estado != EstadoFactura.Cancelada)
+                .Select(d => new MovimientoInventarioDto
+                {
+                    Fecha = d.Factura.FechaEmision,
+                    ProductoNombre = d.Producto.Nombre,
+                    TipoMovimiento = "Venta",
+                    DocumentoReferencia = d.Factura.NumeroFactura,
+                    Cantidad = -d.Cantidad // Negative for outgoing stock
+                }).ToListAsync();
+
+            // 2. Purchases (Entradas)
+            var purchaseMovements = await _context.Lotes
+                .AsNoTracking()
+                .Where(l => l.FechaCompra >= startDate && l.FechaCompra <= endDate)
+                .Select(l => new MovimientoInventarioDto
+                {
+                    Fecha = l.FechaCompra,
+                    ProductoNombre = l.Producto.Nombre,
+                    TipoMovimiento = "Compra",
+                    DocumentoReferencia = "Compra",
+                    Cantidad = l.CantidadComprada
+                }).ToListAsync();
+            
+            // 3. Adjustments (Entradas/Salidas)
+            var adjustmentMovements = await _context.AjustesInventario
+                .AsNoTracking()
+                .Where(a => a.Fecha >= startDate && a.Fecha <= endDate)
+                .Join(_context.Productos, // Manual join
+                    ajuste => ajuste.ProductoId,
+                    producto => producto.Id,
+                    (ajuste, producto) => new MovimientoInventarioDto
+                    {
+                        Fecha = ajuste.Fecha,
+                        ProductoNombre = producto.Nombre,
+                        TipoMovimiento = "Ajuste " + ajuste.Tipo.ToString(),
+                        DocumentoReferencia = ajuste.Motivo,
+                        // Assume Daño, Perdida, AnulacionCompra are negative adjustments
+                        Cantidad = (ajuste.Tipo == TipoAjusteInventario.Daño || ajuste.Tipo == TipoAjusteInventario.Perdida || ajuste.Tipo == TipoAjusteInventario.AnulacionCompra)
+                                   ? -ajuste.CantidadAjustada
+                                   : ajuste.CantidadAjustada // Treat Conteo, Inicial, Otro as positive for now
+                    })
+                .ToListAsync();
+
+            // Combine all movements and order by date
+            var allMovements = salesMovements
+                .Concat(purchaseMovements)
+                .Concat(adjustmentMovements)
+                .OrderBy(m => m.Fecha)
+                .ToList();
+            
+            return allMovements;
+        }
+
+        public async Task<IEnumerable<ComprasPorPeriodoDto>> GetComprasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin)
+        {
+            var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
+            var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+
+            var rawLotesData = await _context.Lotes
+                .AsNoTracking()
+                .Where(l => l.FechaCompra >= startDate && l.FechaCompra <= endDate)
+                .Select(l => new 
+                {
+                    ProductoNombre = l.Producto.Nombre,
+                    l.CantidadComprada,
+                    l.PrecioCompraUnitario
+                })
+                .ToListAsync();
+
+            var reportData = rawLotesData
+                .GroupBy(l => l.ProductoNombre)
+                .Select(g => new ComprasPorPeriodoDto
+                {
+                    ProductoNombre = g.Key,
+                    CantidadComprada = (decimal)g.Sum(l => l.CantidadComprada),
+                    CostoTotal = g.Sum(l => (decimal)l.CantidadComprada * l.PrecioCompraUnitario),
+                    CostoPromedio = g.Sum(l => (decimal)l.CantidadComprada * l.PrecioCompraUnitario) / (decimal)g.Sum(l => l.CantidadComprada)
+                })
+                .OrderBy(r => r.ProductoNombre)
+                .ToList();
+
+            return reportData;
+        }
+
+        public async Task<IEnumerable<ProductoStockMinimoDto>> GetProductosBajoStockMinimoAsync()
+        {
+            var reportData = await _context.Productos
+                .AsNoTracking()
+                .Where(p => p.EstaActivo && p.ManejaInventario && p.StockTotal < p.StockMinimo)
+                .Select(p => new ProductoStockMinimoDto
+                {
+                    CodigoPrincipal = p.CodigoPrincipal,
+                    NombreProducto = p.Nombre,
+                    StockActual = p.StockTotal,
+                    StockMinimo = p.StockMinimo,
+                    CantidadFaltante = p.StockMinimo - p.StockTotal
+                })
+                .OrderBy(p => p.NombreProducto)
+                .ToListAsync();
+
+            return reportData;
+        }
+
         public async Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin)
         {
             var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
@@ -175,6 +286,31 @@ namespace FacturasSRI.Infrastructure.Services
                     ValorTotal = nc.Total
                 })
                 .OrderByDescending(dto => dto.FechaEmision)
+                .ToListAsync();
+
+            return reportData;
+        }
+
+        public async Task<IEnumerable<AjusteInventarioReportDto>> GetAjustesInventarioAsync(DateTime fechaInicio, DateTime fechaFin)
+        {
+            var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
+            var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+
+            var reportData = await _context.AjustesInventario
+                .AsNoTracking()
+                .Where(a => a.Fecha >= startDate && a.Fecha <= endDate)
+                .Join(_context.Productos, // Manual join
+                    ajuste => ajuste.ProductoId,
+                    producto => producto.Id,
+                    (ajuste, producto) => new AjusteInventarioReportDto
+                    {
+                        Fecha = ajuste.Fecha,
+                        ProductoNombre = producto.Nombre,
+                        TipoAjuste = ajuste.Tipo.ToString(),
+                        CantidadAjustada = ajuste.CantidadAjustada,
+                        Motivo = ajuste.Motivo
+                    })
+                .OrderBy(a => a.Fecha)
                 .ToListAsync();
 
             return reportData;

@@ -1,0 +1,62 @@
+**Plan de Refactorización: Mejora de la Gestión de Compras y Lotes (Con `NumeroFacturaProveedor` y Secuencial de Compra)**
+
+Este plan aborda la mejora del sistema de gestión de compras y lotes para proporcionar referencias más claras y una mejor experiencia de usuario, incorporando tanto un número de compra secuencial interno como el número de factura del proveedor.
+
+**Impacto General:** **Complejidad Alta** - Este cambio afecta a la estructura de la base de datos, el modelo de dominio, la lógica de negocio y la interfaz de usuario, introduciendo una nueva entidad principal para agrupar los lotes comprados.
+
+**Parte 1: Modificaciones en el Dominio y Base de Datos**
+
+1.  **Entidad `Secuencial` (`FacturasSRI.Domain/Entities/Secuencial.cs`)**
+    *   **Cambio:** Añadir una nueva propiedad para llevar el último secuencial de compra: `public int UltimoSecuencialCompra { get; set; }`.
+
+2.  **Nueva Entidad `Compra` (`FacturasSRI.Domain/Entities/Compra.cs`)**
+    *   **Cambio:** Crear una nueva entidad que represente una transacción de compra. Esto permitirá agrupar varios lotes bajo una misma compra y tener un identificador único para la transacción.
+    *   **Propiedades sugeridas:**
+        *   `Guid Id { get; set; }`
+        *   `string NumeroCompra { get; set; }` (El autonumérico generado).
+        *   `string? NumeroFacturaProveedor { get; set; }` (Opcional, el valor que el usuario introduce).
+        *   `DateTime FechaCompra { get; set; }`
+        *   `decimal Total { get; set; }` (Suma de los totales de los lotes asociados).
+        *   `virtual ICollection<Lote> Lotes { get; set; }` (Relación uno a muchos con Lotes).
+        *   `Guid UsuarioIdCreador { get; set; }`
+        *   `DateTime FechaCreacion { get; set; }`
+
+3.  **Modificar Entidad `Lote` (`FacturasSRI.Domain/Entities/Lote.cs`)**
+    *   **Cambio:**
+        *   Añadir una propiedad `Guid CompraId { get; set; }` para establecer la relación con la nueva entidad `Compra`.
+        *   Añadir `virtual Compra Compra { get; set; } = null!;`.
+        *   (Opcional) Eliminar `FechaCompra` de `Lote`, ya que se manejaría en `Compra`. Si se mantiene, asegurar consistencia.
+        *   **Importante:** Considerar si `Lote` debe tener `PrecioCompraUnitario` y `CantidadComprada`, o si estos deben ser parte de una nueva entidad `CompraDetalle` para manejar los ítems de una compra. Para este plan, asumimos que `Lote` sigue conteniendo el detalle del item comprado individualmente, pero ahora en el contexto de una `Compra` mayor.
+
+4.  **Base de Datos (Migración)**
+    *   **Acción:** Generar una nueva migración (`dotnet ef migrations add ...`) para añadir la tabla `Compras`, la columna `CompraId` a `Lotes` (con su Foreign Key), y la columna `UltimoSecuencialCompra` a `Secuenciales`.
+    *   **Acción:** Aplicar la migración (`dotnet ef database update`).
+
+**Parte 2: Modificaciones en la Lógica de Negocio (Backend)**
+
+1.  **`IPurchaseService` y `PurchaseService` (`FacturasSRI.Application/Interfaces/IPurchaseService.cs`, `FacturasSRI.Infrastructure/Services/PurchaseService.cs`)**
+    *   **Cambio en `IPurchaseService`:** Modificar la firma del método `CreatePurchaseAsync` para que reciba `NumeroFacturaProveedor` y los datos de los lotes a asociar.
+    *   **Cambio en `PurchaseService`:**
+        *   Generar el `NumeroCompra` (autonumérico) utilizando el `Secuencial` (asegurando transaccionalidad).
+        *   Crear una nueva instancia de `Compra`, asignarle el `NumeroCompra`, `NumeroFacturaProveedor`, `FechaCompra` y `Total` calculado.
+        *   Asociar los `Lotes` que se están creando a esta nueva `Compra`.
+        *   Guardar la `Compra` junto con los `Lotes`.
+
+2.  **DTOs de Compra (`FacturasSRI.Application/Dtos/PurchaseDto.cs`, `FacturasSRI.Application/Dtos/PurchaseListItemDto.cs`)**
+    *   **Cambio:** Añadir las propiedades `NumeroCompra` y `NumeroFacturaProveedor` a `PurchaseDto` (para entrada) y `PurchaseListItemDto` (para visualización).
+    *   **Cambio:** `PurchaseDto` necesitará una colección de DTOs para los lotes individuales que forman parte de la compra.
+
+**Parte 3: Modificaciones en la Interfaz de Usuario (Frontend)**
+
+1.  **Página de Creación de Compra (`FacturasSRI.Web/Components/Pages/Purchases/CreatePurchase.razor`)**
+    *   **Cambio:**
+        *   Añadir un campo de texto para el "Número de Factura del Proveedor" (opcional).
+        *   La interfaz se adaptaría para reflejar la creación de una compra principal que engloba la adición de uno o más lotes.
+
+2.  **Reporte de Movimientos de Inventario (`MovimientosInventarioReport.razor`)**
+    *   **Cambio:** Modificar la consulta subyacente (`GetMovimientosInventarioAsync` en `ReportService`) para que, en lugar de `l.Id.ToString().Substring(0, 8)`, use `l.Compra.NumeroCompra` o `l.Compra.NumeroFacturaProveedor`.
+
+**Consideraciones Adicionales:**
+*   Este plan mejora la trazabilidad y la legibilidad de las transacciones de compra.
+*   Es fundamental asegurar la atomicidad de la generación del `NumeroCompra` (transaccionalidad).
+*   Se requerirá actualizar las vistas de listado y detalle de compras para mostrar la nueva información.

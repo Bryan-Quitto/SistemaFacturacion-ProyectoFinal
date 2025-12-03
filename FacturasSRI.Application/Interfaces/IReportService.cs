@@ -10,5 +10,9 @@ namespace FacturasSRI.Application.Interfaces
         Task<IEnumerable<CuentasPorCobrarDto>> GetCuentasPorCobrarAsync();
         Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin);
         Task<IEnumerable<StockActualDto>> GetStockActualAsync();
+        Task<IEnumerable<MovimientoInventarioDto>> GetMovimientosInventarioAsync(DateTime fechaInicio, DateTime fechaFin);
+        Task<IEnumerable<ComprasPorPeriodoDto>> GetComprasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin);
+        Task<IEnumerable<ProductoStockMinimoDto>> GetProductosBajoStockMinimoAsync();
+        Task<IEnumerable<AjusteInventarioReportDto>> GetAjustesInventarioAsync(DateTime fechaInicio, DateTime fechaFin);
     }
 }
