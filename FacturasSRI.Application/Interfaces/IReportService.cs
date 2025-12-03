@@ -4,7 +4,7 @@ namespace FacturasSRI.Application.Interfaces
 {
     public interface IReportService
     {
-        Task<IEnumerable<VentasPorPeriodoDto>> GetVentasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin);
+        Task<IEnumerable<VentasPorPeriodoDto>> GetVentasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
         Task<IEnumerable<VentasPorProductoDto>> GetVentasPorProductoAsync(DateTime fechaInicio, DateTime fechaFin);
         Task<IEnumerable<ClienteActividadDto>> GetActividadClientesAsync(DateTime fechaInicio, DateTime fechaFin);
         Task<IEnumerable<CuentasPorCobrarDto>> GetCuentasPorCobrarAsync();
@@ -14,5 +14,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<IEnumerable<ComprasPorPeriodoDto>> GetComprasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin);
         Task<IEnumerable<ProductoStockMinimoDto>> GetProductosBajoStockMinimoAsync();
         Task<IEnumerable<AjusteInventarioReportDto>> GetAjustesInventarioAsync(DateTime fechaInicio, DateTime fechaFin);
+        Task<byte[]> GetVentasPorPeriodoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
     }
 }

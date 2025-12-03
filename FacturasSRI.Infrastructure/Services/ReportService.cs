@@ -9,35 +9,59 @@ namespace FacturasSRI.Infrastructure.Services
     public class ReportService : IReportService
     {
         private readonly FacturasSRIDbContext _context;
+        private readonly ReportPdfGeneratorService _pdfGeneratorService;
 
-        public ReportService(FacturasSRIDbContext context)
+        public ReportService(FacturasSRIDbContext context, ReportPdfGeneratorService pdfGeneratorService)
         {
             _context = context;
+            _pdfGeneratorService = pdfGeneratorService;
         }
 
-        public async Task<IEnumerable<VentasPorPeriodoDto>> GetVentasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin)
+        public async Task<IEnumerable<VentasPorPeriodoDto>> GetVentasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
         {
             // The dates are UTC from the endpoint. Using .Date resets the Kind to Unspecified.
             // We must explicitly set it back to Utc for Npgsql to work correctly.
             var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
             var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
 
-            var reportData = await _context.Facturas
-                .AsNoTracking()
+            var query = _context.Facturas.AsNoTracking();
+
+            if (userId.HasValue)
+            {
+                query = query.Where(f => f.UsuarioIdCreador == userId.Value);
+            }
+
+            var reportData = await query
                 .Where(f => f.FechaEmision >= startDate && f.FechaEmision <= endDate && f.Estado != EstadoFactura.Cancelada)
-                .GroupBy(f => f.FechaEmision.Date)
+                .Join(_context.Usuarios,
+                    factura => factura.UsuarioIdCreador,
+                    usuario => usuario.Id,
+                    (factura, usuario) => new { factura, usuario })
+                .GroupBy(x => new { x.factura.FechaEmision.Date, Vendedor = x.usuario.PrimerNombre + " " + x.usuario.PrimerApellido })
                 .Select(g => new VentasPorPeriodoDto
                 {
-                    Fecha = g.Key,
+                    Fecha = g.Key.Date,
+                    Vendedor = g.Key.Vendedor,
                     CantidadFacturas = g.Count(),
-                    Subtotal = g.Sum(f => f.SubtotalSinImpuestos),
-                    TotalIva = g.Sum(f => f.TotalIVA),
-                    Total = g.Sum(f => f.Total)
+                    Subtotal = g.Sum(x => x.factura.SubtotalSinImpuestos),
+                    TotalIva = g.Sum(x => x.factura.TotalIVA),
+                    Total = g.Sum(x => x.factura.Total)
                 })
                 .OrderBy(dto => dto.Fecha)
+                .ThenBy(dto => dto.Vendedor)
                 .ToListAsync();
 
             return reportData;
+        }
+
+        public async Task<byte[]> GetVentasPorPeriodoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
+        {
+            var data = await GetVentasPorPeriodoAsync(fechaInicio, fechaFin, userId);
+            if (data == null || !data.Any())
+            {
+                return Array.Empty<byte>();
+            }
+            return _pdfGeneratorService.GenerateVentasPorPeriodoPdf(data, fechaInicio, fechaFin);
         }
 
         public async Task<IEnumerable<VentasPorProductoDto>> GetVentasPorProductoAsync(DateTime fechaInicio, DateTime fechaFin)

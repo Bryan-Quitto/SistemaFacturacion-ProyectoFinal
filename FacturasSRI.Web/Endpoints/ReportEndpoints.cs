@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using System;
+using System.Security.Claims;
+using System.Linq;
 
 namespace FacturasSRI.Web.Endpoints
 {
@@ -11,18 +13,12 @@ namespace FacturasSRI.Web.Endpoints
     {
         public static void MapReportEndpoints(this IEndpointRouteBuilder app)
         {
-            var reportGroup = app.MapGroup("/api/reports").WithTags("Reports");
+            var reportGroup = app.MapGroup("/api/reports")
+                                 .WithTags("Reports")
+                                 .RequireAuthorization(); // Ensure all endpoints in this group require authentication
 
-            reportGroup.MapGet("/sales/by-period", async (IReportService reportService, DateTime? startDate, DateTime? endDate) =>
-            {
-                var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
-                var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
 
-                var result = await reportService.GetVentasPorPeriodoAsync(finalStartDate, finalEndDate);
-                return Results.Ok(result);
-            })
-            .WithName("GetSalesByPeriodReport")
-            .Produces(200, typeof(IEnumerable<FacturasSRI.Application.Dtos.Reports.VentasPorPeriodoDto>));
+
 
             reportGroup.MapGet("/sales/by-product", async (IReportService reportService, DateTime? startDate, DateTime? endDate) =>
             {
@@ -64,24 +60,6 @@ namespace FacturasSRI.Web.Endpoints
             })
             .WithName("GetCreditNotesReport")
             .Produces(200, typeof(IEnumerable<FacturasSRI.Application.Dtos.Reports.NotasDeCreditoReportDto>));
-
-            reportGroup.MapGet("/sales/by-period/pdf", async (IReportService reportService, ReportPdfGeneratorService pdfService, DateTime? startDate, DateTime? endDate) =>
-            {
-                var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
-                var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
-
-                var reportData = await reportService.GetVentasPorPeriodoAsync(finalStartDate, finalEndDate);
-
-                if (reportData == null || !reportData.Any())
-                {
-                    return Results.NotFound("No se encontraron datos para generar el PDF.");
-                }
-
-                var pdfBytes = pdfService.GenerateVentasPorPeriodoPdf(reportData, finalStartDate, finalEndDate);
-                return Results.File(pdfBytes, "application/pdf", $"Reporte_Ventas_Periodo_{finalStartDate.ToString("yyyyMMdd")}-{finalEndDate.ToString("yyyyMMdd")}.pdf");
-            })
-            .WithName("GetSalesByPeriodPdf")
-            .Produces(200, typeof(byte[]));
 
             reportGroup.MapGet("/sales/by-product/pdf", async (IReportService reportService, ReportPdfGeneratorService pdfService, DateTime? startDate, DateTime? endDate) =>
             {
