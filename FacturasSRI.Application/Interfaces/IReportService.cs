@@ -9,5 +9,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<IEnumerable<ClienteActividadDto>> GetActividadClientesAsync(DateTime fechaInicio, DateTime fechaFin);
         Task<IEnumerable<CuentasPorCobrarDto>> GetCuentasPorCobrarAsync();
         Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin);
+        Task<IEnumerable<StockActualDto>> GetStockActualAsync();
     }
 }

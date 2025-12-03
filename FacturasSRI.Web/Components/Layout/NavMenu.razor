@@ -114,7 +114,7 @@
                     </div>
                 </AuthorizeView>
 
-                <AuthorizeView Roles="Administrador, Vendedor">
+                <AuthorizeView Roles="Administrador, Vendedor, Bodeguero">
                     <div class="nav-section">
                         <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isReportesOpen); }">
                             <i class="bi bi-graph-up"></i>
@@ -124,11 +124,16 @@
                         @if (isReportesOpen || IsCollapsed)
                         {
                             <ul class="nav-submenu">
-                                <li><NavLink href="reports/sales/by-period" Match="NavLinkMatch.All"><i class="bi bi-calendar-week submenu-icon"></i><span>Ventas por Período</span></NavLink></li>
-                                <li><NavLink href="reports/sales/by-product" Match="NavLinkMatch.All"><i class="bi bi-box-seam submenu-icon"></i><span>Ventas por Producto</span></NavLink></li>
-                                <li><NavLink href="reports/sales/customer-activity" Match="NavLinkMatch.All"><i class="bi bi-people submenu-icon"></i><span>Actividad de Clientes</span></NavLink></li>
-                                <li><NavLink href="reports/sales/accounts-receivable" Match="NavLinkMatch.All"><i class="bi bi-wallet2 submenu-icon"></i><span>Cuentas por Cobrar</span></NavLink></li>
-                                <li><NavLink href="reports/sales/credit-notes" Match="NavLinkMatch.All"><i class="bi bi-arrow-left-circle submenu-icon"></i><span>Notas de Crédito</span></NavLink></li>
+                                <AuthorizeView Roles="Administrador, Vendedor" Context="salesContext">
+                                    <li><NavLink href="reports/sales/by-period" Match="NavLinkMatch.All"><i class="bi bi-calendar-week submenu-icon"></i><span>Ventas por Período</span></NavLink></li>
+                                    <li><NavLink href="reports/sales/by-product" Match="NavLinkMatch.All"><i class="bi bi-box-seam submenu-icon"></i><span>Ventas por Producto</span></NavLink></li>
+                                    <li><NavLink href="reports/sales/customer-activity" Match="NavLinkMatch.All"><i class="bi bi-people submenu-icon"></i><span>Actividad de Clientes</span></NavLink></li>
+                                    <li><NavLink href="reports/sales/accounts-receivable" Match="NavLinkMatch.All"><i class="bi bi-wallet2 submenu-icon"></i><span>Cuentas por Cobrar</span></NavLink></li>
+                                    <li><NavLink href="reports/sales/credit-notes" Match="NavLinkMatch.All"><i class="bi bi-arrow-left-circle submenu-icon"></i><span>Notas de Crédito</span></NavLink></li>
+                                </AuthorizeView>
+                                <AuthorizeView Roles="Administrador, Bodeguero" Context="warehouseContext">
+                                    <li><NavLink href="reports/warehouse/current-stock" Match="NavLinkMatch.All"><i class="bi bi-boxes submenu-icon"></i><span>Stock Actual</span></NavLink></li>
+                                </AuthorizeView>
                             </ul>
                         }
                     </div>

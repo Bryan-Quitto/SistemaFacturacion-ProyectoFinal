@@ -131,6 +131,32 @@ namespace FacturasSRI.Infrastructure.Services
             return reportData;
         }
 
+        public async Task<IEnumerable<StockActualDto>> GetStockActualAsync()
+        {
+            var reportData = await _context.Productos
+                .AsNoTracking()
+                .Where(p => p.EstaActivo)
+                .Select(p => new StockActualDto
+                {
+                    CodigoPrincipal = p.CodigoPrincipal,
+                    NombreProducto = p.Nombre,
+                    Categoria = p.Categoria.Nombre,
+                    StockTotal = p.StockTotal,
+                    PrecioCompraPromedioPonderado = p.PrecioCompraPromedioPonderado,
+                    ValorInventario = 0 // Placeholder, will be calculated on the client side
+                })
+                .OrderBy(p => p.NombreProducto)
+                .ToListAsync();
+
+            // Perform calculation on the client side to avoid DB overflow
+            foreach (var item in reportData)
+            {
+                item.ValorInventario = (decimal)item.StockTotal * item.PrecioCompraPromedioPonderado;
+            }
+
+            return reportData;
+        }
+
         public async Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin)
         {
             var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);

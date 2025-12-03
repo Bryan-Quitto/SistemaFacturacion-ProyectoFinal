@@ -128,6 +128,14 @@ namespace FacturasSRI.Web.Endpoints
             })
             .WithName("GetCreditNotesPdf")
             .Produces(200, typeof(byte[]));
+
+            reportGroup.MapGet("/warehouse/current-stock", async (IReportService reportService) =>
+            {
+                var result = await reportService.GetStockActualAsync();
+                return Results.Ok(result);
+            })
+            .WithName("GetCurrentStockReport")
+            .Produces(200, typeof(IEnumerable<FacturasSRI.Application.Dtos.Reports.StockActualDto>));
         }
     }
 }
