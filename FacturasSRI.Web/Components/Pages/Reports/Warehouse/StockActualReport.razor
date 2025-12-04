@@ -38,7 +38,7 @@
                 </button>
                 @if (reportData != null && reportData.Any())
                 {
-                    <button class="btn btn-info" @onclick="DownloadPdf" disabled="@isDownloading">
+                    <button class="btn btn-danger" @onclick="DownloadPdf" disabled="@isDownloading">
                         @if (isDownloading)
                         {
                             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -46,8 +46,7 @@
                         }
                         else
                         {
-                            <i class="bi bi-file-earmark-pdf me-1"></i>
-                            <span>Descargar PDF</span>
+                            <i class="bi bi-file-earmark-pdf me-2"></i><span>Descargar PDF</span>
                         }
                     </button>
                 }
@@ -129,17 +128,14 @@
     {
         isLoading = true;
         errorMessage = null;
-        reportData = null; // Limpiar datos previos
+        reportData = null;
         
         try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
-            var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
-            var finalUserId = user.IsInRole("Administrador") ? null : userId;
+            // Para Stock Actual, enviamos null (Global) tanto para Bodeguero como para Admin.
+            Guid? globalUserId = null;
 
-            reportData = await ReportService.GetStockActualAsync(finalUserId, hideZeroStock);
+            reportData = await ReportService.GetStockActualAsync(globalUserId, hideZeroStock);
         }
         catch (Exception ex)
         {
@@ -158,13 +154,8 @@
         
         try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
-            var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
-            var finalUserId = user.IsInRole("Administrador") ? null : userId;
-
-            var pdfBytes = await ReportService.GetStockActualAsPdfAsync(finalUserId, hideZeroStock);
+            Guid? globalUserId = null;
+            var pdfBytes = await ReportService.GetStockActualAsPdfAsync(globalUserId, hideZeroStock);
 
             if (pdfBytes.Length == 0)
             {

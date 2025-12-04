@@ -2,10 +2,12 @@
 @using Microsoft.AspNetCore.Authorization
 @using System.Globalization
 @using System.Security.Claims
+@using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Dtos.Reports
 @using FacturasSRI.Application.Interfaces
 @using Microsoft.JSInterop
 @inject IReportService ReportService
+@inject IUserService UserService
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
@@ -18,40 +20,62 @@
             <p class="text-muted mb-0">Muestra un resumen de las ventas agrupadas por producto en un período de tiempo.</p>
         </div>
         <div class="card-body">
+            @* Filtros *@
             <div class="row align-items-end mb-3">
-                <div class="col-md-4">
+                
+                @* 1. Fecha Inicio *@
+                <div class="@ColumnClass">
                     <label for="startDate" class="form-label">Fecha de Inicio</label>
                     <input type="date" id="startDate" class="form-control" @bind="startDate" />
                 </div>
-                <div class="col-md-4">
+
+                @* 2. Fecha Fin *@
+                <div class="@ColumnClass">
                     <label for="endDate" class="form-label">Fecha de Fin</label>
                     <input type="date" id="endDate" class="form-control" @bind="endDate" />
                 </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <button class="btn btn-primary me-2" @onclick="GenerateReport" disabled="@isLoading">
+
+                @* 3. Filtro de Usuario (SOLO ADMIN) *@
+                @if (isAdmin)
+                {
+                    <div class="@ColumnClass">
+                        <label for="userFilter" class="form-label">Filtrar por Vendedor</label>
+                        <select id="userFilter" class="form-select" @bind="selectedFilterUserId">
+                            <option value="">-- Todos los Vendedores --</option>
+                            @if (usersList != null)
+                            {
+                                foreach (var user in usersList)
+                                {
+                                    <option value="@user.Id">@user.PrimerNombre @user.PrimerApellido</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                }
+
+                @* 4. Botones *@
+                <div class="@ColumnClass d-flex align-items-end">
+                    <button class="btn btn-primary me-2 w-100" @onclick="GenerateReport" disabled="@isLoading">
                         @if (isLoading)
                         {
                             <span class="spinner-border spinner-border-sm"></span>
-                            <span>Generando...</span>
                         }
                         else
                         {
                             <i class="bi bi-search me-1"></i>
-                            <span>Generar Reporte</span>
+                            <span>Generar</span>
                         }
                     </button>
                     @if (reportData != null && reportData.Any())
                     {
-                        <button class="btn btn-info" @onclick="DownloadPdf" disabled="@isDownloading">
+                        <button class="btn btn-danger w-100" @onclick="DownloadPdf" disabled="@isDownloading">
                             @if (isDownloading)
                             {
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                                <span class="ms-1">Descargando...</span>
                             }
                             else
                             {
-                                <i class="bi bi-file-earmark-pdf me-1"></i>
-                                <span>Descargar PDF</span>
+                                <i class="bi bi-file-earmark-pdf me-2"></i><span>Descargar PDF</span>
                             }
                         </button>
                     }
@@ -121,13 +145,64 @@
 </div>
 
 @code {
+    // Filtros de fecha
     private DateTime startDate = DateTime.Now.AddMonths(-1).Date;
     private DateTime endDate = DateTime.Now.Date;
+
+    // Variables de Usuario y Roles
+    private bool isAdmin = false;
+    private Guid? loggedUserId;
+    private Guid? selectedFilterUserId;
+    private List<UserDto>? usersList;
+
+    // Data y Estado
     private IEnumerable<VentasPorProductoDto>? reportData;
     private bool isLoading = false;
     private bool isDownloading = false;
     private string? errorMessage;
     private readonly CultureInfo esEcCulture = new CultureInfo("es-EC");
+
+    // Layout Dinámico
+    private string ColumnClass => isAdmin ? "col-md-3" : "col-md-4";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity != null && user.Identity.IsAuthenticated)
+            {
+                isAdmin = user.IsInRole("Administrador");
+                
+                var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+                if (Guid.TryParse(userIdClaim?.Value, out var id))
+                {
+                    loggedUserId = id;
+                }
+
+                if (isAdmin)
+                {
+                    var allUsers = await UserService.GetActiveUsersAsync();
+                    // Filtramos bodegueros
+                    usersList = allUsers
+                        .Where(u => u.Roles.Contains("Vendedor") || u.Roles.Contains("Administrador"))
+                        .OrderBy(u => u.PrimerNombre)
+                        .ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar permisos: {ex.Message}";
+        }
+    }
+
+    private Guid? GetQueryUserId()
+    {
+        return isAdmin ? selectedFilterUserId : loggedUserId;
+    }
 
     private async Task GenerateReport()
     {
@@ -144,13 +219,8 @@
 
         try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
-            var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
-            var finalUserId = user.IsInRole("Administrador") ? null : userId;
-
-            reportData = await ReportService.GetVentasPorProductoAsync(startDate, endDate, finalUserId);
+            var queryUserId = GetQueryUserId();
+            reportData = await ReportService.GetVentasPorProductoAsync(startDate, endDate, queryUserId);
         }
         catch (Exception ex)
         {
@@ -169,13 +239,8 @@
 
         try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
-            var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
-            var finalUserId = user.IsInRole("Administrador") ? null : userId;
-
-            var pdfBytes = await ReportService.GetVentasPorProductoAsPdfAsync(startDate, endDate, finalUserId);
+            var queryUserId = GetQueryUserId();
+            var pdfBytes = await ReportService.GetVentasPorProductoAsPdfAsync(startDate, endDate, queryUserId);
 
             if (pdfBytes.Length == 0)
             {

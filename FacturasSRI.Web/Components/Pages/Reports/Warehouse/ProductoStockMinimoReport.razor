@@ -32,7 +32,7 @@
                 </button>
                 @if (reportData != null && reportData.Any())
                 {
-                    <button class="btn btn-info" @onclick="DownloadPdf" disabled="@isDownloading">
+                    <button class="btn btn-danger" @onclick="DownloadPdf" disabled="@isDownloading">
                         @if (isDownloading)
                         {
                             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -40,8 +40,7 @@
                         }
                         else
                         {
-                            <i class="bi bi-file-earmark-pdf me-1"></i>
-                            <span>Descargar PDF</span>
+                            <i class="bi bi-file-earmark-pdf me-2"></i><span>Descargar PDF</span>
                         }
                     </button>
                 }
@@ -62,7 +61,7 @@
                 {
                     <div class="alert alert-success" role="alert">
                         <i class="bi bi-check-circle-fill me-2"></i>
-                        ¡Todos los productos están por encima del stock mínimo!
+                        ¡Excelente! Todos los productos están por encima del stock mínimo.
                     </div>
                 }
                 else
@@ -107,7 +106,7 @@
     private bool isLoading = false;
     private bool isDownloading = false;
     private string? errorMessage;
-    private readonly CultureInfo esEcCulture = new CultureInfo("es-EC"); // Agregada esta línea
+    private readonly CultureInfo esEcCulture = new CultureInfo("es-EC");
     
     protected override async Task OnInitializedAsync()
     {
@@ -118,17 +117,15 @@
     {
         isLoading = true;
         errorMessage = null;
-        reportData = null; // Clear previous data
+        reportData = null; 
         
         try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
-            var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
-            var finalUserId = user.IsInRole("Administrador") ? null : userId;
+            // Nota: Para Stock Mínimo Global, siempre enviamos null como userId, 
+            // ya que el Bodeguero y el Admin deben ver TODO el inventario que falta.
+            Guid? globalUserId = null;
 
-            reportData = await ReportService.GetProductosBajoStockMinimoAsync(finalUserId);
+            reportData = await ReportService.GetProductosBajoStockMinimoAsync(globalUserId);
         }
         catch (Exception ex)
         {
@@ -147,13 +144,8 @@
 
         try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
-            var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
-            var finalUserId = user.IsInRole("Administrador") ? null : userId;
-
-            var pdfBytes = await ReportService.GetProductosBajoStockMinimoAsPdfAsync(finalUserId);
+            Guid? globalUserId = null;
+            var pdfBytes = await ReportService.GetProductosBajoStockMinimoAsPdfAsync(globalUserId);
 
             if (pdfBytes.Length == 0)
             {

@@ -1,10 +1,11 @@
 @page "/credit-notes/{Id:guid}"
-@attribute [Authorize(Roles = "Administrador, Vendedor")]
+@attribute [Authorize(Roles = "Administrador, Vendedor, Bodeguero")]
 
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Interfaces
 @using FacturasSRI.Domain.Enums
 @using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @inject ICreditNoteService CreditNoteService
 @inject NavigationManager Navigation
 @inject IConfiguration Configuration
@@ -39,18 +40,23 @@ else
                 <a href="/api/downloads/nc-ride/@creditNote.Id" target="_blank" class="btn btn-danger me-2">
                     <i class="bi bi-file-earmark-pdf me-2"></i>Descargar PDF
                 </a>
-                <button class="btn btn-success" @onclick="ResendEmail" disabled="@sendingEmail">
-                    @if (sendingEmail)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-                        <span>Enviando...</span>
-                    }
-                    else
-                    {
-                        <i class="bi bi-envelope me-2"></i>
-                        <span>Reenviar Correo</span>
-                    }
-                </button>
+                
+                @* OCULTO PARA BODEGUERO: No debe enviar correos a clientes *@
+                @if (!isBodeguero)
+                {
+                    <button class="btn btn-success" @onclick="ResendEmail" disabled="@sendingEmail">
+                        @if (sendingEmail)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                            <span>Enviando...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-envelope me-2"></i>
+                            <span>Reenviar Correo</span>
+                        }
+                    </button>
+                }
             }
             @if (userIsAdmin && creditNote.Estado == EstadoNotaDeCredito.Cancelada)
             {
@@ -229,35 +235,39 @@ else
                         </div>
                     }
                     
-                    <div class="d-grid gap-2 mt-3">
-                        @if (creditNote.Estado == EstadoNotaDeCredito.Borrador)
-                        {
-                             <div class="alert alert-warning py-2 text-center small mb-2">
-                                <i class="bi bi-info-circle-fill me-1"></i>
-                                Esta nota de crédito es un <strong>borrador</strong>. No tiene validez fiscal hasta que sea emitida.
-                            </div>
-                            <button class="btn btn-primary" @onclick="OpenIssueModal" disabled="@isCheckingStatus">
-                                <i class="bi bi-send-check-fill me-2"></i>
-                                <span>Emitir Nota de Crédito</span>
-                            </button>
-                        }
-                        else if (creditNote.Estado != EstadoNotaDeCredito.Autorizada && creditNote.Estado != EstadoNotaDeCredito.Cancelada)
-                        {
-                            <button class="btn btn-primary" @onclick="HandleCheckSriStatus" disabled="@isCheckingStatus">
-                                @if (isCheckingStatus)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2"></span> <span>Procesando...</span>
-                                }
-                                else
-                                {
-                                    <i class="bi bi-arrow-clockwise me-2"></i> <span>Actualizar / Reintentar</span>
-                                }
-                            </button>
-                            <small class="text-muted text-center" style="font-size: 0.7rem;">
-                                Use este botón para consultar el estado o reintentar el envío si hubo error de conexión.
-                            </small>
-                        }
-                    </div>
+                    @* OCULTO PARA BODEGUERO: Solo lectura *@
+                    @if (!isBodeguero)
+                    {
+                        <div class="d-grid gap-2 mt-3">
+                            @if (creditNote.Estado == EstadoNotaDeCredito.Borrador)
+                            {
+                                 <div class="alert alert-warning py-2 text-center small mb-2">
+                                    <i class="bi bi-info-circle-fill me-1"></i>
+                                    Esta nota de crédito es un <strong>borrador</strong>. No tiene validez fiscal hasta que sea emitida.
+                                </div>
+                                <button class="btn btn-primary" @onclick="OpenIssueModal" disabled="@isCheckingStatus">
+                                    <i class="bi bi-send-check-fill me-2"></i>
+                                    <span>Emitir Nota de Crédito</span>
+                                </button>
+                            }
+                            else if (creditNote.Estado != EstadoNotaDeCredito.Autorizada && creditNote.Estado != EstadoNotaDeCredito.Cancelada)
+                            {
+                                <button class="btn btn-primary" @onclick="HandleCheckSriStatus" disabled="@isCheckingStatus">
+                                    @if (isCheckingStatus)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span> <span>Procesando...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-arrow-clockwise me-2"></i> <span>Actualizar / Reintentar</span>
+                                    }
+                                </button>
+                                <small class="text-muted text-center" style="font-size: 0.7rem;">
+                                    Use este botón para consultar el estado o reintentar el envío si hubo error de conexión.
+                                </small>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -302,6 +312,7 @@ else
     private string? sriCheckMessage;
     private bool isCheckingStatus = false;
     private bool userIsAdmin = false;
+    private bool isBodeguero = false; // Variable para controlar rol Bodeguero
     private bool showIssueModal = false;
     private bool sendingEmail = false;
     private bool emailSuccess = false;
@@ -339,7 +350,11 @@ else
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        userIsAdmin = authState.User.IsInRole("Administrador");
+        var user = authState.User;
+        
+        userIsAdmin = user.IsInRole("Administrador");
+        isBodeguero = user.IsInRole("Bodeguero"); // Detectamos si es bodeguero
+        
         await LoadData();
     }
 

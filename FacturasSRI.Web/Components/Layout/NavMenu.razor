@@ -28,26 +28,36 @@
                     </NavLink>
                 </div>
 
+                @* --- SECCIÓN FACTURACIÓN --- *@
                 <div class="nav-section">
                     <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isFacturasOpen); }">
                         <i class="bi bi-file-earmark-text-fill"></i>
-                        @if (!IsCollapsed) { <span>Facturas</span> }
+                        @if (!IsCollapsed) { <span>Facturación</span> } @* Cambié "Facturas" por "Facturación" para que abarque NC *@
                         @if (!IsCollapsed) { <i class="bi @(isFacturasOpen ? "bi-chevron-down" : "bi-chevron-right") ms-auto"></i> }
                     </div>
                     @if (isFacturasOpen || IsCollapsed)
                     {
                         <ul class="nav-submenu">
+                            @* Crear Factura: Solo quien vende *@
                             <AuthorizeView Roles="Administrador, Vendedor" Context="innerContext">
                                 <li><NavLink href="invoices/create"><i class="bi bi-file-earmark-plus submenu-icon"></i><span>Crear Factura</span></NavLink></li>
                             </AuthorizeView>
+                            
+                            @* Listar Facturas: Todos (Bodeguero necesita ver qué despachar) *@
                             <li><NavLink href="invoices" Match="NavLinkMatch.All"><i class="bi bi-card-list submenu-icon"></i><span>Listar Facturas</span></NavLink></li>
+                            
+                            @* Notas de Crédito: Todos (Bodeguero necesita ver devoluciones) *@
+                            <li><NavLink href="credit-notes" Match="NavLinkMatch.All"><i class="bi bi-arrow-return-left submenu-icon"></i><span>Notas de Crédito</span></NavLink></li>
+                            
+                            @* Pagos: Solo quien cobra *@
                             <AuthorizeView Roles="Administrador, Vendedor" Context="innerContext">
-                                <li><NavLink href="credit-notes" Match="NavLinkMatch.All"><i class="bi bi-arrow-return-left submenu-icon"></i><span>Notas de Crédito</span></NavLink></li>
                                 <li><NavLink href="payments" Match="NavLinkMatch.All"><i class="bi bi-credit-card submenu-icon"></i><span>Historial de Pagos</span></NavLink></li>
                             </AuthorizeView>
                         </ul>
                     }
                 </div>
+
+                @* --- SECCIÓN CLIENTES (Solo Ventas) --- *@
                 <AuthorizeView Roles="Administrador, Vendedor">
                     <div class="nav-section">
                         <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isClientesOpen); }">
@@ -65,6 +75,7 @@
                     </div>
                 </AuthorizeView>
 
+                @* --- SECCIÓN PRODUCTOS --- *@
                 <div class="nav-section">
                     <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isProductosOpen); }">
                         <i class="bi bi-box-seam-fill"></i>
@@ -82,6 +93,7 @@
                     }
                 </div>
 
+                @* --- SECCIÓN BODEGA OPERATIVA (Compras e Inventario) --- *@
                 <AuthorizeView Roles="Administrador, Bodeguero">
                     <div class="nav-section">
                         <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isComprasOpen); }">
@@ -115,7 +127,7 @@
                 </AuthorizeView>
 
 
-
+                @* --- SECCIÓN REPORTES --- *@
                 <AuthorizeView Roles="Administrador, Vendedor">
                     <div class="nav-section">
                         <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isReportesVentasOpen); }">
@@ -138,7 +150,7 @@
                 <AuthorizeView Roles="Administrador, Bodeguero">
                     <div class="nav-section">
                         <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isReportesBodegaOpen); }">
-                            <i class="bi bi-box-seam-fill"></i> @* Changed icon to be more warehouse-related *@
+                            <i class="bi bi-box-seam-fill"></i>
                             @if (!IsCollapsed) { <span>Reportes de Bodega</span> }
                             @if (!IsCollapsed) { <i class="bi @(isReportesBodegaOpen ? "bi-chevron-down" : "bi-chevron-right") ms-auto"></i> }
                         </div>
@@ -155,6 +167,7 @@
                     </div>
                 </AuthorizeView>
 
+                @* --- SECCIÓN ADMIN (Configuración) --- *@
                 <AuthorizeView Roles="Administrador">
                     <div class="nav-section">
                         <div class="nav-link-header" @onclick="() => { if (!IsCollapsed) ToggleSubMenu(ref isImpuestosOpen); }">
