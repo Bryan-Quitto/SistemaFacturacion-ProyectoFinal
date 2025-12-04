@@ -5,10 +5,14 @@ namespace FacturasSRI.Application.Interfaces
     public interface IReportService
     {
         Task<IEnumerable<VentasPorPeriodoDto>> GetVentasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
-        Task<IEnumerable<VentasPorProductoDto>> GetVentasPorProductoAsync(DateTime fechaInicio, DateTime fechaFin);
-        Task<IEnumerable<ClienteActividadDto>> GetActividadClientesAsync(DateTime fechaInicio, DateTime fechaFin);
-        Task<IEnumerable<CuentasPorCobrarDto>> GetCuentasPorCobrarAsync();
-        Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin);
+        Task<IEnumerable<VentasPorProductoDto>> GetVentasPorProductoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<byte[]> GetVentasPorProductoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<IEnumerable<ClienteActividadDto>> GetActividadClientesAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<byte[]> GetActividadClientesAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<IEnumerable<CuentasPorCobrarDto>> GetCuentasPorCobrarAsync(Guid? userId);
+        Task<byte[]> GetCuentasPorCobrarAsPdfAsync(Guid? userId);
+        Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<byte[]> GetNotasDeCreditoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
         Task<IEnumerable<StockActualDto>> GetStockActualAsync();
         Task<IEnumerable<MovimientoInventarioDto>> GetMovimientosInventarioAsync(DateTime fechaInicio, DateTime fechaFin);
         Task<IEnumerable<ComprasPorPeriodoDto>> GetComprasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin);

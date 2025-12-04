@@ -1,0 +1,36 @@
+# Plan de Acción para Mejoras en Reportes
+
+## 1. Reporte de Ventas por Producto
+
+*   **Objetivo:** Agregar la fecha y el vendedor a cada fila para saber cuándo y quién vendió cada producto.
+*   **Acciones:**
+    1.  **DTO:** Añadir propiedades `Fecha` y `Vendedor` a `VentasPorProductoDto`.
+    2.  **Servicio:** Modificar `GetVentasPorProductoAsync` en `ReportService` para agrupar los resultados no solo por producto, sino también por fecha y vendedor.
+    3.  **Componente:** Actualizar la tabla en `VentasPorProductoReport.razor` para mostrar las nuevas columnas "Fecha" y "Vendedor".
+
+## 2. Reporte de Actividad de Clientes
+
+*   **Objetivo:** Clarificar el propósito del reporte y el funcionamiento del filtro de fechas.
+*   **Análisis:** El filtro de fechas actual se usa para calcular la "Última Compra" y el "Total Comprado" *dentro de ese período*. El reporte muestra a **todos** los clientes, lo cual es correcto, pero la descripción puede ser confusa. Agregar un "vendedor" por fila no es práctico aquí, ya que un cliente puede comprarle a varios vendedores.
+*   **Acciones:**
+    1.  **Componente:** Modificar el texto descriptivo en `ClienteActividadReport.razor` a: "Muestra la actividad de todos los clientes. Los cálculos de 'Última Compra' y 'Total Comprado' se basan únicamente en las ventas realizadas dentro del período de fechas seleccionado."
+
+## 3. Reporte de Cuentas por Cobrar
+
+*   **Objetivo:** Añadir el vendedor que generó la factura para saber quién es el responsable de ese cobro.
+*   **Acciones:**
+    1.  **DTO:** Añadir la propiedad `Vendedor` a `CuentasPorCobrarDto`.
+    2.  **Servicio:** Modificar `GetCuentasPorCobrarAsync` en `ReportService` para incluir la información del vendedor que creó la factura.
+    3.  **Componente:** Actualizar la tabla en `CuentasPorCobrarReport.razor` para mostrar la nueva columna "Vendedor".
+
+## 4. Reporte de Notas de Crédito Emitidas
+
+*   **Objetivo:** Añadir el vendedor que generó la nota de crédito.
+*   **Acciones:**
+    1.  **DTO:** Añadir la propiedad `Vendedor` a `NotasDeCreditoReportDto`.
+    2.  **Servicio:** Modificar `GetNotasDeCreditoAsync` en `ReportService` para incluir la información del vendedor que creó la nota de crédito.
+    3.  **Componente:** Actualizar la tabla en `NotasDeCreditoReport.razor` para mostrar la nueva columna "Vendedor".
+
+## 5. Verificación Final
+
+*   **Acción:** Al finalizar todos los cambios, ejecutar `dotnet build` para garantizar que el proyecto compila correctamente.

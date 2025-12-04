@@ -64,14 +64,21 @@ namespace FacturasSRI.Infrastructure.Services
             return _pdfGeneratorService.GenerateVentasPorPeriodoPdf(data, fechaInicio, fechaFin);
         }
 
-        public async Task<IEnumerable<VentasPorProductoDto>> GetVentasPorProductoAsync(DateTime fechaInicio, DateTime fechaFin)
+        public async Task<IEnumerable<VentasPorProductoDto>> GetVentasPorProductoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
         {
             var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
             var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
 
-            var reportData = await _context.FacturaDetalles
+            var query = _context.FacturaDetalles
                 .AsNoTracking()
-                .Where(d => d.Factura.FechaEmision >= startDate && d.Factura.FechaEmision <= endDate && d.Factura.Estado != EstadoFactura.Cancelada)
+                .Where(d => d.Factura.FechaEmision >= startDate && d.Factura.FechaEmision <= endDate && d.Factura.Estado != EstadoFactura.Cancelada);
+
+            if (userId.HasValue)
+            {
+                query = query.Where(d => d.Factura.UsuarioIdCreador == userId.Value);
+            }
+
+            var reportData = await query
                 .GroupBy(d => new { d.ProductoId, d.Producto.CodigoPrincipal, d.Producto.Nombre })
                 .Select(g => new VentasPorProductoDto
                 {
@@ -87,15 +94,31 @@ namespace FacturasSRI.Infrastructure.Services
             return reportData;
         }
 
-        public async Task<IEnumerable<ClienteActividadDto>> GetActividadClientesAsync(DateTime fechaInicio, DateTime fechaFin)
+        public async Task<byte[]> GetVentasPorProductoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
+        {
+            var data = await GetVentasPorProductoAsync(fechaInicio, fechaFin, userId);
+            if (data == null || !data.Any())
+            {
+                return Array.Empty<byte>();
+            }
+            return _pdfGeneratorService.GenerateVentasPorProductoPdf(data, fechaInicio, fechaFin);
+        }
+
+        public async Task<IEnumerable<ClienteActividadDto>> GetActividadClientesAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
         {
             var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
             var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
 
-            // Get all invoices in the date range to avoid multiple DB calls in a loop
-            var facturasEnRango = await _context.Facturas
+            var queryFacturas = _context.Facturas
                 .AsNoTracking()
-                .Where(f => f.FechaEmision >= startDate && f.FechaEmision <= endDate && f.Estado != EstadoFactura.Cancelada && f.ClienteId != null)
+                .Where(f => f.FechaEmision >= startDate && f.FechaEmision <= endDate && f.Estado != EstadoFactura.Cancelada && f.ClienteId != null);
+
+            if (userId.HasValue)
+            {
+                queryFacturas = queryFacturas.Where(f => f.UsuarioIdCreador == userId.Value);
+            }
+
+            var facturasEnRango = await queryFacturas
                 .Select(f => new { f.ClienteId, f.FechaEmision, f.Total })
                 .ToListAsync();
 
@@ -127,13 +150,30 @@ namespace FacturasSRI.Infrastructure.Services
             return reportData;
         }
 
-        public async Task<IEnumerable<CuentasPorCobrarDto>> GetCuentasPorCobrarAsync()
+        public async Task<byte[]> GetActividadClientesAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
+        {
+            var data = await GetActividadClientesAsync(fechaInicio, fechaFin, userId);
+            if (data == null || !data.Any())
+            {
+                return Array.Empty<byte>();
+            }
+            return _pdfGeneratorService.GenerateActividadClientesPdf(data, fechaInicio, fechaFin);
+        }
+
+        public async Task<IEnumerable<CuentasPorCobrarDto>> GetCuentasPorCobrarAsync(Guid? userId)
         {
             var today = DateTime.UtcNow.Date;
 
-            var reportData = await _context.Facturas
+            var query = _context.Facturas
                 .AsNoTracking()
-                .Where(f => f.Estado != EstadoFactura.Cancelada && f.ClienteId != null && f.Total > f.Cobros.Sum(c => c.Monto))
+                .Where(f => f.Estado != EstadoFactura.Cancelada && f.ClienteId != null && f.Total > f.Cobros.Sum(c => c.Monto));
+
+            if (userId.HasValue)
+            {
+                query = query.Where(f => f.UsuarioIdCreador == userId.Value);
+            }
+
+            var reportData = await query
                 .Select(f => new CuentasPorCobrarDto
                 {
                     NombreCliente = f.Cliente.RazonSocial,
@@ -153,6 +193,16 @@ namespace FacturasSRI.Infrastructure.Services
             reportData.ForEach(r => r.DiasVencida = Math.Max(0, r.DiasVencida));
 
             return reportData;
+        }
+
+        public async Task<byte[]> GetCuentasPorCobrarAsPdfAsync(Guid? userId)
+        {
+            var data = await GetCuentasPorCobrarAsync(userId);
+            if (data == null || !data.Any())
+            {
+                return Array.Empty<byte>();
+            }
+            return _pdfGeneratorService.GenerateCuentasPorCobrarPdf(data);
         }
 
         public async Task<IEnumerable<StockActualDto>> GetStockActualAsync()
@@ -292,14 +342,21 @@ namespace FacturasSRI.Infrastructure.Services
             return reportData;
         }
 
-        public async Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin)
+        public async Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
         {
             var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
             var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
 
-            var reportData = await _context.NotasDeCredito
+            var query = _context.NotasDeCredito
                 .AsNoTracking()
-                .Where(nc => nc.FechaEmision >= startDate && nc.FechaEmision <= endDate)
+                .Where(nc => nc.FechaEmision >= startDate && nc.FechaEmision <= endDate);
+
+            if (userId.HasValue)
+            {
+                query = query.Where(nc => nc.UsuarioIdCreador == userId.Value);
+            }
+
+            var reportData = await query
                 .Select(nc => new NotasDeCreditoReportDto
                 {
                     NumeroNotaCredito = nc.NumeroNotaCredito,
@@ -313,6 +370,16 @@ namespace FacturasSRI.Infrastructure.Services
                 .ToListAsync();
 
             return reportData;
+        }
+
+        public async Task<byte[]> GetNotasDeCreditoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
+        {
+            var data = await GetNotasDeCreditoAsync(fechaInicio, fechaFin, userId);
+            if (data == null || !data.Any())
+            {
+                return Array.Empty<byte>();
+            }
+            return _pdfGeneratorService.GenerateNotasDeCreditoPdf(data, fechaInicio, fechaFin);
         }
 
         public async Task<IEnumerable<AjusteInventarioReportDto>> GetAjustesInventarioAsync(DateTime fechaInicio, DateTime fechaFin)
