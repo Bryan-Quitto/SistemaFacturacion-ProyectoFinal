@@ -12,5 +12,6 @@ namespace FacturasSRI.Application.Dtos.Reports
         public decimal CantidadComprada { get; set; }
         public decimal CostoUnitario { get; set; }
         public decimal CostoTotal { get; set; }
+        public string UsuarioResponsable { get; set; } = string.Empty;
     }
 }

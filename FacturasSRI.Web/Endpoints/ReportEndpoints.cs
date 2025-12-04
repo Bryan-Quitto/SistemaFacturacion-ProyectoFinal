@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using System;
-using System.Security.Claims;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace FacturasSRI.Web.Endpoints
@@ -15,10 +15,13 @@ namespace FacturasSRI.Web.Endpoints
         {
             var reportGroup = app.MapGroup("/api/reports")
                                  .WithTags("Reports")
-                                 .RequireAuthorization(); // Ensure all endpoints in this group require authentication
-            reportGroup.MapGet("/warehouse/current-stock", async (IReportService reportService) =>
+                                 .RequireAuthorization();
+
+            // 1. Stock Actual (JSON) - Agregamos parámetro opcional ?hideZeroStock=true
+            reportGroup.MapGet("/warehouse/current-stock", async (IReportService reportService, bool? hideZeroStock) =>
             {
-                var result = await reportService.GetStockActualAsync(null);
+                // Por defecto ocultamos ceros si no se especifica
+                var result = await reportService.GetStockActualAsync(null, hideZeroStock ?? true);
                 return Results.Ok(result);
             })
             .WithName("GetCurrentStockReport")
@@ -62,11 +65,17 @@ namespace FacturasSRI.Web.Endpoints
             .WithName("GetInventoryAdjustmentsReport")
             .Produces(200, typeof(IEnumerable<FacturasSRI.Application.Dtos.Reports.AjusteInventarioReportDto>));
 
-            reportGroup.MapGet("/warehouse/current-stock/pdf", async (IReportService reportService, ReportPdfGeneratorService pdfService) =>
+            // 2. Stock Actual (PDF) - Agregamos parámetro opcional
+            reportGroup.MapGet("/warehouse/current-stock/pdf", async (IReportService reportService, ReportPdfGeneratorService pdfService, bool? hideZeroStock) =>
             {
-                var reportData = await reportService.GetStockActualAsync(null);
+                bool hide = hideZeroStock ?? true;
+                // Pasamos el booleano al servicio de datos
+                var reportData = await reportService.GetStockActualAsync(null, hide);
+                
                 if (reportData == null || !reportData.Any()) return Results.NotFound("No se encontraron datos para generar el PDF.");
-                var pdfBytes = pdfService.GenerateStockActualPdf(reportData);
+                
+                // Pasamos el booleano al generador de PDF
+                var pdfBytes = pdfService.GenerateStockActualPdf(reportData, hide);
                 return Results.File(pdfBytes, "application/pdf", $"Reporte_Stock_Actual_{DateTime.Now:yyyyMMdd}.pdf");
             })
             .WithName("GetStockActualPdf")

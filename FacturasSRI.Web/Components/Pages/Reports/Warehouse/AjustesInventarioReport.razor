@@ -80,6 +80,7 @@
                             <thead class="table-dark">
                                 <tr>
                                     <th>Fecha</th>
+                                    <th>Responsable</th>
                                     <th>Producto</th>
                                     <th>Tipo de Ajuste</th>
                                     <th class="text-end">Cantidad Ajustada</th>
@@ -91,6 +92,7 @@
                                 {
                                     <tr>
                                         <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td>@item.UsuarioResponsable</td>
                                         <td>@item.ProductoNombre</td>
                                         <td>@item.TipoAjuste</td>
                                         <td class="text-end">@item.CantidadAjustada</td>

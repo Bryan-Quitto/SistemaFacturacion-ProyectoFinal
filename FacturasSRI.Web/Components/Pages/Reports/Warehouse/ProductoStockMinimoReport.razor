@@ -70,26 +70,30 @@
                     <div class="table-responsive">
                         <table class="table table-bordered table-striped table-hover">
                             <thead class="table-dark">
+                            <tr>
+                                <th>Código</th>
+                                <th>Producto</th>
+                                <th class="text-end">Actual</th>
+                                <th class="text-end">Mínimo</th>
+                                <th class="text-end">Faltante</th>
+                                <th class="text-end">Costo Unit.</th> 
+                                <th class="text-end">Total Reposición</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in reportData)
+                            {
                                 <tr>
-                                    <th>Código</th>
-                                    <th>Producto</th>
-                                    <th class="text-end">Stock Actual</th>
-                                    <th class="text-end">Stock Mínimo</th>
-                                    <th class="text-end">Cantidad Faltante</th>
+                                    <td>@item.CodigoPrincipal</td>
+                                    <td>@item.NombreProducto</td>
+                                    <td class="text-end">@item.StockActual</td>
+                                    <td class="text-end">@item.StockMinimo</td>
+                                    <td class="text-end font-weight-bold text-danger">@item.CantidadFaltante</td>
+                                    <td class="text-end">@item.CostoPromedioUnitario.ToString("C", esEcCulture)</td>
+                                    <td class="text-end font-weight-bold">@item.CostoEstimadoReposicion.ToString("C", esEcCulture)</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var item in reportData)
-                                {
-                                    <tr>
-                                        <td>@item.CodigoPrincipal</td>
-                                        <td>@item.NombreProducto</td>
-                                        <td class="text-end">@item.StockActual</td>
-                                        <td class="text-end">@item.StockMinimo</td>
-                                        <td class="text-end font-weight-bold">@item.CantidadFaltante</td>
-                                    </tr>
-                                }
-                            </tbody>
+                            }
+                        </tbody>
                         </table>
                     </div>
                 }
@@ -103,6 +107,7 @@
     private bool isLoading = false;
     private bool isDownloading = false;
     private string? errorMessage;
+    private readonly CultureInfo esEcCulture = new CultureInfo("es-EC"); // Agregada esta línea
     
     protected override async Task OnInitializedAsync()
     {

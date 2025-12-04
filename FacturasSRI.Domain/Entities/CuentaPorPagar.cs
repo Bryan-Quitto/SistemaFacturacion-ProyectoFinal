@@ -15,7 +15,7 @@ namespace FacturasSRI.Domain.Entities
         [ForeignKey("ProductoId")]
         public virtual Producto Producto { get; set; } = null!;
 
-        // Relación opcional con Lote (si el producto maneja lotes)
+        // Relación opcional con Lote
         public Guid? LoteId { get; set; }
         [ForeignKey("LoteId")]
         public virtual Lote? Lote { get; set; }
@@ -24,20 +24,13 @@ namespace FacturasSRI.Domain.Entities
         [MaxLength(200)]
         public string NombreProveedor { get; set; } = string.Empty;
 
-        // Ruta del archivo PDF de la factura en el storage
         public string? FacturaCompraPath { get; set; }
-        
-        // Ruta del archivo PDF del comprobante de pago
         public string? ComprobantePagoPath { get; set; }
-
-        // NUEVO: Ruta del archivo PDF de la Nota de Crédito (Anulación)
         public string? NotaCreditoPath { get; set; }
 
         public DateTime FechaEmision { get; set; }
-        
-        public DateTime? FechaVencimiento { get; set; } // Obligatorio solo para Credito
-        
-        public DateTime? FechaPago { get; set; } // Se llena cuando se paga
+        public DateTime? FechaVencimiento { get; set; } 
+        public DateTime? FechaPago { get; set; } 
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal MontoTotal { get; set; }
@@ -48,8 +41,11 @@ namespace FacturasSRI.Domain.Entities
 
         public FormaDePago FormaDePago { get; set; }
 
-        // Auditoría
         public Guid UsuarioIdCreador { get; set; }
+
+        [ForeignKey("UsuarioIdCreador")]
+        public virtual Usuario UsuarioCreador { get; set; } = null!;
+
         public DateTime FechaCreacion { get; set; }
 
         public string? NumeroFacturaProveedor { get; set; }

@@ -17,7 +17,13 @@
                 <h4 class="m-0 font-weight-bold text-primary">Reporte de Stock Actual</h4>
                 <p class="text-muted mb-0">Muestra el inventario valorizado de todos los productos activos.</p>
             </div>
-            <div>
+            <div class="d-flex align-items-center">
+                 <div class="form-check me-3">
+                    <input class="form-check-input" type="checkbox" id="hideZeros" @bind="hideZeroStock">
+                    <label class="form-check-label" for="hideZeros">
+                        Ocultar Stock 0
+                    </label>
+                </div>
                 <button class="btn btn-primary me-2" @onclick="GenerateReport" disabled="@isLoading">
                     @if (isLoading)
                     {
@@ -107,6 +113,7 @@
 </div>
 
 @code {
+    private bool hideZeroStock = true;
     private IEnumerable<StockActualDto>? reportData;
     private bool isLoading = false;
     private bool isDownloading = false;
@@ -122,7 +129,7 @@
     {
         isLoading = true;
         errorMessage = null;
-        reportData = null; // Clear previous data
+        reportData = null; // Limpiar datos previos
         
         try
         {
@@ -130,9 +137,9 @@
             var user = authState.User;
             var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
             var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
-            var finalUserId = user.IsInRole("Administrador") ? null : userId; // For bodegueros, this will be userId, for admin will be null (show all)
+            var finalUserId = user.IsInRole("Administrador") ? null : userId;
 
-            reportData = await ReportService.GetStockActualAsync(finalUserId);
+            reportData = await ReportService.GetStockActualAsync(finalUserId, hideZeroStock);
         }
         catch (Exception ex)
         {
@@ -146,9 +153,9 @@
 
     private async Task DownloadPdf()
     {
-        isDownloading = true; // Assuming isDownloading is a private bool field
+        isDownloading = true;
         errorMessage = null;
-
+        
         try
         {
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -157,7 +164,7 @@
             var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
             var finalUserId = user.IsInRole("Administrador") ? null : userId;
 
-            var pdfBytes = await ReportService.GetStockActualAsPdfAsync(finalUserId);
+            var pdfBytes = await ReportService.GetStockActualAsPdfAsync(finalUserId, hideZeroStock);
 
             if (pdfBytes.Length == 0)
             {

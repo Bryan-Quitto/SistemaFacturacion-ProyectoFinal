@@ -52,7 +52,8 @@
                                                     <i class="bi bi-file-earmark-pdf me-1"></i>
                                                     <span>Descargar PDF</span>
                                                 }
-                                            </button>                    }
+                                            </button>                   
+                                             }
                 </div>
             </div>
 
@@ -80,6 +81,7 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>Fecha</th>
+                                <th>Resp.</th>
                                 <th>Proveedor</th>
                                 <th>Documento</th>
                                 <th>Producto</th>
@@ -93,6 +95,7 @@
                             {
                                 <tr>
                                     <td>@item.Fecha.ToString("dd/MM/yyyy")</td>
+                                    <td>@item.UsuarioResponsable</td>
                                     <td>@item.NombreProveedor</td>
                                     <td>
                                         @if (!string.IsNullOrEmpty(item.NumeroFacturaProveedor))
@@ -102,7 +105,7 @@
                                         <div><small class="text-muted">Int:</small> #@item.NumeroCompraInterno</div>
                                     </td>
                                     <td>@item.ProductoNombre</td>
-                                    <td class="text-end">@item.CantidadComprada.ToString("N0")</td> <!-- N0 para enteros si no usas decimales en cantidad -->
+                                    <td class="text-end">@item.CantidadComprada.ToString("N0")</td>
                                     <td class="text-end">@item.CostoUnitario.ToString("C", esEcCulture)</td>
                                     <td class="text-end">@item.CostoTotal.ToString("C", esEcCulture)</td>
                                 </tr>

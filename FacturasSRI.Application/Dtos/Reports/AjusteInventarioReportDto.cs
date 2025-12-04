@@ -1,3 +1,5 @@
+using System;
+
 namespace FacturasSRI.Application.Dtos.Reports
 {
     public class AjusteInventarioReportDto
@@ -7,5 +9,6 @@ namespace FacturasSRI.Application.Dtos.Reports
         public string TipoAjuste { get; set; } = string.Empty;
         public int CantidadAjustada { get; set; }
         public string Motivo { get; set; } = string.Empty;
+        public string UsuarioResponsable { get; set; } = string.Empty;
     }
 }

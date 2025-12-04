@@ -7,5 +7,8 @@ namespace FacturasSRI.Application.Dtos.Reports
         public int StockActual { get; set; }
         public int StockMinimo { get; set; }
         public int CantidadFaltante { get; set; }
+        
+        public decimal CostoPromedioUnitario { get; set; }
+        public decimal CostoEstimadoReposicion { get; set; }
     }
 }
