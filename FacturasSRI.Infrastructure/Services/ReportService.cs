@@ -226,7 +226,7 @@
                     return _pdfGeneratorService.GenerateCuentasPorCobrarPdf(data);
                 }
         
-                public async Task<IEnumerable<StockActualDto>> GetStockActualAsync()
+                public async Task<IEnumerable<StockActualDto>> GetStockActualAsync(Guid? userId)
                 {
                     var reportData = await _context.Productos
                         .AsNoTracking()
@@ -252,7 +252,17 @@
                     return reportData;
                 }
         
-                public async Task<IEnumerable<MovimientoInventarioDto>> GetMovimientosInventarioAsync(DateTime fechaInicio, DateTime fechaFin)
+                public async Task<byte[]> GetStockActualAsPdfAsync(Guid? userId)
+                {
+                    var data = await GetStockActualAsync(userId);
+                    if (data == null || !data.Any())
+                    {
+                        return Array.Empty<byte>();
+                    }
+                    return _pdfGeneratorService.GenerateStockActualPdf(data);
+                }
+        
+                public async Task<IEnumerable<MovimientoInventarioDto>> GetMovimientosInventarioAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
                 {
                     var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
                     var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
@@ -313,7 +323,17 @@
                     return allMovements;
                 }
         
-                public async Task<IEnumerable<ComprasPorPeriodoDto>> GetComprasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin)
+                public async Task<byte[]> GetMovimientosInventarioAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
+                {
+                    var data = await GetMovimientosInventarioAsync(fechaInicio, fechaFin, userId);
+                    if (data == null || !data.Any())
+                    {
+                        return Array.Empty<byte>();
+                    }
+                    return _pdfGeneratorService.GenerateMovimientosInventarioPdf(data, fechaInicio, fechaFin);
+                }
+        
+                public async Task<IEnumerable<ComprasPorPeriodoDto>> GetComprasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
                 {
                     var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
                     var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
@@ -344,7 +364,17 @@
                     return reportData;
                 }
         
-                public async Task<IEnumerable<ProductoStockMinimoDto>> GetProductosBajoStockMinimoAsync()
+                public async Task<byte[]> GetComprasPorPeriodoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
+                {
+                    var data = await GetComprasPorPeriodoAsync(fechaInicio, fechaFin, userId);
+                    if (data == null || !data.Any())
+                    {
+                        return Array.Empty<byte>();
+                    }
+                    return _pdfGeneratorService.GenerateComprasPorPeriodoPdf(data, fechaInicio, fechaFin);
+                }
+        
+                public async Task<IEnumerable<ProductoStockMinimoDto>> GetProductosBajoStockMinimoAsync(Guid? userId)
                 {
                     var reportData = await _context.Productos
                         .AsNoTracking()
@@ -361,6 +391,16 @@
                         .ToListAsync();
         
                     return reportData;
+                }
+        
+                public async Task<byte[]> GetProductosBajoStockMinimoAsPdfAsync(Guid? userId)
+                {
+                    var data = await GetProductosBajoStockMinimoAsync(userId);
+                    if (data == null || !data.Any())
+                    {
+                        return Array.Empty<byte>();
+                    }
+                    return _pdfGeneratorService.GenerateProductosBajoStockMinimoPdf(data);
                 }
         
                 public async Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
@@ -406,7 +446,7 @@
                     return _pdfGeneratorService.GenerateNotasDeCreditoPdf(data, fechaInicio, fechaFin);
                 }
         
-                public async Task<IEnumerable<AjusteInventarioReportDto>> GetAjustesInventarioAsync(DateTime fechaInicio, DateTime fechaFin)
+                public async Task<IEnumerable<AjusteInventarioReportDto>> GetAjustesInventarioAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
                 {
                     var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
                     var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
@@ -429,6 +469,16 @@
                         .ToListAsync();
         
                     return reportData;
+                }
+        
+                public async Task<byte[]> GetAjustesInventarioAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
+                {
+                    var data = await GetAjustesInventarioAsync(fechaInicio, fechaFin, userId);
+                    if (data == null || !data.Any())
+                    {
+                        return Array.Empty<byte>();
+                    }
+                    return _pdfGeneratorService.GenerateAjustesInventarioPdf(data, fechaInicio, fechaFin);
                 }
             }
         }

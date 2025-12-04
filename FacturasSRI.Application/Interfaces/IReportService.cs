@@ -13,11 +13,16 @@ namespace FacturasSRI.Application.Interfaces
         Task<byte[]> GetCuentasPorCobrarAsPdfAsync(Guid? userId);
         Task<IEnumerable<NotasDeCreditoReportDto>> GetNotasDeCreditoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
         Task<byte[]> GetNotasDeCreditoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
-        Task<IEnumerable<StockActualDto>> GetStockActualAsync();
-        Task<IEnumerable<MovimientoInventarioDto>> GetMovimientosInventarioAsync(DateTime fechaInicio, DateTime fechaFin);
-        Task<IEnumerable<ComprasPorPeriodoDto>> GetComprasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin);
-        Task<IEnumerable<ProductoStockMinimoDto>> GetProductosBajoStockMinimoAsync();
-        Task<IEnumerable<AjusteInventarioReportDto>> GetAjustesInventarioAsync(DateTime fechaInicio, DateTime fechaFin);
+        Task<IEnumerable<StockActualDto>> GetStockActualAsync(Guid? userId);
+        Task<byte[]> GetStockActualAsPdfAsync(Guid? userId);
+        Task<IEnumerable<MovimientoInventarioDto>> GetMovimientosInventarioAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<byte[]> GetMovimientosInventarioAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<IEnumerable<ComprasPorPeriodoDto>> GetComprasPorPeriodoAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<byte[]> GetComprasPorPeriodoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<IEnumerable<ProductoStockMinimoDto>> GetProductosBajoStockMinimoAsync(Guid? userId);
+        Task<byte[]> GetProductosBajoStockMinimoAsPdfAsync(Guid? userId);
+        Task<IEnumerable<AjusteInventarioReportDto>> GetAjustesInventarioAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
+        Task<byte[]> GetAjustesInventarioAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
         Task<byte[]> GetVentasPorPeriodoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId);
     }
 }

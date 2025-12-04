@@ -16,29 +16,9 @@ namespace FacturasSRI.Web.Endpoints
             var reportGroup = app.MapGroup("/api/reports")
                                  .WithTags("Reports")
                                  .RequireAuthorization(); // Ensure all endpoints in this group require authentication
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             reportGroup.MapGet("/warehouse/current-stock", async (IReportService reportService) =>
             {
-                var result = await reportService.GetStockActualAsync();
+                var result = await reportService.GetStockActualAsync(null);
                 return Results.Ok(result);
             })
             .WithName("GetCurrentStockReport")
@@ -48,7 +28,7 @@ namespace FacturasSRI.Web.Endpoints
             {
                 var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
                 var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
-                var result = await reportService.GetMovimientosInventarioAsync(finalStartDate, finalEndDate);
+                var result = await reportService.GetMovimientosInventarioAsync(finalStartDate, finalEndDate, null);
                 return Results.Ok(result);
             })
             .WithName("GetInventoryMovementsReport")
@@ -58,7 +38,7 @@ namespace FacturasSRI.Web.Endpoints
             {
                 var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
                 var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
-                var result = await reportService.GetComprasPorPeriodoAsync(finalStartDate, finalEndDate);
+                var result = await reportService.GetComprasPorPeriodoAsync(finalStartDate, finalEndDate, null);
                 return Results.Ok(result);
             })
             .WithName("GetPurchasesByPeriodReport")
@@ -66,7 +46,7 @@ namespace FacturasSRI.Web.Endpoints
 
             reportGroup.MapGet("/warehouse/low-stock-products", async (IReportService reportService) =>
             {
-                var result = await reportService.GetProductosBajoStockMinimoAsync();
+                var result = await reportService.GetProductosBajoStockMinimoAsync(null);
                 return Results.Ok(result);
             })
             .WithName("GetLowStockProductsReport")
@@ -76,7 +56,7 @@ namespace FacturasSRI.Web.Endpoints
             {
                 var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
                 var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
-                var result = await reportService.GetAjustesInventarioAsync(finalStartDate, finalEndDate);
+                var result = await reportService.GetAjustesInventarioAsync(finalStartDate, finalEndDate, null);
                 return Results.Ok(result);
             })
             .WithName("GetInventoryAdjustmentsReport")
@@ -84,7 +64,7 @@ namespace FacturasSRI.Web.Endpoints
 
             reportGroup.MapGet("/warehouse/current-stock/pdf", async (IReportService reportService, ReportPdfGeneratorService pdfService) =>
             {
-                var reportData = await reportService.GetStockActualAsync();
+                var reportData = await reportService.GetStockActualAsync(null);
                 if (reportData == null || !reportData.Any()) return Results.NotFound("No se encontraron datos para generar el PDF.");
                 var pdfBytes = pdfService.GenerateStockActualPdf(reportData);
                 return Results.File(pdfBytes, "application/pdf", $"Reporte_Stock_Actual_{DateTime.Now:yyyyMMdd}.pdf");
@@ -96,7 +76,7 @@ namespace FacturasSRI.Web.Endpoints
             {
                 var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
                 var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
-                var reportData = await reportService.GetMovimientosInventarioAsync(finalStartDate, finalEndDate);
+                var reportData = await reportService.GetMovimientosInventarioAsync(finalStartDate, finalEndDate, null);
                 if (reportData == null || !reportData.Any()) return Results.NotFound("No se encontraron datos para generar el PDF.");
                 var pdfBytes = pdfService.GenerateMovimientosInventarioPdf(reportData, finalStartDate, finalEndDate);
                 return Results.File(pdfBytes, "application/pdf", $"Reporte_Movimientos_Inventario_{finalStartDate:yyyyMMdd}-{finalEndDate:yyyyMMdd}.pdf");
@@ -108,7 +88,7 @@ namespace FacturasSRI.Web.Endpoints
             {
                 var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
                 var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
-                var reportData = await reportService.GetComprasPorPeriodoAsync(finalStartDate, finalEndDate);
+                var reportData = await reportService.GetComprasPorPeriodoAsync(finalStartDate, finalEndDate, null);
                 if (reportData == null || !reportData.Any()) return Results.NotFound("No se encontraron datos para generar el PDF.");
                 var pdfBytes = pdfService.GenerateComprasPorPeriodoPdf(reportData, finalStartDate, finalEndDate);
                 return Results.File(pdfBytes, "application/pdf", $"Reporte_Compras_Periodo_{finalStartDate:yyyyMMdd}-{finalEndDate:yyyyMMdd}.pdf");
@@ -118,7 +98,7 @@ namespace FacturasSRI.Web.Endpoints
 
             reportGroup.MapGet("/warehouse/low-stock-products/pdf", async (IReportService reportService, ReportPdfGeneratorService pdfService) =>
             {
-                var reportData = await reportService.GetProductosBajoStockMinimoAsync();
+                var reportData = await reportService.GetProductosBajoStockMinimoAsync(null);
                 if (reportData == null || !reportData.Any()) return Results.NotFound("No se encontraron datos para generar el PDF.");
                 var pdfBytes = pdfService.GenerateProductosBajoStockMinimoPdf(reportData);
                 return Results.File(pdfBytes, "application/pdf", $"Reporte_Productos_Bajo_Stock_{DateTime.Now:yyyyMMdd}.pdf");
@@ -130,7 +110,7 @@ namespace FacturasSRI.Web.Endpoints
             {
                 var finalStartDate = (startDate ?? DateTime.Now.AddMonths(-1)).ToUniversalTime();
                 var finalEndDate = (endDate ?? DateTime.Now).ToUniversalTime();
-                var reportData = await reportService.GetAjustesInventarioAsync(finalStartDate, finalEndDate);
+                var reportData = await reportService.GetAjustesInventarioAsync(finalStartDate, finalEndDate, null);
                 if (reportData == null || !reportData.Any()) return Results.NotFound("No se encontraron datos para generar el PDF.");
                 var pdfBytes = pdfService.GenerateAjustesInventarioPdf(reportData, finalStartDate, finalEndDate);
                 return Results.File(pdfBytes, "application/pdf", $"Reporte_Ajustes_Inventario_{finalStartDate:yyyyMMdd}-{finalEndDate:yyyyMMdd}.pdf");

@@ -2,7 +2,10 @@
 @using Microsoft.AspNetCore.Authorization
 @using System.Globalization
 @using FacturasSRI.Application.Dtos.Reports
-@inject HttpClient Http
+@using System.Security.Claims
+@using FacturasSRI.Application.Interfaces
+@inject IReportService ReportService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JSRuntime
 
 @attribute [Authorize(Roles = "Administrador, Bodeguero")]
@@ -38,11 +41,18 @@
                     </button>
                     @if (reportData != null && reportData.Any())
                     {
-                        <button class="btn btn-info" @onclick="DownloadPdf">
-                            <i class="bi bi-file-earmark-pdf me-1"></i>
-                            Descargar PDF
-                        </button>
-                    }
+                                            <button class="btn btn-info" @onclick="DownloadPdf" disabled="@isDownloading">
+                                                @if (isDownloading)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                                    <span class="ms-1">Descargando...</span>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-file-earmark-pdf me-1"></i>
+                                                    <span>Descargar PDF</span>
+                                                }
+                                            </button>                    }
                 </div>
             </div>
 
@@ -101,6 +111,7 @@
     private DateTime endDate = DateTime.Now.Date;
     private IEnumerable<AjusteInventarioReportDto>? reportData;
     private bool isLoading = false;
+    private bool isDownloading = false;
     private string? errorMessage;
     
     private async Task GenerateReport()
@@ -118,21 +129,17 @@
 
         try
         {
-            var response = await Http.GetAsync($"/api/reports/warehouse/inventory-adjustments?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}");
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+            var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
+            var finalUserId = user.IsInRole("Administrador") ? null : userId;
 
-            if (response.IsSuccessStatusCode)
-            {
-                reportData = await response.Content.ReadFromJsonAsync<IEnumerable<AjusteInventarioReportDto>>();
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                errorMessage = $"No se pudo generar el reporte. El servidor respondió con el código de estado {response.StatusCode}. Detalles: {errorContent}";
-            }
+            reportData = await ReportService.GetAjustesInventarioAsync(startDate, endDate, finalUserId);
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ocurrió un error de red o de cliente al intentar generar el reporte: {ex.Message}";
+            errorMessage = $"Ocurrió un error al generar el reporte: {ex.Message}";
         }
         finally
         {
@@ -142,7 +149,38 @@
     
     private async Task DownloadPdf()
     {
-        var url = $"/api/reports/warehouse/inventory-adjustments/pdf?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}";
-        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+        isDownloading = true;
+        errorMessage = null;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+            var userId = Guid.TryParse(userIdClaim?.Value, out var id) ? (Guid?)id : null;
+            var finalUserId = user.IsInRole("Administrador") ? null : userId;
+
+            var pdfBytes = await ReportService.GetAjustesInventarioAsPdfAsync(startDate, endDate, finalUserId);
+
+            if (pdfBytes.Length == 0)
+            {
+                errorMessage = "No se encontraron datos para generar el PDF.";
+                isDownloading = false;
+                return;
+            }
+
+            var fileName = $"Reporte_Ajustes_Inventario_{startDate:yyyyMMdd}-{endDate:yyyyMMdd}.pdf";
+            var fileStream = new MemoryStream(pdfBytes);
+            using var streamRef = new DotNetStreamReference(stream: fileStream);
+            await JSRuntime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ocurrió un error al descargar el PDF: {ex.Message}";
+        }
+        finally
+        {
+            isDownloading = false;
+        }
     }
 }
