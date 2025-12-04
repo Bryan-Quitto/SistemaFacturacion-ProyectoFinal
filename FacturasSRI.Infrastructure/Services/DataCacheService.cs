@@ -1,8 +1,11 @@
-using FacturasSRI.Application.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
+using FacturasSRI.Application.Dtos;
+using FacturasSRI.Domain.Entities;
+using FacturasSRI.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,58 +14,106 @@ namespace FacturasSRI.Infrastructure.Services
 {
     public class DataCacheService : IHostedService, IDisposable
     {
-        private readonly IServiceScopeFactory _scopeFactory;
+        // Usamos la fábrica de contexto directamente para no depender de otros Servicios
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private Timer? _timer;
 
-        public DataCacheService(IServiceScopeFactory scopeFactory)
+        public DataCacheService(IDbContextFactory<FacturasSRIDbContext> contextFactory)
         {
-            _scopeFactory = scopeFactory;
+            _contextFactory = contextFactory;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
-            _timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromMinutes(5));
+            // Mantenemos el timer como respaldo por si algo falla, cada 10 min es suficiente
+            _timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromMinutes(10));
             return Task.CompletedTask;
         }
 
         private async void DoWork(object? state)
         {
-            await GenerateProductCache();
-            await GenerateCustomerCache();
+            try 
+            {
+                await GenerateProductCache();
+                await GenerateCustomerCache();
+            }
+            catch
+            {
+                // Ignorar errores en el background task para no tumbar la app
+            }
         }
 
         public async Task GenerateProductCache()
         {
-            using (var scope = _scopeFactory.CreateScope())
+            // Creamos un contexto ligero y efímero solo para leer y volcar a JSON
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            
+            // Proyección directa a DTO (optimizada)
+            var products = await context.Productos
+                .AsNoTracking() // Importante para rendimiento
+                .Include(p => p.Lotes)
+                .Where(p => p.EstaActivo) // Solo activos
+                .OrderBy(p => p.Nombre)
+                .Select(p => new ProductDto 
+                { 
+                    Id = p.Id, 
+                    Nombre = p.Nombre, 
+                    CodigoPrincipal = p.CodigoPrincipal, 
+                    PrecioVentaUnitario = p.PrecioVentaUnitario, 
+                    IsActive = p.EstaActivo, 
+                    ManejaInventario = p.ManejaInventario, 
+                    ManejaLotes = p.ManejaLotes,
+                    // Calculamos el stock total directamente en la consulta
+                    StockTotal = p.ManejaLotes ? p.Lotes.Sum(l => l.CantidadDisponible) : p.StockTotal, 
+                    StockMinimo = p.StockMinimo,
+                    PrecioCompraPromedioPonderado = p.PrecioCompraPromedioPonderado 
+                })
+                .ToListAsync();
+
+            var json = JsonSerializer.Serialize(products);
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "cache", "products.json");
+            
+            // Nos aseguramos que el directorio exista
+            var directory = Path.GetDirectoryName(path);
+            if(directory != null && !Directory.Exists(directory))
             {
-                var productService = scope.ServiceProvider.GetRequiredService<IProductService>();
-                var products = await productService.GetAllProductsForCacheAsync();
-                var json = JsonSerializer.Serialize(products);
-                var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "cache", "products.json");
-                var directory = Path.GetDirectoryName(path);
-                if(directory != null)
-                {
-                    Directory.CreateDirectory(directory);
-                }
-                await File.WriteAllTextAsync(path, json);
+                Directory.CreateDirectory(directory);
             }
+
+            await File.WriteAllTextAsync(path, json);
         }
 
         public async Task GenerateCustomerCache()
         {
-            using (var scope = _scopeFactory.CreateScope())
-            {
-                var customerService = scope.ServiceProvider.GetRequiredService<ICustomerService>();
-                var customers = await customerService.GetActiveCustomersAsync();
-                var json = JsonSerializer.Serialize(customers);
-                var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "cache", "customers.json");
-                var directory = Path.GetDirectoryName(path);
-                if(directory != null)
+            await using var context = await _contextFactory.CreateDbContextAsync();
+
+            // Proyección directa a DTO (optimizada)
+            var customers = await context.Clientes
+                .AsNoTracking()
+                .Where(c => c.EstaActivo)
+                .Select(c => new CustomerDto
                 {
-                    Directory.CreateDirectory(directory);
-                }
-                await File.WriteAllTextAsync(path, json);
+                    Id = c.Id,
+                    TipoIdentificacion = c.TipoIdentificacion,
+                    NumeroIdentificacion = c.NumeroIdentificacion,
+                    RazonSocial = c.RazonSocial,
+                    Email = c.Email,
+                    Direccion = c.Direccion,
+                    Telefono = c.Telefono,
+                    EstaActivo = c.EstaActivo
+                })
+                .ToListAsync();
+
+            var json = JsonSerializer.Serialize(customers);
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "cache", "customers.json");
+            
+            var directory = Path.GetDirectoryName(path);
+            if(directory != null && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
             }
+
+            await File.WriteAllTextAsync(path, json);
         }
 
         public Task StopAsync(CancellationToken cancellationToken)

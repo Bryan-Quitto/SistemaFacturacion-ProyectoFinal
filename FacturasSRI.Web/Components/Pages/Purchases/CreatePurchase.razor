@@ -191,7 +191,9 @@
         try
         {
             var baseUri = Navigation.ToAbsoluteUri(Navigation.BaseUri);
-            var productsTask = Http.GetFromJsonAsync<List<ProductDto>>(new Uri(baseUri, "cache/products.json"));
+            var cacheBuster = DateTime.Now.Ticks;
+
+            var productsTask = Http.GetFromJsonAsync<List<ProductDto>>(new Uri(baseUri, $"cache/products.json?v={cacheBuster}"));
             var taxesTask = TaxService.GetActiveTaxesAsync();
 
             await Task.WhenAll(productsTask, taxesTask);
