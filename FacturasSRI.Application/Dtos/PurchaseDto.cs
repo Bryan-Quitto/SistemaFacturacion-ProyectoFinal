@@ -31,5 +31,8 @@ namespace FacturasSRI.Application.Dtos
         // Campo para la forma de pago (Contado/Crédito)
         public FormaDePago FormaDePago { get; set; }
         public DateTime? FechaVencimiento { get; set; }
+        
+        [Display(Name = "Nº Factura Proveedor")]
+        public string? NumeroFacturaProveedor { get; set; } 
     }
 }

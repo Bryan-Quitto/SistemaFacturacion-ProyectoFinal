@@ -14,7 +14,7 @@
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h4 class="m-0 font-weight-bold text-primary">Reporte de Compras por Período</h4>
-            <p class="text-muted mb-0">Muestra un resumen de las compras de productos, agrupadas por producto.</p>
+            <p class="text-muted mb-0">Muestra un listado detallado de todas las compras realizadas en el período.</p>
         </div>
         <div class="card-body">
             <div class="row align-items-end mb-3">
@@ -76,36 +76,48 @@
                 else
                 {
                     <div class="table-responsive">
-                        <table class="table table-bordered table-striped table-hover">
-                            <thead class="table-dark">
+                    <table class="table table-bordered table-striped table-hover table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Proveedor</th>
+                                <th>Documento</th>
+                                <th>Producto</th>
+                                <th class="text-end">Cant.</th>
+                                <th class="text-end">Costo Unit.</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in reportData)
+                            {
                                 <tr>
-                                    <th>Producto</th>
-                                    <th class="text-end">Cantidad Comprada</th>
-                                    <th class="text-end">Costo Promedio Unitario</th>
-                                    <th class="text-end">Costo Total</th>
+                                    <td>@item.Fecha.ToString("dd/MM/yyyy")</td>
+                                    <td>@item.NombreProveedor</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(item.NumeroFacturaProveedor))
+                                        {
+                                            <div><small class="text-muted">Prov:</small> @item.NumeroFacturaProveedor</div>
+                                        }
+                                        <div><small class="text-muted">Int:</small> #@item.NumeroCompraInterno</div>
+                                    </td>
+                                    <td>@item.ProductoNombre</td>
+                                    <td class="text-end">@item.CantidadComprada.ToString("N0")</td> <!-- N0 para enteros si no usas decimales en cantidad -->
+                                    <td class="text-end">@item.CostoUnitario.ToString("C", esEcCulture)</td>
+                                    <td class="text-end">@item.CostoTotal.ToString("C", esEcCulture)</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var item in reportData)
-                                {
-                                    <tr>
-                                        <td>@item.ProductoNombre</td>
-                                        <td class="text-end">@item.CantidadComprada</td>
-                                        <td class="text-end">@item.CostoPromedio.ToString("C", esEcCulture)</td>
-                                        <td class="text-end">@item.CostoTotal.ToString("C", esEcCulture)</td>
-                                    </tr>
-                                }
-                            </tbody>
-                             <tfoot>
-                                <tr class="table-primary">
-                                    <td class="text-end font-weight-bold"><strong>Totales:</strong></td>
-                                    <td class="text-end font-weight-bold"><strong>@reportData.Sum(x => x.CantidadComprada)</strong></td>
-                                    <td></td>
-                                    <td class="text-end font-weight-bold"><strong>@reportData.Sum(x => x.CostoTotal).ToString("C", esEcCulture)</strong></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-primary">
+                                <td colspan="4" class="text-end font-weight-bold"><strong>Totales:</strong></td>
+                                <td class="text-end font-weight-bold"><strong>@reportData.Sum(x => x.CantidadComprada).ToString("N0")</strong></td>
+                                <td></td>
+                                <td class="text-end font-weight-bold"><strong>@reportData.Sum(x => x.CostoTotal).ToString("C", esEcCulture)</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
                 }
             }
         </div>

@@ -473,40 +473,59 @@ namespace FacturasSRI.Infrastructure.Services
             {
                 container.Page(page =>
                 {
-                    page.Size(PageSizes.A4);
+                    // CAMBIO IMPORTANTE: Landscape para que quepan las columnas
+                    page.Size(PageSizes.A4.Landscape()); 
                     page.Margin(1, Unit.Centimetre);
-                    page.Header().Element(compose => ComposeHeader(compose, "Reporte de Compras por Período", startDate, endDate));
+                    page.Header().Element(compose => ComposeHeader(compose, "Reporte Detallado de Compras", startDate, endDate));
                     page.Content().Element(compose =>
                     {
                         compose.Table(table =>
                         {
                             table.ColumnsDefinition(columns =>
                             {
-                                columns.RelativeColumn(3);
-                                columns.RelativeColumn(2);
-                                columns.RelativeColumn(2);
-                                columns.RelativeColumn(2);
+                                columns.RelativeColumn(1.5f); // Fecha
+                                columns.RelativeColumn(2.5f); // Proveedor
+                                columns.RelativeColumn(2.5f); // Documento (Fac + Int)
+                                columns.RelativeColumn(3);    // Producto
+                                columns.RelativeColumn(1);    // Cantidad
+                                columns.RelativeColumn(1.5f); // Costo Unit
+                                columns.RelativeColumn(1.5f); // Total
                             });
                             table.Header(header =>
                             {
+                                header.Cell().Element(HeaderCellStyle).Text("Fecha");
+                                header.Cell().Element(HeaderCellStyle).Text("Proveedor");
+                                header.Cell().Element(HeaderCellStyle).Text("Documento");
                                 header.Cell().Element(HeaderCellStyle).Text("Producto");
-                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Cantidad Comprada");
-                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Costo Promedio Unitario");
-                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Costo Total");
+                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Cant.");
+                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Costo Unit.");
+                                header.Cell().Element(HeaderCellStyle).AlignRight().Text("Total");
                             });
                             foreach (var item in data)
                             {
+                                table.Cell().Element(DataCellStyle).Text(item.Fecha.ToString("dd/MM/yyyy"));
+                                table.Cell().Element(DataCellStyle).Text(item.NombreProveedor);
+                                
+                                // Combinamos Fac Prov e Interno en la misma celda
+                                table.Cell().Element(DataCellStyle).Column(col => 
+                                {
+                                    if(!string.IsNullOrEmpty(item.NumeroFacturaProveedor))
+                                        col.Item().Text($"Prov: {item.NumeroFacturaProveedor}").FontSize(8);
+                                    
+                                    col.Item().Text($"Int: #{item.NumeroCompraInterno}").FontSize(8).Italic();
+                                });
+
                                 table.Cell().Element(DataCellStyle).Text(item.ProductoNombre);
-                                table.Cell().Element(DataCellStyle).AlignRight().Text(item.CantidadComprada.ToString("N2"));
-                                table.Cell().Element(DataCellStyle).AlignRight().Text(item.CostoPromedio.ToString("C", esEcCulture));
+                                table.Cell().Element(DataCellStyle).AlignRight().Text(item.CantidadComprada.ToString("N0"));
+                                table.Cell().Element(DataCellStyle).AlignRight().Text(item.CostoUnitario.ToString("C", esEcCulture));
                                 table.Cell().Element(DataCellStyle).AlignRight().Text(item.CostoTotal.ToString("C", esEcCulture));
                             }
-                            table.Cell().ColumnSpan(4).Element(TotalsRowStyle).Row(row =>
+                            table.Cell().ColumnSpan(7).Element(TotalsRowStyle).Row(row =>
                             {
-                                row.RelativeItem(3).AlignRight().Text("Totales:").Bold();
-                                row.RelativeItem(2).AlignRight().Text(data.Sum(x => x.CantidadComprada).ToString("N2")).Bold();
-                                row.RelativeItem(2); // Spacer for average cost
-                                row.RelativeItem(2).AlignRight().Text(data.Sum(x => x.CostoTotal).ToString("C", esEcCulture)).Bold();
+                                row.RelativeItem(10.5f).AlignRight().Text("Totales:").Bold(); // Ajustado para alinear con columnas anteriores
+                                row.RelativeItem(1).AlignRight().Text(data.Sum(x => x.CantidadComprada).ToString("N0")).Bold();
+                                row.RelativeItem(1.5f); // Espacio vacío bajo Costo Unit
+                                row.RelativeItem(1.5f).AlignRight().Text(data.Sum(x => x.CostoTotal).ToString("C", esEcCulture)).Bold();
                             });
                         });
                     });

@@ -93,6 +93,18 @@ namespace FacturasSRI.Infrastructure.Services
 
                 producto.StockTotal = totalStock;
 
+                var secuencial = await context.Set<Secuencial>().FirstOrDefaultAsync();
+                if (secuencial == null)
+                {
+                    // Si no existe tabla secuencial (raro), créala o lanza error.
+                    // Asumiremos que existe por tus otras tablas.
+                    secuencial = new Secuencial { UltimoSecuencialCompra = 0 };
+                    context.Set<Secuencial>().Add(secuencial);
+                }
+
+                secuencial.UltimoSecuencialCompra++;
+                var nuevoNumeroInterno = secuencial.UltimoSecuencialCompra;
+
                 var cuenta = new CuentaPorPagar
                 {
                     Id = Guid.NewGuid(),
@@ -106,6 +118,8 @@ namespace FacturasSRI.Infrastructure.Services
                     FormaDePago = purchaseDto.FormaDePago,
                     FechaVencimiento = purchaseDto.FormaDePago == FormaDePago.Credito ? purchaseDto.FechaVencimiento!.Value.ToUniversalTime() : null,
                     FechaPago = purchaseDto.FormaDePago == FormaDePago.Contado ? (DateTime?)DateTime.UtcNow : null,
+                    NumeroCompraInterno = nuevoNumeroInterno,
+                    NumeroFacturaProveedor = purchaseDto.NumeroFacturaProveedor,
                     UsuarioIdCreador = purchaseDto.UsuarioIdCreador,
                     FechaCreacion = DateTime.UtcNow
                 };
@@ -195,6 +209,9 @@ namespace FacturasSRI.Infrastructure.Services
             }
 
             var cantidadAjustar = compra.Producto.ManejaLotes ? compra.Lote!.CantidadDisponible : compra.Cantidad;
+            string identificadorCompra = !string.IsNullOrEmpty(compra.NumeroFacturaProveedor) 
+                ? $"Fac. Prov. {compra.NumeroFacturaProveedor}" 
+                : $"Compra #{compra.NumeroCompraInterno}";
 
             var ajusteDto = new AjusteInventarioDto
             {
@@ -202,7 +219,7 @@ namespace FacturasSRI.Infrastructure.Services
                 LoteId = compra.LoteId, 
                 CantidadAjustada = cantidadAjustar,
                 Tipo = TipoAjusteInventario.AnulacionCompra,
-                Motivo = $"Anulación de compra vencida ID: {compra.Id} con Nota de Crédito.",
+                Motivo = $"Anulación de {identificadorCompra} (Interno #{compra.NumeroCompraInterno}) con Nota de Crédito.",
                 UsuarioIdAutoriza = usuarioId
             };
 

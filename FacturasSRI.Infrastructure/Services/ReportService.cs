@@ -337,30 +337,47 @@
                 {
                     var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
                     var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
-        
-                    var rawLotesData = await _context.Lotes
+
+                    // CONSULTA PRINCIPAL: Usamos CuentasPorPagar para acceder a los IDs
+                    var query = _context.CuentasPorPagar
                         .AsNoTracking()
-                        .Where(l => l.FechaCompra >= startDate && l.FechaCompra <= endDate)
-                        .Select(l => new 
+                        .Include(c => c.Producto)
+                        .Include(c => c.Lote)
+                        // Filtramos por fecha de emisión de la compra
+                        .Where(c => c.FechaEmision >= startDate && c.FechaEmision <= endDate);
+
+                    // Opcional: Filtramos compras canceladas si solo quieres ver las válidas
+                    query = query.Where(c => c.Estado != EstadoCompra.Cancelada);
+
+                    var rawData = await query
+                        .OrderBy(c => c.FechaEmision)
+                        .Select(c => new 
                         {
-                            ProductoNombre = l.Producto.Nombre,
-                            l.CantidadComprada,
-                            l.PrecioCompraUnitario
+                            c.FechaEmision,
+                            ProductoNombre = c.Producto.Nombre,
+                            c.NombreProveedor,
+                            c.NumeroFacturaProveedor,
+                            c.NumeroCompraInterno,
+                            c.Cantidad,
+                            c.MontoTotal,
+                            // Intentamos sacar el precio unitario del Lote, si no existe (servicio), lo calculamos
+                            PrecioUnitario = c.Lote != null ? c.Lote.PrecioCompraUnitario : (c.Cantidad > 0 ? c.MontoTotal / c.Cantidad : 0)
                         })
                         .ToListAsync();
-        
-                    var reportData = rawLotesData
-                        .GroupBy(l => l.ProductoNombre)
-                        .Select(g => new ComprasPorPeriodoDto
-                        {
-                            ProductoNombre = g.Key,
-                            CantidadComprada = (decimal)g.Sum(l => l.CantidadComprada),
-                            CostoTotal = g.Sum(l => (decimal)l.CantidadComprada * l.PrecioCompraUnitario),
-                            CostoPromedio = g.Sum(l => (decimal)l.CantidadComprada * l.PrecioCompraUnitario) / (decimal)g.Sum(l => l.CantidadComprada)
-                        })
-                        .OrderBy(r => r.ProductoNombre)
-                        .ToList();
-        
+
+                    // Mapeo final al DTO
+                    var reportData = rawData.Select(item => new ComprasPorPeriodoDto
+                    {
+                        Fecha = item.FechaEmision,
+                        ProductoNombre = item.ProductoNombre,
+                        NombreProveedor = item.NombreProveedor,
+                        NumeroFacturaProveedor = item.NumeroFacturaProveedor,
+                        NumeroCompraInterno = item.NumeroCompraInterno,
+                        CantidadComprada = (decimal)item.Cantidad,
+                        CostoUnitario = item.PrecioUnitario,
+                        CostoTotal = item.MontoTotal
+                    }).ToList();
+
                     return reportData;
                 }
         

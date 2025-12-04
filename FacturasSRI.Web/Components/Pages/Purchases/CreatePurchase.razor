@@ -77,6 +77,11 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Nº Factura Proveedor (Opcional)</label>
+                        <InputText @bind-Value="newPurchase.NumeroFacturaProveedor" class="form-control" placeholder="Ej: 001-002-123456" />
+                    </div>
+
+                    <div class="mb-3">
                         <label for="comprobante" class="form-label">Comprobante de Compra (PDF)</label>
                         <InputFile id="comprobante" class="form-control" OnChange="@OnInputFileChange" disabled="@isSubmitting" accept=".pdf" />
                         @if (!string.IsNullOrEmpty(fileValidationMessage))
