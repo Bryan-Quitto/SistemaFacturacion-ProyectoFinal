@@ -86,6 +86,7 @@
                                     <th>Cliente</th>
                                     <th>Factura Afectada</th>
                                     <th>Motivo</th>
+                                    <th>Vendedor</th>
                                     <th class="text-end">Valor</th>
                                 </tr>
                             </thead>
@@ -98,13 +99,14 @@
                                         <td>@item.NombreCliente</td>
                                         <td>@item.FacturaModificada</td>
                                         <td>@item.Motivo</td>
+                                        <td>@item.Vendedor</td>
                                         <td class="text-end">@item.ValorTotal.ToString("C", esEcCulture)</td>
                                     </tr>
                                 }
                             </tbody>
                              <tfoot>
                                 <tr class="table-primary">
-                                    <td colspan="5" class="text-end font-weight-bold"><strong>Total Devuelto:</strong></td>
+                                    <td colspan="6" class="text-end font-weight-bold"><strong>Total Devuelto:</strong></td>
                                     <td class="text-end font-weight-bold"><strong>@reportData.Sum(x => x.ValorTotal).ToString("C", esEcCulture)</strong></td>
                                 </tr>
                             </tfoot>

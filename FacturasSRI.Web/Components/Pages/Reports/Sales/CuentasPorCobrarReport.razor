@@ -74,6 +74,7 @@
                                 <tr>
                                     <th>Cliente</th>
                                     <th>Factura #</th>
+                                    <th>Vendedor</th>
                                     <th>Fecha Emisión</th>
                                     <th class="text-end">Días Vencida</th>
                                     <th class="text-end">Monto Factura</th>
@@ -87,6 +88,7 @@
                                     <tr class="@(item.DiasVencida > 30 ? "table-danger" : item.DiasVencida > 15 ? "table-warning" : "")">
                                         <td>@item.NombreCliente</td>
                                         <td>@item.NumeroFactura</td>
+                                        <td>@item.Vendedor</td>
                                         <td>@item.FechaEmision.ToString("dd/MM/yyyy")</td>
                                         <td class="text-end">@item.DiasVencida</td>
                                         <td class="text-end">@item.MontoFactura.ToString("C", esEcCulture)</td>
@@ -97,7 +99,7 @@
                             </tbody>
                              <tfoot>
                                 <tr class="table-primary">
-                                    <td colspan="6" class="text-end font-weight-bold"><strong>Total Pendiente:</strong></td>
+                                    <td colspan="7" class="text-end font-weight-bold"><strong>Total Pendiente:</strong></td>
                                     <td class="text-end font-weight-bold"><strong>@reportData.Sum(x => x.SaldoPendiente).ToString("C", esEcCulture)</strong></td>
                                 </tr>
                             </tfoot>

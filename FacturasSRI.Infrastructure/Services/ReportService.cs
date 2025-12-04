@@ -71,24 +71,42 @@
         
                     var query = _context.FacturaDetalles
                         .AsNoTracking()
-                        .Where(d => d.Factura.FechaEmision >= startDate && d.Factura.FechaEmision <= endDate && d.Factura.Estado != EstadoFactura.Cancelada);
+                        .Where(d => d.Factura.FechaEmision >= startDate && d.Factura.FechaEmision <= endDate && d.Factura.Estado != EstadoFactura.Cancelada)
+                        .Join(_context.Facturas, // Join with Facturas
+                            detalle => detalle.FacturaId,
+                            factura => factura.Id,
+                            (detalle, factura) => new { detalle, factura })
+                        .Join(_context.Usuarios, // Join with Usuarios
+                            df => df.factura.UsuarioIdCreador,
+                            usuario => usuario.Id,
+                            (df, usuario) => new { df.detalle, df.factura, usuario });
         
                     if (userId.HasValue)
                     {
-                        query = query.Where(d => d.Factura.UsuarioIdCreador == userId.Value);
+                        query = query.Where(x => x.factura.UsuarioIdCreador == userId.Value);
                     }
         
                     var reportData = await query
-                        .GroupBy(d => new { d.ProductoId, d.Producto.CodigoPrincipal, d.Producto.Nombre })
+                        .GroupBy(x => new {
+                            x.detalle.ProductoId,
+                            x.detalle.Producto.CodigoPrincipal,
+                            x.detalle.Producto.Nombre,
+                            Fecha = x.factura.FechaEmision.Date, // Group by date
+                            Vendedor = x.usuario.PrimerNombre + " " + x.usuario.PrimerApellido // Group by seller
+                        })
                         .Select(g => new VentasPorProductoDto
                         {
+                            Fecha = g.Key.Fecha,
+                            Vendedor = g.Key.Vendedor,
                             CodigoProducto = g.Key.CodigoPrincipal,
                             NombreProducto = g.Key.Nombre,
-                            CantidadVendida = g.Sum(d => d.Cantidad),
-                            TotalVendido = g.Sum(d => d.Subtotal),
-                            PrecioPromedio = g.Sum(d => d.Subtotal) / g.Sum(d => d.Cantidad)
+                            CantidadVendida = g.Sum(d => d.detalle.Cantidad),
+                            TotalVendido = g.Sum(d => d.detalle.Subtotal),
+                            PrecioPromedio = g.Sum(d => d.detalle.Cantidad) > 0 ? g.Sum(d => d.detalle.Subtotal) / g.Sum(d => d.detalle.Cantidad) : 0
                         })
-                        .OrderByDescending(dto => dto.TotalVendido)
+                        .OrderBy(dto => dto.Fecha) // Order by date first
+                        .ThenBy(dto => dto.Vendedor) // Then by seller
+                        .ThenByDescending(dto => dto.TotalVendido)
                         .ToListAsync();
         
                     return reportData;
@@ -173,7 +191,9 @@
                         query = query.Where(f => f.UsuarioIdCreador == userId.Value);
                     }
         
-                    var reportData = await query
+                    var queryWithIncludes = query.Include(f => f.UsuarioCreador); 
+        
+                    var reportData = await queryWithIncludes
                         .Select(f => new CuentasPorCobrarDto
                         {
                             NombreCliente = f.Cliente.RazonSocial,
@@ -184,7 +204,8 @@
                                          : (int)(today - f.FechaEmision).TotalDays,
                             MontoFactura = f.Total,
                             MontoPagado = f.Cobros.Sum(c => c.Monto),
-                            SaldoPendiente = f.Total - f.Cobros.Sum(c => c.Monto)
+                            SaldoPendiente = f.Total - f.Cobros.Sum(c => c.Monto),
+                            Vendedor = f.UsuarioCreador.PrimerNombre + " " + f.UsuarioCreador.PrimerApellido // Add Vendedor
                         })
                         .OrderBy(dto => dto.DiasVencida)
                         .ToListAsync();
@@ -356,7 +377,9 @@
                         query = query.Where(nc => nc.UsuarioIdCreador == userId.Value);
                     }
         
-                    var reportData = await query
+                    var queryWithIncludes = query.Include(nc => nc.UsuarioCreador);
+        
+                    var reportData = await queryWithIncludes
                         .Select(nc => new NotasDeCreditoReportDto
                         {
                             NumeroNotaCredito = nc.NumeroNotaCredito,
@@ -364,7 +387,8 @@
                             NombreCliente = nc.Cliente.RazonSocial,
                             FacturaModificada = nc.Factura.NumeroFactura,
                             Motivo = nc.RazonModificacion,
-                            ValorTotal = nc.Total
+                            ValorTotal = nc.Total,
+                            Vendedor = nc.UsuarioCreador.PrimerNombre + " " + nc.UsuarioCreador.PrimerApellido // Add Vendedor
                         })
                         .OrderByDescending(dto => dto.FechaEmision)
                         .ToListAsync();
