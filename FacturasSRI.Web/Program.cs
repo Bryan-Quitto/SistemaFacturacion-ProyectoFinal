@@ -74,6 +74,8 @@ builder.Services.AddScoped<FacturasSRI.Infrastructure.Services.PdfGeneratorServi
 builder.Services.AddScoped<FacturasSRI.Infrastructure.Services.ReportPdfGeneratorService>();
 
 builder.Services.AddScoped<AuthenticationStateProvider, CookieAuthenticationStateProvider>();
+builder.Services.AddScoped<IStripePaymentService, StripePaymentService>();
+
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 

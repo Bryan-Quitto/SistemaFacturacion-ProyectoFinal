@@ -1,0 +1,127 @@
+@page "/cliente/pago-exitoso"
+@attribute [Authorize(Policy = "IsCustomer")]
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@inject NavigationManager Navigation
+@inject IStripePaymentService StripeService
+@inject ICobroService CobroService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ILogger<PagoExitoso> Logger
+
+<div class="container mt-5 text-center">
+    @if (isLoading)
+    {
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Procesando pago...</span>
+        </div>
+        <h3 class="mt-3">Confirmando su pago...</h3>
+        <p class="text-muted">Por favor no cierre esta ventana.</p>
+    }
+    else if (isSuccess)
+    {
+        <div class="text-success mb-4">
+            <i class="bi bi-check-circle-fill" style="font-size: 5rem;"></i>
+        </div>
+        <h2>¡Pago Realizado con Éxito!</h2>
+        <p>Hemos registrado su pago correctamente.</p>
+        <button class="btn btn-primary mt-3" @onclick="GoBackToInvoices">Volver a mis Facturas</button>
+    }
+    else
+    {
+        <div class="text-danger mb-4">
+            <i class="bi bi-x-circle-fill" style="font-size: 5rem;"></i>
+        </div>
+        <h2>Hubo un problema</h2>
+        <p>@errorMessage</p>
+        <button class="btn btn-secondary mt-3" @onclick="GoBackToInvoices">Volver</button>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? session_id { get; set; }
+
+    [SupplyParameterFromQuery]
+    public Guid? facturaId { get; set; }
+
+    private bool isLoading = true;
+    private bool isSuccess = false;
+    private string errorMessage = "";
+
+    // Inyectamos el Factory para buscar al vendedor
+    @inject Microsoft.EntityFrameworkCore.IDbContextFactory<FacturasSRI.Infrastructure.Persistence.FacturasSRIDbContext> ContextFactory 
+    @using Microsoft.EntityFrameworkCore
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(session_id) || facturaId == null)
+        {
+            errorMessage = "Datos de sesión inválidos.";
+            isLoading = false;
+            return;
+        }
+
+        try
+        {
+            var session = await StripeService.GetSessionAsync(session_id);
+
+            if (session.PaymentStatus == "paid")
+            {
+                // 1. Buscar el Usuario Vendedor (Dueño de la factura)
+                Guid usuarioVendedorId;
+                using (var context = await ContextFactory.CreateDbContextAsync())
+                {
+                    var facturaInfo = await context.Facturas
+                        .Where(f => f.Id == facturaId.Value)
+                        .Select(f => new { f.UsuarioIdCreador })
+                        .FirstOrDefaultAsync();
+
+                    if (facturaInfo == null) throw new Exception("Factura no encontrada.");
+                    usuarioVendedorId = facturaInfo.UsuarioIdCreador;
+                }
+
+                // 2. Crear el cobro con el ID del Vendedor
+                var nuevoCobro = new RegistrarCobroDto
+                {
+                    FacturaId = facturaId.Value,
+                    Monto = (decimal)(session.AmountTotal ?? 0) / 100m,
+                    MetodoDePago = "Tarjeta de Crédito/Débito",
+                    Referencia = $"Stripe: {session.PaymentIntentId}", 
+                    UsuarioIdCreador = usuarioVendedorId, // <--- USAMOS EL ID DEL VENDEDOR
+                    FechaCobro = DateTime.UtcNow
+                };
+
+                await CobroService.RegistrarCobroAsync(nuevoCobro, null, null);
+
+                isSuccess = true;
+                Logger.LogInformation($"Pago registrado en UI para Factura {facturaId}");
+            }
+            else
+            {
+                errorMessage = "El pago no fue completado en Stripe.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error procesando retorno de Stripe");
+            // Si dice que ya está pagada, es un éxito (probablemente el Webhook ganó la carrera)
+            if (ex.Message.Contains("totalmente pagada"))
+            {
+                isSuccess = true;
+            }
+            else
+            {
+                errorMessage = "Error al registrar el pago en el sistema. Si se descontó de su tarjeta, contacte a soporte.";
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoBackToInvoices()
+    {
+        Navigation.NavigateTo("/cliente/facturas");
+    }
+}

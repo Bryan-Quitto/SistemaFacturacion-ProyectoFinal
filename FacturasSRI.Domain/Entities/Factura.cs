@@ -27,5 +27,6 @@ namespace FacturasSRI.Domain.Entities
         public virtual ICollection<FacturaDetalle> Detalles { get; set; } = new List<FacturaDetalle>();
         public virtual ICollection<Cobro> Cobros { get; set; } = new List<Cobro>();
         public virtual FacturaSRI? InformacionSRI { get; set; }
+        public string? StripeSessionId { get; set; } 
     }
 }

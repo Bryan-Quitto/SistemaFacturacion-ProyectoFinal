@@ -5,8 +5,10 @@
 @using FacturasSRI.Domain.Enums
 @using FacturasSRI.Web.Components.Shared
 @inject IInvoiceService InvoiceService
+@inject IStripePaymentService StripePaymentService 
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JS 
 
 <PageTitle>Mis Facturas</PageTitle>
 
@@ -88,15 +90,35 @@ else if (paginatedInvoices != null)
                             @invoice.SaldoPendiente.ToString("C")
                         </td>
                         <td class="text-end">
-                            <div class="btn-group shadow-sm" role="group">
-                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => ViewDetails(invoice.Id)" title="Ver Detalles">
-                                    <i class="bi bi-eye-fill"></i>
+                        <div class="btn-group shadow-sm" role="group">
+                            @if (invoice.SaldoPendiente > 0 && 
+                                invoice.Estado != EstadoFactura.Cancelada && 
+                                invoice.Estado != EstadoFactura.RechazadaSRI &&
+                                invoice.Estado != EstadoFactura.Borrador)
+                            {
+                                <button class="btn btn-sm btn-success" 
+                                        @onclick="() => PayWithStripe(invoice)" 
+                                        title="Pagar con Tarjeta"
+                                        disabled="@isProcessingPayment">
+                                    @if (isProcessingPayment && currentPaymentId == invoice.Id)
+                                    {
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-credit-card-2-front-fill"></i>
+                                    }
                                 </button>
-                                <a href="/api/public/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
-                                    <i class="bi bi-file-earmark-pdf-fill"></i>
-                                </a>
-                            </div>
-                        </td>
+                            }
+
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => ViewDetails(invoice.Id)" title="Ver Detalles">
+                                <i class="bi bi-eye-fill"></i>
+                            </button>
+                            <a href="/api/public/invoice-ride/@invoice.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Descargar PDF">
+                                <i class="bi bi-file-earmark-pdf-fill"></i>
+                            </a>
+                        </div>
+                    </td>
                     </tr>
                 }
             </tbody>
@@ -134,6 +156,9 @@ else if (paginatedInvoices != null)
     private FormaDePago? selectedFormaDePago;
     private DateTime? startDate;
     private DateTime? endDate;
+
+    private bool isProcessingPayment = false;
+    private Guid? currentPaymentId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -205,6 +230,46 @@ else if (paginatedInvoices != null)
             EstadoFactura.RechazadaSRI => "Rechazada por SRI",
             _ => status.ToString(),
         };
+    }
+
+    private async Task PayWithStripe(InvoiceDto invoice)
+    {
+        try
+        {
+            isProcessingPayment = true;
+            currentPaymentId = invoice.Id;
+            StateHasChanged();
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userIdStr = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out Guid userId))
+            {
+                errorMessage = "No se pudo identificar su usuario para procesar el pago.";
+                return;
+            }
+
+            // Construir URLs de retorno
+            // NOTA: Usamos Navigation.BaseUri para asegurar que funcione en local y producción
+            var successUrl = $"{Navigation.BaseUri}cliente/pago-exitoso?facturaId={invoice.Id}";
+            var cancelUrl = $"{Navigation.BaseUri}cliente/facturas";
+
+            // Crear sesión de Stripe
+            var checkoutUrl = await StripePaymentService.CreateCheckoutSessionAsync(invoice, successUrl, cancelUrl, userId);
+
+            // Redirigir a Stripe
+            Navigation.NavigateTo(checkoutUrl, forceLoad: true); 
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al iniciar el pago: {ex.Message}";
+        }
+        finally
+        {
+            isProcessingPayment = false;
+            currentPaymentId = null;
+        }
     }
 
     private string GetStatusBadgeClass(EstadoFactura status)
