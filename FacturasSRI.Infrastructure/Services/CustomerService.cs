@@ -35,6 +35,18 @@ namespace FacturasSRI.Infrastructure.Services
             _dataCacheService = dataCacheService;
         }
 
+        private string GenerateTemporaryPassword(int length = 12)
+        {
+            const string validChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()";
+            var random = new Random();
+            var password = new char[length];
+            for (int i = 0; i < length; i++)
+            {
+                password[i] = validChars[random.Next(validChars.Length)];
+            }
+            return new string(password);
+        }
+
         public async Task<CustomerDto> CreateCustomerAsync(CustomerDto customerDto)
         {
             if (!_validationService.IsValid(customerDto.NumeroIdentificacion, customerDto.TipoIdentificacion.ToString()))
@@ -45,13 +57,16 @@ namespace FacturasSRI.Infrastructure.Services
             await using var context = await _contextFactory.CreateDbContextAsync();
             var existingCustomer = await context.Clientes
                 .FirstOrDefaultAsync(c => c.NumeroIdentificacion == customerDto.NumeroIdentificacion || 
-                                           c.RazonSocial == customerDto.RazonSocial || 
+                                           c.RazonSocial == customerDto.RazonSocial ||
+                                           c.Email == customerDto.Email || 
                                            c.Telefono == customerDto.Telefono);
 
             if (existingCustomer != null)
             {
-                throw new InvalidOperationException("Ya existe un cliente con el mismo número de identificación, razón social o teléfono.");
+                throw new InvalidOperationException("Ya existe un cliente con el mismo número de identificación, razón social, correo electrónico o teléfono.");
             }
+
+            var temporaryPassword = GenerateTemporaryPassword();
 
             var customer = new Cliente
             {
@@ -63,10 +78,16 @@ namespace FacturasSRI.Infrastructure.Services
                 Direccion = customerDto.Direccion,
                 Telefono = customerDto.Telefono,
                 UsuarioIdCreador = customerDto.UsuarioIdCreador,
-                FechaCreacion = DateTime.UtcNow
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(temporaryPassword),
+                FechaCreacion = DateTime.UtcNow,
+                IsEmailConfirmed = true, // Manually created customers are confirmed and active
+                EstaActivo = true
             };
             context.Clientes.Add(customer);
             await context.SaveChangesAsync();
+
+            // Send welcome email with temporary password
+            await _emailService.SendCustomerTemporaryPasswordEmailAsync(customer.Email, customer.RazonSocial, temporaryPassword);
 
             // Regenerate cache
             await _dataCacheService.GenerateCustomerCache();
@@ -156,7 +177,7 @@ namespace FacturasSRI.Infrastructure.Services
                     Direccion = x.customer.Direccion,
                     Telefono = x.customer.Telefono,
                     EstaActivo = x.customer.EstaActivo,
-                    CreadoPor = x.usuarioCreador != null ? x.usuarioCreador.PrimerNombre + " " + x.usuarioCreador.PrimerApellido : "Usuario no encontrado",
+                    CreadoPor = x.usuarioCreador != null ? x.usuarioCreador.PrimerNombre + " " + x.usuarioCreador.PrimerApellido : "Registro propio",
                     FechaCreacion = x.customer.FechaCreacion,
                     FechaModificacion = x.customer.FechaModificacion,
                     UltimaModificacionPor = x.usuarioModificador != null ? x.usuarioModificador.PrimerNombre + " " + x.usuarioModificador.PrimerApellido : "N/A"
@@ -184,7 +205,7 @@ namespace FacturasSRI.Infrastructure.Services
                               Direccion = customer.Direccion,
                               Telefono = customer.Telefono,
                               EstaActivo = customer.EstaActivo,
-                              CreadoPor = usuarioCreador != null ? usuarioCreador.PrimerNombre + " " + usuarioCreador.PrimerApellido : "Usuario no encontrado",
+                              CreadoPor = usuarioCreador != null ? usuarioCreador.PrimerNombre + " " + usuarioCreador.PrimerApellido : "Registro propio",
                               FechaCreacion = customer.FechaCreacion,
                               FechaModificacion = customer.FechaModificacion,
                               UltimaModificacionPor = usuarioModificador != null ? usuarioModificador.PrimerNombre + " " + usuarioModificador.PrimerApellido : "N/A"
