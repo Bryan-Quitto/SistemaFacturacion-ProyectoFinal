@@ -403,5 +403,55 @@ namespace FacturasSRI.Infrastructure.Services
             await context.SaveChangesAsync();
             return true;
         }
+
+        public async Task<CustomerDashboardStatsDto> GetCustomerDashboardStatsAsync(Guid customerId)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+
+            // 1. Query Base: Solo facturas autorizadas del cliente
+            var query = context.Facturas
+                .AsNoTracking()
+                .Where(f => f.ClienteId == customerId && f.Estado == EstadoFactura.Autorizada);
+
+            // 2. Calcular Históricos Generales
+            var totalComprado = await query.SumAsync(f => f.Total);
+            var countFacturas = await query.CountAsync();
+
+            // 3. Calcular Saldo Pendiente (Corrección del error)
+            // Traemos solo los montos necesarios para calcular en memoria y evitar errores de EF Core
+            var facturasCalculo = await query
+                .Select(f => new
+                {
+                    f.Total,
+                    TotalPagado = f.Cobros.Sum(c => c.Monto)
+                })
+                .ToListAsync();
+
+            // Calculamos en memoria: (Total - Pagado)
+            // Usamos Math.Max(0, ...) para evitar negativos por decimales ínfimos
+            var saldoPendiente = facturasCalculo.Sum(x => Math.Max(0, x.Total - x.TotalPagado));
+            
+            // Contamos cuántas tienen deuda real (mayor a 1 centavo para ignorar redondeos)
+            var countPendientes = facturasCalculo.Count(x => (x.Total - x.TotalPagado) > 0.01m);
+
+            // 4. Obtener la última factura para el widget
+            var ultimaFactura = await query
+                .OrderByDescending(f => f.FechaEmision)
+                .Select(f => new { f.Id, f.NumeroFactura, f.Total, f.FechaEmision })
+                .FirstOrDefaultAsync();
+
+            return new CustomerDashboardStatsDto
+            {
+                TotalCompradoHistorico = totalComprado,
+                TotalFacturasHistorico = countFacturas,
+                SaldoPendiente = saldoPendiente,
+                FacturasPendientes = countPendientes,
+                UltimaFacturaId = ultimaFactura?.Id,
+                UltimaFacturaNumero = ultimaFactura?.NumeroFactura ?? "N/A",
+                UltimaFacturaTotal = ultimaFactura?.Total ?? 0,
+                UltimaFacturaFecha = ultimaFactura?.FechaEmision
+            };
+        }
+
     }
 }

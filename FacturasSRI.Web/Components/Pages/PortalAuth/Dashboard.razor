@@ -1,16 +1,219 @@
 @page "/cliente/dashboard"
 @layout ClienteLayout
-
 @attribute [Authorize(Policy = "IsCustomer")]
 
-<h3>Dashboard del Cliente</h3>
+@using FacturasSRI.Application.Dtos
+@using FacturasSRI.Application.Interfaces
+@using System.Security.Claims
+@inject ICustomerService CustomerService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
 
-<AuthorizeView>
-    <Authorized>
-        <p>Bienvenido a tu portal, @context.User.Identity?.Name!</p>
-        <p>Aquí podrás ver tus facturas, notas de crédito y más.</p>
-    </Authorized>
-    <NotAuthorized>
-        <p>No estás autorizado para ver esta página.</p>
-    </NotAuthorized>
-</AuthorizeView>
+<PageTitle>Mi Panel - Aether Tech</PageTitle>
+
+<div class="mb-4">
+    <h2 class="fw-bold">Mi Panel</h2>
+    <p class="text-muted">Bienvenido de nuevo, @customerName. Aquí tienes el resumen de tu cuenta.</p>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+        <p class="mt-3">Cargando tu información...</p>
+    </div>
+}
+else if (stats != null)
+{
+    <div class="row g-4 mb-4">
+        
+        @* TARJETA 1: SALDO PENDIENTE (La más importante para el negocio) *@
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0 bg-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-shape bg-warning bg-opacity-10 text-warning rounded-3 p-3">
+                            <i class="bi bi-wallet2 fs-4"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="mb-0 text-muted text-uppercase small fw-bold">Saldo por Pagar</h6>
+                            <small class="text-muted">Facturas pendientes</small>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold mb-1 @(stats.SaldoPendiente > 0 ? "text-danger" : "text-success")">
+                        @stats.SaldoPendiente.ToString("C")
+                    </h3>
+                    
+                    @if (stats.FacturasPendientes > 0)
+                    {
+                        <div class="mt-3">
+                            <a href="/cliente/facturas" class="btn btn-sm btn-outline-warning w-100">
+                                Ver @stats.FacturasPendientes facturas pendientes
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <small class="text-success"><i class="bi bi-check-circle-fill me-1"></i>¡Estás al día!</small>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* TARJETA 2: TOTAL COMPRADO (Fidelización) *@
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0 bg-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-shape bg-primary bg-opacity-10 text-primary rounded-3 p-3">
+                            <i class="bi bi-bag-check fs-4"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="mb-0 text-muted text-uppercase small fw-bold">Mis Compras</h6>
+                            <small class="text-muted">Histórico total</small>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold mb-1 text-dark">
+                        @stats.TotalCompradoHistorico.ToString("C")
+                    </h3>
+                    <small class="text-muted">En @stats.TotalFacturasHistorico facturas emitidas</small>
+                </div>
+            </div>
+        </div>
+
+        @* TARJETA 3: ÚLTIMA ACTIVIDAD (Acceso rápido) *@
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0 bg-white">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-shape bg-info bg-opacity-10 text-info rounded-3 p-3">
+                            <i class="bi bi-clock-history fs-4"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="mb-0 text-muted text-uppercase small fw-bold">Última Factura</h6>
+                            <small class="text-muted">Actividad reciente</small>
+                        </div>
+                    </div>
+                    @if (stats.UltimaFacturaId.HasValue)
+                    {
+                        <h5 class="fw-bold mb-1">@stats.UltimaFacturaNumero</h5>
+                        <p class="mb-2 text-muted">@stats.UltimaFacturaTotal.ToString("C") - @stats.UltimaFacturaFecha?.ToLocalTime().ToString("dd MMM yyyy")</p>
+                        <a href="/cliente/facturas/@stats.UltimaFacturaId" class="btn btn-sm btn-link p-0 text-decoration-none">Ver detalles <i class="bi bi-arrow-right"></i></a>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No hay actividad reciente.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ACCESOS RÁPIDOS *@
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5 class="fw-bold mb-3">Accesos Rápidos</h5>
+        </div>
+        
+        <div class="col-md-4 mb-3">
+            <a href="/cliente/facturas" class="card card-hover-effect text-decoration-none shadow-sm border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    @* AQUI EL CAMBIO: Agregamos 'icon-shape' y quitamos 'p-3' *@
+                    <div class="icon-shape bg-primary text-white rounded-circle me-3 flex-shrink-0">
+                        <i class="bi bi-receipt fs-4"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-1">Mis Facturas</h6>
+                        <small class="text-muted">Consulta y descarga tus documentos</small>
+                    </div>
+                    <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <a href="/cliente/pagos" class="card card-hover-effect text-decoration-none shadow-sm border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="icon-shape bg-success text-white rounded-circle me-3 flex-shrink-0">
+                        <i class="bi bi-credit-card fs-4"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-1">Mis Pagos</h6>
+                        <small class="text-muted">Revisa tu historial de abonos</small>
+                    </div>
+                    <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-md-4 mb-3">
+            <a href="/cliente/notas-credito" class="card card-hover-effect text-decoration-none shadow-sm border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="icon-shape bg-warning text-white rounded-circle me-3 flex-shrink-0">
+                        <i class="bi bi-arrow-return-left fs-4"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-1">Devoluciones</h6>
+                        <small class="text-muted">Notas de crédito emitidas</small>
+                    </div>
+                    <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                </div>
+            </a>
+        </div>
+    </div>
+}
+
+<style>
+    .icon-shape {
+        width: 60px;       /* Ancho fijo */
+        height: 60px;      /* Alto fijo igual al ancho */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;    /* Evita que se aplaste */
+    }
+    
+    .card-hover-effect {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card-hover-effect:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+</style>
+
+@code {
+    private CustomerDashboardStatsDto? stats;
+    private string customerName = "Cliente";
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity != null && user.Identity.IsAuthenticated)
+            {
+                customerName = user.Identity.Name ?? "Cliente";
+                var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+                
+                if (Guid.TryParse(userIdClaim?.Value, out var customerId))
+                {
+                    stats = await CustomerService.GetCustomerDashboardStatsAsync(customerId);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Manejo silencioso o log de error
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

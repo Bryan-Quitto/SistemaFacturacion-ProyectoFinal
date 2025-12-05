@@ -20,5 +20,6 @@ namespace FacturasSRI.Application.Interfaces
         Task<bool> ChangePasswordAsync(string customerId, ChangePasswordDto passwordDto);
         Task<bool> GeneratePasswordResetTokenAsync(string email);
         Task<bool> ResetPasswordAsync(string token, string newPassword);
+        Task<CustomerDashboardStatsDto> GetCustomerDashboardStatsAsync(Guid customerId);
     }
 }
