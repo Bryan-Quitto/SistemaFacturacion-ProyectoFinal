@@ -20,23 +20,10 @@
     <div class="card-body">
         <div class="row g-3 align-items-end">
             @* Buscador *@
-            <div class="col-lg-4 col-md-6">
+            <div class="col-lg-6 col-md-6">
                 <label for="search-payment" class="form-label fw-bold mb-1">Búsqueda</label>
-                <input type="text" id="search-payment" class="form-control" placeholder="Por Nro. de Factura o Referencia..."
+                <input type="text" id="search-payment" class="form-control" placeholder="Por Nro. de Factura..."
                        @bind="searchTerm" @bind:event="oninput" @onkeyup="OnFilterChanged" />
-            </div>
-
-            @* Filtro de Método de Pago (NUEVO) *@
-            <div class="col-lg-2 col-md-6">
-                <label for="payment-method" class="form-label fw-bold mb-1">Método de Pago</label>
-                <InputSelect id="payment-method" class="form-select" @bind-Value="selectedPaymentMethod" @bind-Value:after="OnFilterChanged">
-                    <option value="All">Todos</option>
-                    <option value="Tarjeta">Tarjeta (Online)</option>
-                    <option value="Transferencia">Transferencia</option>
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Abono">Abono Inicial</option>
-                </InputSelect>
             </div>
 
             @* Fechas *@
@@ -62,59 +49,45 @@
     <div class="alert alert-danger">@errorMessage</div>
 }
 
-@if (paginatedPayments == null && string.IsNullOrEmpty(errorMessage))
+@if (paginatedInvoices == null && string.IsNullOrEmpty(errorMessage))
 {
-    <p><em>Cargando pagos...</em></p>
+    <p><em>Cargando facturas...</em></p>
 }
-else if (paginatedPayments != null)
+else if (paginatedInvoices != null)
 {
     <div class="table-responsive">
         <table class="table table-hover align-middle">
             <thead>
                 <tr>
-                    <th>Fecha de Pago</th>
                     <th>Factura</th>
-                    <th>Método de Pago</th>
-                    <th>Referencia / Detalle</th>
-                    <th class="text-end">Monto</th>
+                    <th>Fecha Emisión</th>
+                    <th class="text-end">Total</th>
+                    <th class="text-end">Pagado</th>
+                    <th class="text-end">Pendiente</th>
                     <th class="text-end" style="width: 50px;"></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var payment in paginatedPayments.Items)
+                @foreach (var invoice in paginatedInvoices.Items)
                 {
                     <tr>
-                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(payment.FechaCobro).ToString("dd/MM/yyyy HH:mm")</td>
-                        <td class="fw-medium">@payment.NumeroFactura</td>
-                        
-                        <td>
-                            @if(payment.MetodoDePago.Contains("Tarjeta")) { <i class="bi bi-credit-card me-1 text-primary"></i> }
-                            else if(payment.MetodoDePago.Contains("Efectivo")) { <i class="bi bi-cash-coin me-1 text-success"></i> }
-                            else if(payment.MetodoDePago.Contains("Transferencia")) { <i class="bi bi-bank me-1 text-info"></i> }
-                            @payment.MetodoDePago
-                        </td>
-
-                        <td>
-                            @if (string.IsNullOrEmpty(payment.Referencia))
+                        <td class="fw-bold">@invoice.NumeroFactura</td>
+                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(invoice.FechaEmision).ToString("dd/MM/yyyy")</td>
+                        <td class="text-end fw-bold">@invoice.TotalFactura.ToString("C")</td>
+                        <td class="text-end text-success">@invoice.TotalPagado.ToString("C")</td>
+                        <td class="text-end">
+                            @if (invoice.SaldoPendiente > 0)
                             {
-                                <span class="text-muted small fst-italic">N/A</span>
-                            }
-                            else if (payment.Referencia.Contains("Stripe"))
-                            {
-                                <span class="badge bg-primary bg-gradient shadow-sm" title="@payment.Referencia" style="cursor: help;">
-                                    <i class="bi bi-stripe"></i> Pago Online
-                                </span>
+                                <span class="text-danger fw-bold">@invoice.SaldoPendiente.ToString("C")</span>
                             }
                             else
                             {
-                                <span>@payment.Referencia</span>
+                                <span class="badge bg-light text-success border border-success"><i class="bi bi-check-circle-fill me-1"></i>Pagada</span>
                             }
                         </td>
-
-                        <td class="text-end fw-bold">@payment.Monto.ToString("C")</td>
                         <td class="text-end">
-                            <a href="/api/public/payment-receipt/@payment.Id" target="_blank" class="btn btn-sm btn-outline-primary" title="Descargar Recibo">
-                                <i class="bi bi-download"></i>
+                            <a href="@($"/cliente/pagos/detalles/{invoice.FacturaId}")" class="btn btn-sm btn-outline-primary" title="Ver Pagos de Factura">
+                                <i class="bi bi-wallet2"></i>
                             </a>
                         </td>
                     </tr>
@@ -124,24 +97,24 @@ else if (paginatedPayments != null)
     </div>
     
     <div class="d-flex justify-content-between align-items-center mt-3">
-        @if (paginatedPayments.TotalCount > 0)
+        @if (paginatedInvoices.TotalCount > 0)
         {
             <p class="text-muted mb-0 small">
-                Mostrando del @((currentPage - 1) * pageSize + 1) al @Math.Min(currentPage * pageSize, paginatedPayments.TotalCount) de @paginatedPayments.TotalCount registros.
+                Mostrando del @((currentPage - 1) * pageSize + 1) al @Math.Min(currentPage * pageSize, paginatedInvoices.TotalCount) de @paginatedInvoices.TotalCount registros.
             </p>
             <Pagination CurrentPage="currentPage" 
-                        TotalPages="paginatedPayments.TotalPages" 
+                        TotalPages="paginatedInvoices.TotalPages" 
                         OnPageSelected="SelectedPage" />
         }
         else
         {
-            <p class="text-muted mb-0 small">No se encontraron pagos con los filtros aplicados.</p>
+            <p class="text-muted mb-0 small">No se encontraron facturas con los filtros aplicados.</p>
         }
     </div>
 }
 
 @code {
-    private PaginatedList<CobroDto>? paginatedPayments;
+    private PaginatedList<FacturasConPagosDto>? paginatedInvoices;
     private string? errorMessage;
     private Guid clienteId;
 
@@ -152,7 +125,6 @@ else if (paginatedPayments != null)
     private string searchTerm = string.Empty;
     private DateTime? startDate;
     private DateTime? endDate;
-    private string selectedPaymentMethod = "All"; // Nuevo filtro
 
     protected override async Task OnInitializedAsync()
     {
@@ -163,7 +135,7 @@ else if (paginatedPayments != null)
             var clienteIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
             if(clienteIdClaim != null && Guid.TryParse(clienteIdClaim.Value, out clienteId))
             {
-                await LoadPayments(1);
+                await LoadInvoices(1);
             }
             else
             {
@@ -176,7 +148,7 @@ else if (paginatedPayments != null)
         }
     }
 
-    private async Task LoadPayments(int page)
+    private async Task LoadInvoices(int page)
     {
         currentPage = page;
         errorMessage = null;
@@ -185,12 +157,11 @@ else if (paginatedPayments != null)
             var startDateUtc = startDate.HasValue ? startDate.Value.ToUniversalTime() : (DateTime?)null;
             var endDateUtc = endDate.HasValue ? endDate.Value.ToUniversalTime() : (DateTime?)null;
             
-            // Pasamos el nuevo parámetro 'selectedPaymentMethod'
-            paginatedPayments = await CobroService.GetCobrosByClientIdAsync(clienteId, currentPage, pageSize, searchTerm, startDateUtc, endDateUtc, selectedPaymentMethod);
+            paginatedInvoices = await CobroService.GetFacturasConPagosByClientIdAsync(clienteId, currentPage, pageSize, searchTerm, startDateUtc, endDateUtc);
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar los pagos: {ex.Message}";
+            errorMessage = $"Error al cargar las facturas: {ex.Message}";
         }
         StateHasChanged();
     }
@@ -200,10 +171,9 @@ else if (paginatedPayments != null)
         searchTerm = string.Empty;
         startDate = null;
         endDate = null;
-        selectedPaymentMethod = "All"; // Resetear filtro
-        await LoadPayments(1);
+        await LoadInvoices(1);
     }
 
-    private async Task OnFilterChanged() => await LoadPayments(1);
-    private async Task SelectedPage(int page) => await LoadPayments(page);
+    private async Task OnFilterChanged() => await LoadInvoices(1);
+    private async Task SelectedPage(int page) => await LoadInvoices(page);
 }

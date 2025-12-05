@@ -248,7 +248,57 @@ namespace FacturasSRI.Infrastructure.Services
                     SaldoPendiente = x.CuentaPorCobrar != null ? x.CuentaPorCobrar.SaldoPendiente : 0,
                     TotalPagado = x.Factura.Cobros.Sum(c => c.Monto),
                     FormaDePago = x.Factura.FormaDePago,
-                    EstadoFactura = x.Factura.Estado
+                    EstadoFactura = x.Factura.Estado,
+                    FechaEmision = x.Factura.FechaEmision
+                });
+
+            return await PaginatedList<FacturasConPagosDto>.CreateAsync(finalQuery, pageNumber, pageSize);
+        }
+
+        public async Task<PaginatedList<FacturasConPagosDto>> GetFacturasConPagosByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? searchTerm, DateTime? startDate, DateTime? endDate)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var query = from f in context.Facturas
+                                    .Include(f => f.Cobros) // Explicitly include Cobros here
+                                    .Include(f => f.Cliente) // Explicitly include Cliente for ClienteNombre
+                        join cpc in context.CuentasPorCobrar on f.Id equals cpc.FacturaId into cpcJoin
+                        from cuentaPorCobrar in cpcJoin.DefaultIfEmpty() // Left join with CuentasPorCobrar
+                        where f.ClienteId == clienteId // Filter by client ID
+                        select new
+                        {
+                            Factura = f,
+                            CuentaPorCobrar = cuentaPorCobrar
+                        };
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(x => x.Factura.NumeroFactura.Contains(searchTerm));
+            }
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(x => x.Factura.FechaEmision >= startDate.Value);
+            }
+
+            if (endDate.HasValue)
+            {
+                var endOfDay = endDate.Value.Date.AddDays(1);
+                query = query.Where(x => x.Factura.FechaEmision < endOfDay);
+            }
+
+            var finalQuery = query
+                .OrderByDescending(x => x.Factura.FechaEmision)
+                .Select(x => new FacturasConPagosDto
+                {
+                    FacturaId = x.Factura.Id,
+                    NumeroFactura = x.Factura.NumeroFactura,
+                    ClienteNombre = x.Factura.Cliente != null ? x.Factura.Cliente.RazonSocial : "N/A", // Cliente is now eagerly loaded
+                    TotalFactura = x.Factura.Total,
+                    TotalPagado = x.Factura.Cobros.Sum(c => c.Monto), // Cobros are now eagerly loaded
+                    SaldoPendiente = x.CuentaPorCobrar != null ? x.CuentaPorCobrar.SaldoPendiente : 0,
+                    FormaDePago = x.Factura.FormaDePago,
+                    EstadoFactura = x.Factura.Estado,
+                    FechaEmision = x.Factura.FechaEmision
                 });
 
             return await PaginatedList<FacturasConPagosDto>.CreateAsync(finalQuery, pageNumber, pageSize);
@@ -311,6 +361,60 @@ namespace FacturasSRI.Infrastructure.Services
                     Referencia = c.Referencia,
                     ComprobantePagoPath = c.ComprobantePagoPath,
                     CreadoPor = c.UsuarioCreador != null ? $"{c.UsuarioCreador.PrimerNombre} {c.UsuarioCreador.PrimerApellido}" : "N/A"
+                });
+
+            return await PaginatedList<CobroDto>.CreateAsync(finalQuery, pageNumber, pageSize);
+        }
+
+        public async Task<PaginatedList<CobroDto>> GetCobrosByFacturaIdAndClientIdAsync(Guid facturaId, Guid clienteId, int pageNumber, int pageSize, string? searchTerm, DateTime? startDate, DateTime? endDate, string? paymentMethod)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var query = context.Cobros
+                .Where(c => c.FacturaId == facturaId && c.Factura.ClienteId == clienteId)
+                .Include(c => c.Factura)
+                .Include(c => c.UsuarioCreador)
+                .AsQueryable();
+
+            // 1. Filtros de Fecha
+            if (startDate.HasValue)
+                query = query.Where(c => c.FechaCobro >= startDate.Value);
+
+            if (endDate.HasValue)
+            {
+                var endOfDay = endDate.Value.Date.AddDays(1);
+                query = query.Where(c => c.FechaCobro < endOfDay);
+            }
+
+            // 2. Filtro de Método de Pago
+            if (!string.IsNullOrEmpty(paymentMethod) && paymentMethod != "All")
+            {
+                query = query.Where(c => c.MetodoDePago.Contains(paymentMethod));
+            }
+
+            // 3. Filtro de Texto (Referencia)
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim();
+                query = query.Where(c => 
+                    c.Referencia != null && c.Referencia.Contains(term)
+                );
+            }
+
+            var finalQuery = query
+                .OrderByDescending(c => c.FechaCobro)
+                .Select(c => new CobroDto
+                {
+                    Id = c.Id,
+                    FacturaId = c.FacturaId,
+                    NumeroFactura = c.Factura != null ? c.Factura.NumeroFactura : "N/A",
+                    ClienteNombre = c.Factura != null && c.Factura.Cliente != null ? c.Factura.Cliente.RazonSocial : "N/A",
+                    FechaCobro = c.FechaCobro,
+                    Monto = c.Monto,
+                    MetodoDePago = c.MetodoDePago,
+                    Referencia = c.Referencia,
+                    ComprobantePagoPath = c.ComprobantePagoPath,
+                    // For customer view, CreadoPor is not needed, so it can be "N/A" or omitted
+                    CreadoPor = "N/A" 
                 });
 
             return await PaginatedList<CobroDto>.CreateAsync(finalQuery, pageNumber, pageSize);

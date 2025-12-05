@@ -13,5 +13,6 @@ namespace FacturasSRI.Application.Dtos
         public decimal TotalPagado { get; set; }
         public FormaDePago FormaDePago { get; set; }
         public EstadoFactura EstadoFactura { get; set; }
+        public DateTime FechaEmision { get; set; }
     }
 }

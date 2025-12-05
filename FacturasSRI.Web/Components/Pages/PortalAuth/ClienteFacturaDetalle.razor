@@ -32,6 +32,9 @@ else
             <button class="btn btn-outline-secondary" @onclick="GoBack">
                 <i class="bi bi-arrow-left-circle me-2"></i>Volver a Mis Facturas
             </button>
+            <a href="@($"/cliente/pagos/detalles/{invoice.Id}")" class="btn btn-dark">
+                <i class="bi bi-wallet2 me-2"></i>Historial de Pagos
+            </a>
             <button class="btn btn-info text-white" @onclick="DownloadXmlAsync">
                 <i class="bi bi-filetype-xml me-2"></i>Descargar XML
             </button>

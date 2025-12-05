@@ -60,6 +60,7 @@ else if (paginatedFacturasConPagos.Items.Any())
                 <tr>
                     <th>Factura</th>
                     <th>Cliente</th>
+                    <th>Fecha Emisión</th>
                     <th>Forma de Pago</th>
                     <th>Estado SRI</th>
                     <th class="text-end">Total</th>
@@ -74,6 +75,7 @@ else if (paginatedFacturasConPagos.Items.Any())
                     <tr>
                         <td class="fw-bold">@factura.NumeroFactura</td>
                         <td>@factura.ClienteNombre</td>
+                        <td>@factura.FechaEmision.ToString("dd/MM/yyyy")</td>
                         <td>
                             <span class="badge @(factura.FormaDePago == FormaDePago.Credito ? "bg-info text-dark" : "bg-light text-dark border")">
                                 @factura.FormaDePago
