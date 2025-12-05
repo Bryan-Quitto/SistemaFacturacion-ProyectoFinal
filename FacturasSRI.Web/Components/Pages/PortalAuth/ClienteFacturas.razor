@@ -196,7 +196,7 @@ else if (paginatedInvoices != null)
         {
             var startDateUtc = startDate.HasValue ? startDate.Value.ToUniversalTime() : (DateTime?)null;
             var endDateUtc = endDate.HasValue ? endDate.Value.ToUniversalTime() : (DateTime?)null;
-            paginatedInvoices = await InvoiceService.GetInvoicesByClientIdAsync(clienteId, currentPage, pageSize, paymentStatus, selectedFormaDePago, startDateUtc, endDateUtc, searchTerm);
+            paginatedInvoices = await InvoiceService.GetInvoicesByClientIdAsync(clienteId, currentPage, pageSize, paymentStatus, selectedFormaDePago, startDateUtc, endDateUtc, searchTerm, EstadoFactura.Autorizada);
         }
         catch (Exception ex)
         {

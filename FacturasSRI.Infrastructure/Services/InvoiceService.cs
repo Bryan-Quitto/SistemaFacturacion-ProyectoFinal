@@ -1082,7 +1082,7 @@ namespace FacturasSRI.Infrastructure.Services
             return Task.CompletedTask;
         }
 
-        public async Task<PaginatedList<InvoiceDto>> GetInvoicesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? paymentStatus, FormaDePago? formaDePago, DateTime? startDate, DateTime? endDate, string? searchTerm)
+        public async Task<PaginatedList<InvoiceDto>> GetInvoicesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? paymentStatus, FormaDePago? formaDePago, DateTime? startDate, DateTime? endDate, string? searchTerm, EstadoFactura? status = null)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
             
@@ -1100,6 +1100,11 @@ namespace FacturasSRI.Infrastructure.Services
             if (formaDePago.HasValue)
             {
                 query = query.Where(x => x.invoice.FormaDePago == formaDePago.Value);
+            }
+
+            if (status.HasValue)
+            {
+                query = query.Where(x => x.invoice.Estado == status.Value);
             }
 
             if (!string.IsNullOrEmpty(paymentStatus) && paymentStatus != "All")

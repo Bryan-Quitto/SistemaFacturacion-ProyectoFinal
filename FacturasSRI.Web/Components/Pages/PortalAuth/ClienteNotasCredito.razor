@@ -149,7 +149,7 @@ else if (paginatedCreditNotes != null)
         {
             var startDateUtc = startDate.HasValue ? startDate.Value.ToUniversalTime() : (DateTime?)null;
             var endDateUtc = endDate.HasValue ? endDate.Value.ToUniversalTime() : (DateTime?)null;
-            paginatedCreditNotes = await CreditNoteService.GetCreditNotesByClientIdAsync(clienteId, currentPage, pageSize, searchTerm, startDateUtc, endDateUtc);
+            paginatedCreditNotes = await CreditNoteService.GetCreditNotesByClientIdAsync(clienteId, currentPage, pageSize, searchTerm, startDateUtc, endDateUtc, EstadoNotaDeCredito.Autorizada);
         }
         catch (Exception ex)
         {

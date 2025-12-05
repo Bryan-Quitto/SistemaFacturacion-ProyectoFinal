@@ -843,7 +843,7 @@ namespace FacturasSRI.Infrastructure.Services
 } : (CreditNoteDto?)null;
         }
 
-        public async Task<PaginatedList<CreditNoteDto>> GetCreditNotesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? searchTerm, DateTime? startDate, DateTime? endDate)
+        public async Task<PaginatedList<CreditNoteDto>> GetCreditNotesByClientIdAsync(Guid clienteId, int pageNumber, int pageSize, string? searchTerm, DateTime? startDate, DateTime? endDate, EstadoNotaDeCredito? status = null)
 {
     await using var context = await _contextFactory.CreateDbContextAsync();
     var query = context.NotasDeCredito
@@ -879,6 +879,11 @@ namespace FacturasSRI.Infrastructure.Services
     {
         var endOfDay = endDate.Value.Date.AddDays(1);
         query = query.Where(nc => nc.FechaEmision < endOfDay);
+    }
+
+    if (status.HasValue)
+    {
+        query = query.Where(nc => nc.Estado == status.Value);
     }
 
     return await PaginatedList<CreditNoteDto>.CreateAsync(query, pageNumber, pageSize);
