@@ -1,26 +1,10 @@
-using FacturasSRI.Application.Dtos;
-using FacturasSRI.Domain.Enums;
-using Microsoft.AspNetCore.Hosting;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
-using System;
-using System.IO;
-using System.Linq;
-using SkiaSharp;
-using ZXing;
-using ZXing.SkiaSharp;
-using ZXing.Common;
-
-namespace FacturasSRI.Infrastructure.Services
-{
-    public class PdfGeneratorService
-    {
         private readonly IWebHostEnvironment _env;
+        private readonly ITimeZoneHelper _timeZoneHelper;
 
-        public PdfGeneratorService(IWebHostEnvironment env)
+        public PdfGeneratorService(IWebHostEnvironment env, ITimeZoneHelper timeZoneHelper)
         {
             _env = env;
+            _timeZoneHelper = timeZoneHelper;
         }
 
         // ======================== FACTURA ========================
@@ -97,7 +81,7 @@ namespace FacturasSRI.Infrastructure.Services
                     column.Item().PaddingTop(5).Row(r => {
                         r.RelativeItem().Column(c => {
                             c.Item().Text("FECHA Y HORA DE AUTORIZACIÓN").SemiBold().FontSize(6);
-                            var fecha = factura.FechaEmision == default ? DateTime.Now : factura.FechaEmision;
+                            var fecha = factura.FechaAutorizacion.HasValue ? _timeZoneHelper.ConvertUtcToEcuadorTime(factura.FechaAutorizacion.Value) : DateTime.Now;
                             c.Item().Text($"{fecha:dd/MM/yyyy HH:mm:ss}").FontSize(8);
                         });
                     });
@@ -120,7 +104,7 @@ namespace FacturasSRI.Infrastructure.Services
                 column.Item().Element(ContainerBox).Column(col =>
                 {
                     col.Item().Row(row => { row.RelativeItem(6).Text($"Razón Social: {factura.ClienteNombre}").FontSize(8); row.RelativeItem(4).Text($"Identificación: {factura.ClienteIdentificacion}").FontSize(8); });
-                    col.Item().Row(row => { row.RelativeItem(6).Text($"Fecha Emisión: {factura.FechaEmision:dd/MM/yyyy}").FontSize(8); row.RelativeItem(4).Text($"Guía Remisión:").FontSize(8); });
+                    col.Item().Row(row => { row.RelativeItem(6).Text($"Fecha Emisión: {_timeZoneHelper.ConvertUtcToEcuadorTime(factura.FechaEmision):dd/MM/yyyy}").FontSize(8); row.RelativeItem(4).Text($"Guía Remisión:").FontSize(8); });
                     col.Item().Text($"Dirección: {factura.ClienteDireccion ?? "N/A"}").FontSize(8);
                 });
                 column.Item().PaddingVertical(5);
@@ -223,7 +207,7 @@ namespace FacturasSRI.Infrastructure.Services
                         r.RelativeItem().Column(c =>
                         {
                             c.Item().Text("FECHA Y HORA DE AUTORIZACIÓN").SemiBold().FontSize(6);
-                            var fecha = nc.FechaEmision == default ? DateTime.Now : nc.FechaEmision;
+                            var fecha = nc.FechaAutorizacion.HasValue ? _timeZoneHelper.ConvertUtcToEcuadorTime(nc.FechaAutorizacion.Value) : DateTime.Now;
                             c.Item().Text($"{fecha:dd/MM/yyyy HH:mm:ss}").FontSize(8);
                         });
                     });
@@ -293,7 +277,7 @@ namespace FacturasSRI.Infrastructure.Services
                     });
                     column.Item().Row(r => {
                         r.RelativeItem().Text("Fecha de Pago:").FontSize(8);
-                        r.RelativeItem().AlignRight().Text($"{cobro.FechaCobro:dd/MM/yyyy HH:mm}").FontSize(8);
+                        r.RelativeItem().AlignRight().Text($"{_timeZoneHelper.ConvertUtcToEcuadorTime(cobro.FechaCobro):dd/MM/yyyy HH:mm}").FontSize(8);
                     });
                 });
             });
@@ -369,7 +353,7 @@ namespace FacturasSRI.Infrastructure.Services
                     });
                     col.Item().Row(row =>
                     {
-                        row.RelativeItem(6).Text($"Fecha Emisión: {nc.FechaEmision:dd/MM/yyyy}").FontSize(8);
+                        row.RelativeItem(6).Text($"Fecha Emisión: {_timeZoneHelper.ConvertUtcToEcuadorTime(nc.FechaEmision):dd/MM/yyyy}").FontSize(8);
                         row.RelativeItem(4).Text($"Dirección: {nc.ClienteDireccion}").FontSize(8);
                     });
                     
@@ -378,7 +362,7 @@ namespace FacturasSRI.Infrastructure.Services
                     col.Item().Row(row =>
                     {
                         row.RelativeItem().Text($"Factura: {nc.NumeroFacturaModificada}").FontSize(8);
-                        row.RelativeItem().Text($"Fecha Sustento: {nc.FechaEmisionFacturaModificada:dd/MM/yyyy}").FontSize(8);
+                        row.RelativeItem().Text($"Fecha Sustento: {_timeZoneHelper.ConvertUtcToEcuadorTime(nc.FechaEmisionFacturaModificada):dd/MM/yyyy}").FontSize(8);
                     });
                     col.Item().Text($"Razón Modificación: {nc.RazonModificacion}").FontSize(8).Italic();
                 });
@@ -476,35 +460,3 @@ namespace FacturasSRI.Infrastructure.Services
                 });
             });
         }
-
-        // --- Helpers Compartidos ---
-        private byte[] GenerarCodigoBarras(string texto)
-        {
-            if (string.IsNullOrWhiteSpace(texto)) return Array.Empty<byte>();
-            try
-            {
-                var writer = new BarcodeWriter
-                {
-                    Format = BarcodeFormat.CODE_128,
-                    Options = new EncodingOptions { Width = 400, Height = 60, PureBarcode = true, Margin = 0 }
-                };
-                var bitmap = writer.Write(texto);
-                using (var image = SKImage.FromBitmap(bitmap))
-                using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
-                {
-                    return data.ToArray();
-                }
-            }
-            catch (Exception) { return Array.Empty<byte>(); }
-        }
-
-        static IContainer ContainerBox(IContainer container) => container.Border(1).BorderColor(Colors.Black).Padding(4);
-        static IContainer HeaderCellStyle(IContainer container) => container.Border(1).BorderColor(Colors.Black).Background(Colors.Grey.Lighten3).Padding(2).AlignCenter();
-        static IContainer CellStyle(IContainer container) => container.BorderLeft(1).BorderRight(1).BorderBottom(1).BorderColor(Colors.Black).Padding(2);
-
-        void TotalesRow(ColumnDescriptor column, string label, decimal value)
-        {
-            column.Item().Row(row => { row.RelativeItem().Text(label).FontSize(7); row.RelativeItem().AlignRight().Text(value.ToString("N2")).FontSize(7); });
-        }
-    }
-}

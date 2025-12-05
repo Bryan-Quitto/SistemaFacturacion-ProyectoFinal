@@ -6,10 +6,12 @@
 @using FacturasSRI.Application.Dtos.Reports
 @using FacturasSRI.Application.Interfaces
 @using Microsoft.JSInterop
+@using FacturasSRI.Application.Interfaces
 @inject IReportService ReportService
 @inject IUserService UserService
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ITimeZoneHelper TimeZoneHelper
 
 @attribute [Authorize(Roles = "Administrador, Vendedor")]
 
@@ -118,7 +120,7 @@
                                     <tr class="@(item.DiasDesdeUltimaCompra > 90 ? "table-warning" : "")">
                                         <td>@item.NombreCliente</td>
                                         <td>@item.Identificacion</td>
-                                        <td>@item.UltimaCompra?.ToString("dd/MM/yyyy")</td>
+                                        <td>@(item.UltimaCompra.HasValue ? TimeZoneHelper.ConvertUtcToEcuadorTime(item.UltimaCompra.Value).ToString("dd/MM/yyyy") : "N/A")</td>
                                         <td class="text-end">@(item.DiasDesdeUltimaCompra == -1 ? "N/A" : item.DiasDesdeUltimaCompra.ToString())</td>
                                         <td class="text-end">@item.NumeroDeCompras</td>
                                         <td class="text-end">@item.TotalComprado.ToString("C", esEcCulture)</td>

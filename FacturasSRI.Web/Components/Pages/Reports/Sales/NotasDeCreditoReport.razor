@@ -10,6 +10,7 @@
 @inject IUserService UserService
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ITimeZoneHelper TimeZoneHelper
 
 @attribute [Authorize(Roles = "Administrador, Vendedor")]
 
@@ -118,7 +119,7 @@
                                 @foreach (var item in reportData)
                                 {
                                     <tr>
-                                        <td>@item.FechaEmision.ToString("dd/MM/yyyy")</td>
+                                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(item.FechaEmision).ToString("dd/MM/yyyy")</td>
                                         <td>@item.Vendedor</td>
                                         <td>@item.NumeroNotaCredito</td>
                                         <td>@item.NombreCliente</td>

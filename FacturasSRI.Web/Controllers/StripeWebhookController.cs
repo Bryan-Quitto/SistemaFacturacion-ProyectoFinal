@@ -17,13 +17,15 @@ namespace FacturasSRI.Web.Controllers
         private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
         private readonly ILogger<StripeWebhookController> _logger;
         private readonly IEmailService _emailService;
+        private readonly ITimeZoneHelper _timeZoneHelper;
 
         public StripeWebhookController(
             IConfiguration config, 
             ICobroService cobroService, 
             IDbContextFactory<FacturasSRIDbContext> contextFactory,
             ILogger<StripeWebhookController> logger,
-            IEmailService emailService)
+            IEmailService emailService,
+            ITimeZoneHelper timeZoneHelper)
         {
             var secret = config["Stripe:WebhookSecret"];
             if (string.IsNullOrEmpty(secret)) throw new ArgumentNullException(nameof(secret));
@@ -33,6 +35,7 @@ namespace FacturasSRI.Web.Controllers
             _contextFactory = contextFactory;
             _logger = logger;
             _emailService = emailService;
+            _timeZoneHelper = timeZoneHelper;
         }
 
         [HttpPost]
@@ -116,7 +119,7 @@ namespace FacturasSRI.Web.Controllers
                                     facturaDatos.ClienteNombre,
                                     facturaDatos.NumeroFactura,
                                     nuevoCobro.Monto,
-                                    nuevoCobro.FechaCobro.ToString("dd/MM/yyyy HH:mm"),
+                                    _timeZoneHelper.ConvertUtcToEcuadorTime(nuevoCobro.FechaCobro).ToString("dd/MM/yyyy HH:mm"),
                                     nuevoCobro.Referencia
                                 );
                             }

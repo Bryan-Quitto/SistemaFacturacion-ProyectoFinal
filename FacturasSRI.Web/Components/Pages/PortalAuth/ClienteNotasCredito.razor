@@ -7,6 +7,7 @@
 @inject ICreditNoteService CreditNoteService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
+@inject ITimeZoneHelper TimeZoneHelper
 
 <PageTitle>Mis Notas de Crédito</PageTitle>
 
@@ -69,7 +70,7 @@ else if (paginatedCreditNotes != null)
                 {
                     <tr>
                         <td class="fw-medium">@nc.NumeroNotaCredito</td>
-                        <td>@nc.FechaEmision.ToString("dd/MM/yyyy")</td>
+                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(nc.FechaEmision).ToString("dd/MM/yyyy")</td>
                         <td>@nc.NumeroFacturaModificada</td>
                         <td>@nc.RazonModificacion</td>
                         <td class="text-end fw-bold">@nc.Total.ToString("C")</td>

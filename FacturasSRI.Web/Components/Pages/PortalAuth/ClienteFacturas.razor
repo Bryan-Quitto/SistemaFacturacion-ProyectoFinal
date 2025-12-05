@@ -9,6 +9,7 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JS 
+@inject ITimeZoneHelper TimeZoneHelper
 
 <PageTitle>Mis Facturas</PageTitle>
 
@@ -86,7 +87,7 @@ else if (paginatedInvoices != null)
                 {
                     <tr>
                         <td class="fw-medium">@invoice.NumeroFactura</td>
-                        <td>@invoice.FechaEmision.ToString("dd/MM/yyyy")</td>
+                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(invoice.FechaEmision).ToString("dd/MM/yyyy")</td>
                         <td>
                             <span class="badge @GetStatusBadgeClass(invoice.Estado)">@GetDisplayStatus(invoice.Estado)</span>
                         </td>

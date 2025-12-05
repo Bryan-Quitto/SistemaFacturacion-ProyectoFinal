@@ -5,6 +5,7 @@
 @using FacturasSRI.Web.Components.Shared
 @inject ICobroService CobroService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ITimeZoneHelper TimeZoneHelper
 
 <PageTitle>Mis Pagos</PageTitle>
 
@@ -65,7 +66,7 @@ else if (paginatedPayments != null)
                 @foreach (var payment in paginatedPayments.Items)
                 {
                     <tr>
-                        <td>@payment.FechaCobro.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(payment.FechaCobro).ToString("dd/MM/yyyy HH:mm")</td>
                         <td class="fw-medium">@payment.NumeroFactura</td>
                         <td>@payment.MetodoDePago</td>
                         <td>@payment.Referencia</td>
