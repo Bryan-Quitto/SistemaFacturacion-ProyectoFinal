@@ -6,10 +6,13 @@
 @using FacturasSRI.Application.Dtos.Reports
 @using FacturasSRI.Application.Interfaces
 @using Microsoft.JSInterop
+@using Microsoft.Extensions.Logging 
 @inject IReportService ReportService
 @inject IUserService UserService
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ITimeZoneHelper TimeZoneHelper
+@inject ILogger<VentasPorProductoReport> Logger
 
 @attribute [Authorize(Roles = "Administrador, Vendedor")]
 
@@ -139,7 +142,12 @@
                                 @foreach (var item in FilteredData)
                                 {
                                     <tr>
-                                        <td>@item.Fecha.ToShortDateString()</td>
+                                        @* CORRECCIÓN VISUAL: La fecha que viene de la BD es UTC, pero EF a veces la trae Unspecified. La forzamos a UTC para mostrarla. *@
+                                        <td>
+                                            @(item.Fecha.Kind == DateTimeKind.Unspecified 
+                                                ? item.Fecha.ToString("dd/MM/yyyy") // Si ya viene sin hora, mostrar directo
+                                                : item.Fecha.ToString("dd/MM/yyyy")) 
+                                        </td>
                                         <td>@item.Vendedor</td>
                                         <td>@item.CodigoProducto</td>
                                         <td>@item.NombreProducto</td>
@@ -172,15 +180,8 @@
     {
         get
         {
-            if (reportData == null)
-            {
-                return new List<VentasPorProductoDto>();
-            }
-
-            if (string.IsNullOrWhiteSpace(searchText))
-            {
-                return reportData;
-            }
+            if (reportData == null) return new List<VentasPorProductoDto>();
+            if (string.IsNullOrWhiteSpace(searchText)) return reportData;
 
             var lowerSearchText = searchText.ToLowerInvariant();
 
@@ -188,29 +189,22 @@
                 (item.Vendedor?.ToLowerInvariant().Contains(lowerSearchText) ?? false) ||
                 (item.CodigoProducto?.ToLowerInvariant().Contains(lowerSearchText) ?? false) ||
                 (item.NombreProducto?.ToLowerInvariant().Contains(lowerSearchText) ?? false) ||
-                (item.Fecha.ToShortDateString().ToLowerInvariant().Contains(lowerSearchText))
+                (item.Fecha.ToString("dd/MM/yyyy").Contains(lowerSearchText))
             );
         }
     }
 
-    // Filtros de fecha
-    private DateTime startDate = DateTime.Now.AddMonths(-1).Date;
-    private DateTime endDate = DateTime.Now.Date;
-
-    // Variables de Usuario y Roles
+    private DateTime startDate = DateTime.Today.AddMonths(-1).Date;
+    private DateTime endDate = DateTime.Today;
     private bool isAdmin = false;
     private Guid? loggedUserId;
     private Guid? selectedFilterUserId;
     private List<UserDto>? usersList;
-
-    // Data y Estado
     private IEnumerable<VentasPorProductoDto>? reportData;
     private bool isLoading = false;
     private bool isDownloading = false;
     private string? errorMessage;
     private readonly CultureInfo esEcCulture = new CultureInfo("es-EC");
-
-    // Layout Dinámico
     private string ColumnClass => isAdmin ? "col-md-3" : "col-md-4";
 
     protected override async Task OnInitializedAsync()
@@ -233,7 +227,6 @@
                 if (isAdmin)
                 {
                     var allUsers = await UserService.GetActiveUsersAsync();
-                    // Filtramos bodegueros
                     usersList = allUsers
                         .Where(u => u.Roles.Contains("Vendedor") || u.Roles.Contains("Administrador"))
                         .OrderBy(u => u.PrimerNombre)
@@ -244,6 +237,7 @@
         catch (Exception ex)
         {
             errorMessage = $"Error al cargar permisos: {ex.Message}";
+            Logger.LogError(ex, "Error en OnInitializedAsync");
         }
     }
 
@@ -258,21 +252,25 @@
         errorMessage = null;
         reportData = null;
 
-        if (startDate > endDate)
-        {
-            errorMessage = "La fecha de inicio no puede ser posterior a la fecha de fin.";
-            isLoading = false;
-            return;
-        }
-
         try
         {
             var queryUserId = GetQueryUserId();
-            reportData = await ReportService.GetVentasPorProductoAsync(startDate, endDate, queryUserId);
+            
+            // SOLUCIÓN CLAVE: Forzar Unspecified antes de enviar al helper
+            // Esto le dice al helper: "Toma esta fecha tal cual es (ej 00:00:00) y asume que es hora de Ecuador"
+            var safeStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
+            var safeEndDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
+
+            // Ahora sí convertimos
+            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(safeStartDate.Date);
+            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(safeEndDate.Date.AddDays(1).AddTicks(-1));
+
+            reportData = await ReportService.GetVentasPorProductoAsync(utcStartDate, utcEndDate, queryUserId);
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ocurrió un error al generar el reporte: {ex.Message}";
+            errorMessage = $"Error al generar: {ex.Message}";
+            Logger.LogError(ex, "Error en GenerateReport");
         }
         finally
         {
@@ -288,7 +286,15 @@
         try
         {
             var queryUserId = GetQueryUserId();
-            var pdfBytes = await ReportService.GetVentasPorProductoAsPdfAsync(startDate, endDate, queryUserId);
+            
+            // SOLUCIÓN CLAVE (Repetida para PDF)
+            var safeStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
+            var safeEndDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
+
+            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(safeStartDate.Date);
+            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(safeEndDate.Date.AddDays(1).AddTicks(-1));
+
+            var pdfBytes = await ReportService.GetVentasPorProductoAsPdfAsync(utcStartDate, utcEndDate, queryUserId);
 
             if (pdfBytes.Length == 0)
             {
@@ -304,7 +310,8 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ocurrió un error al descargar el PDF: {ex.Message}";
+            errorMessage = $"Error al descargar el PDF: {ex.Message}";
+            Logger.LogError(ex, "Error en DownloadPdf");
         }
         finally
         {

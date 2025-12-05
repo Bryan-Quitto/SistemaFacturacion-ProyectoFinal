@@ -22,20 +22,14 @@
         </div>
         <div class="card-body">
             <div class="row align-items-end mb-3">
-                
-                @* 1. Fecha Inicio *@
                 <div class="@ColumnClass">
                     <label for="startDate" class="form-label">Fecha de Inicio</label>
                     <input type="date" id="startDate" class="form-control" @bind="startDate" />
                 </div>
-
-                @* 2. Fecha Fin *@
                 <div class="@ColumnClass">
                     <label for="endDate" class="form-label">Fecha de Fin</label>
                     <input type="date" id="endDate" class="form-control" @bind="endDate" />
                 </div>
-
-                @* 3. Filtro de Usuario (SOLO ADMIN) *@
                 @if (isAdmin)
                 {
                     <div class="@ColumnClass">
@@ -52,8 +46,6 @@
                         </select>
                     </div>
                 }
-
-                @* 4. Botones *@
                 <div class="@ColumnClass d-flex align-items-end">
                     <button class="btn btn-primary me-2 w-100" @onclick="GenerateReport" disabled="@isLoading">
                         @if (isLoading)
@@ -140,7 +132,11 @@
                                     <tr class="@(item.DiasDesdeUltimaCompra > 90 ? "table-warning" : "")">
                                         <td>@item.NombreCliente</td>
                                         <td>@item.Identificacion</td>
-                                        <td>@(item.UltimaCompra.HasValue ? TimeZoneHelper.ConvertUtcToEcuadorTime(item.UltimaCompra.Value).ToString("dd/MM/yyyy") : "N/A")</td>
+                                        <td>
+                                            @(item.UltimaCompra.HasValue 
+                                                ? TimeZoneHelper.ConvertUtcToEcuadorTime(DateTime.SpecifyKind(item.UltimaCompra.Value, DateTimeKind.Utc)).ToString("dd/MM/yyyy") 
+                                                : "N/A")
+                                        </td>
                                         <td class="text-end">@(item.DiasDesdeUltimaCompra == -1 ? "N/A" : item.DiasDesdeUltimaCompra.ToString())</td>
                                         <td class="text-end">@item.NumeroDeCompras</td>
                                         <td class="text-end">@item.TotalComprado.ToString("C", esEcCulture)</td>
@@ -162,15 +158,8 @@
     {
         get
         {
-            if (reportData == null)
-            {
-                return new List<ClienteActividadDto>();
-            }
-
-            if (string.IsNullOrWhiteSpace(searchText))
-            {
-                return reportData;
-            }
+            if (reportData == null) return new List<ClienteActividadDto>();
+            if (string.IsNullOrWhiteSpace(searchText)) return reportData;
 
             var lowerSearchText = searchText.ToLowerInvariant();
 
@@ -181,24 +170,17 @@
         }
     }
 
-    // Variables de Filtro
     private DateTime startDate = DateTime.Today.AddMonths(-1).Date;
     private DateTime endDate = DateTime.Today;
-
-    // Variables de Usuario y Roles
     private bool isAdmin = false;
     private Guid? loggedUserId;
     private Guid? selectedFilterUserId;
     private List<UserDto>? usersList;
-
-    // Variables de Datos
     private IEnumerable<ClienteActividadDto>? reportData;
     private bool isLoading = false;
     private bool isDownloading = false;
     private string? errorMessage;
     private readonly CultureInfo esEcCulture = new CultureInfo("es-EC");
-
-    // Layout Dinámico
     private string ColumnClass => isAdmin ? "col-md-3" : "col-md-4";
 
     protected override async Task OnInitializedAsync()
@@ -221,7 +203,6 @@
                 if (isAdmin)
                 {
                     var allUsers = await UserService.GetActiveUsersAsync();
-                    // Filtramos para quitar bodegueros, solo Ventas y Admin
                     usersList = allUsers
                         .Where(u => u.Roles.Contains("Vendedor") || u.Roles.Contains("Administrador"))
                         .OrderBy(u => u.PrimerNombre)
@@ -256,10 +237,12 @@
         try
         {
             var queryUserId = GetQueryUserId();
+            
+            var safeStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
+            var safeEndDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
 
-            // Convert local selected dates to UTC (Ecuador's beginning/end of day)
-            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(startDate.Date);
-            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(endDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
+            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(safeStartDate.Date);
+            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(safeEndDate.Date.AddDays(1).AddTicks(-1));
 
             reportData = await ReportService.GetActividadClientesAsync(utcStartDate, utcEndDate, queryUserId);
         }
@@ -281,10 +264,12 @@
         try
         {
             var queryUserId = GetQueryUserId();
+            
+            var safeStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
+            var safeEndDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
 
-            // Convert local selected dates to UTC (Ecuador's beginning/end of day)
-            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(startDate.Date);
-            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(endDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
+            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(safeStartDate.Date);
+            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(safeEndDate.Date.AddDays(1).AddTicks(-1));
 
             var pdfBytes = await ReportService.GetActividadClientesAsPdfAsync(utcStartDate, utcEndDate, queryUserId);
 

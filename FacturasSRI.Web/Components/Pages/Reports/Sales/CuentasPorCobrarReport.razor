@@ -21,12 +21,9 @@
             <p class="text-muted mb-0">Muestra todas las facturas con saldos pendientes de pago.</p>
         </div>
         <div class="card-body">
-            
-            @* Fila de Filtros y Acciones *@
             <div class="row align-items-end mb-3">
                 @if (isAdmin)
                 {
-                    @* Filtro de Usuario solo para Admin *@
                     <div class="col-md-6">
                         <label for="userFilter" class="form-label">Filtrar por Vendedor</label>
                         <select id="userFilter" class="form-select" @bind="selectedFilterUserId">
@@ -41,8 +38,6 @@
                         </select>
                     </div>
                 }
-
-                @* Botones (Ocupan el resto del espacio o ancho completo si no es admin) *@
                 <div class="@(isAdmin ? "col-md-6" : "col-md-12") d-flex justify-content-end">
                     <button class="btn btn-primary me-2" @onclick="GenerateReport" disabled="@isLoading">
                         @if (isLoading)
@@ -62,7 +57,6 @@
                             @if (isDownloading)
                             {
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                                <span class="ms-1">Descargando...</span>
                             }
                             else
                             {
@@ -131,7 +125,7 @@
                                 @foreach (var item in FilteredData.OrderByDescending(x => x.DiasVencida))
                                 {
                                     <tr class="@(item.DiasVencida > 30 ? "table-danger" : item.DiasVencida > 15 ? "table-warning" : "")">
-                                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(item.FechaEmision).ToString("dd/MM/yyyy")</td>
+                                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(DateTime.SpecifyKind(item.FechaEmision, DateTimeKind.Utc)).ToString("dd/MM/yyyy")</td>
                                         <td>@item.Vendedor</td>
                                         <td>@item.NombreCliente</td>
                                         <td>@item.NumeroFactura</td>
@@ -163,15 +157,8 @@
     {
         get
         {
-            if (reportData == null)
-            {
-                return new List<CuentasPorCobrarDto>();
-            }
-
-            if (string.IsNullOrWhiteSpace(searchText))
-            {
-                return reportData;
-            }
+            if (reportData == null) return new List<CuentasPorCobrarDto>();
+            if (string.IsNullOrWhiteSpace(searchText)) return reportData;
 
             var lowerSearchText = searchText.ToLowerInvariant();
 
@@ -183,13 +170,10 @@
         }
     }
 
-    // Variables de Usuario y Roles
     private bool isAdmin = false;
     private Guid? loggedUserId;
     private Guid? selectedFilterUserId;
     private List<UserDto>? usersList;
-
-    // Variables de Datos
     private IEnumerable<CuentasPorCobrarDto>? reportData;
     private bool isLoading = false;
     private bool isDownloading = false;
@@ -222,7 +206,6 @@
                         .ToList();
                 }
             }
-            // Llamamos a generar el reporte automáticamente al entrar
             await GenerateReport();
         }
         catch (Exception ex)

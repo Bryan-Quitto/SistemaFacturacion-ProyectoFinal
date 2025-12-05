@@ -1,1 +1,0 @@
- Error: Ocurrió un error al descargar el PDF: The conversion could not be completed because the supplied DateTime did not have the Kind property set correctly. For example, when the Kind property is DateTimeKind.Local, the source time zone must be TimeZoneInfo.Local. (Parameter 'sourceTimeZone')

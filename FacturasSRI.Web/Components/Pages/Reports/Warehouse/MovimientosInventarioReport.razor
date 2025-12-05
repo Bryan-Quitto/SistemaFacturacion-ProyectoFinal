@@ -138,7 +138,7 @@
                             @foreach (var item in FilteredData)
                             {
                                 <tr>
-                                    <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(item.Fecha).ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(DateTime.SpecifyKind(item.Fecha, DateTimeKind.Utc)).ToString("dd/MM/yyyy HH:mm")</td>
                                     <td>@item.UsuarioResponsable</td>
                                     <td>@item.ProductoNombre</td>
                                     <td>@item.TipoMovimiento</td>
@@ -184,7 +184,7 @@
                 (item.ProductoNombre?.ToLowerInvariant().Contains(lowerSearchText) ?? false) ||
                 (item.TipoMovimiento?.ToLowerInvariant().Contains(lowerSearchText) ?? false) ||
                 (item.DocumentoReferencia?.ToLowerInvariant().Contains(lowerSearchText) ?? false) ||
-                (TimeZoneHelper.ConvertUtcToEcuadorTime(item.Fecha).ToString("dd/MM/yyyy HH:mm").ToLowerInvariant().Contains(lowerSearchText))
+                (TimeZoneHelper.ConvertUtcToEcuadorTime(DateTime.SpecifyKind(item.Fecha, DateTimeKind.Utc)).ToString("dd/MM/yyyy HH:mm").ToLowerInvariant().Contains(lowerSearchText))
             );
         }
     }
@@ -258,9 +258,12 @@
         {
             var queryUserId = GetQueryUserId();
 
+            var safeStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
+            var safeEndDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
+
             // Convert local selected dates to UTC (Ecuador's beginning/end of day)
-            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(startDate.Date);
-            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(endDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
+            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(safeStartDate.Date);
+            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(safeEndDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
 
             reportData = await ReportService.GetMovimientosInventarioAsync(utcStartDate, utcEndDate, queryUserId);
         }
@@ -283,9 +286,12 @@
         {
             var queryUserId = GetQueryUserId();
 
+            var safeStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
+            var safeEndDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
+
             // Convert local selected dates to UTC (Ecuador's beginning/end of day)
-            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(startDate.Date);
-            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(endDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
+            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(safeStartDate.Date);
+            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(safeEndDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
 
             var pdfBytes = await ReportService.GetMovimientosInventarioAsPdfAsync(utcStartDate, utcEndDate, queryUserId);
 

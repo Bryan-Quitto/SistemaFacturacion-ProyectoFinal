@@ -5,6 +5,7 @@
 @using FacturasSRI.Application.Dtos
 @using FacturasSRI.Application.Dtos.Reports
 @using FacturasSRI.Application.Interfaces
+@using Microsoft.JSInterop
 @inject IReportService ReportService
 @inject IUserService UserService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -139,7 +140,9 @@
                                 @foreach (var item in FilteredData)
                                 {
                                     <tr>
-                                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(item.Fecha).ToString("dd/MM/yyyy")</td>
+                                        <td>
+                                            @TimeZoneHelper.ConvertUtcToEcuadorTime(DateTime.SpecifyKind(item.Fecha, DateTimeKind.Utc)).ToString("dd/MM/yyyy")
+                                        </td>
                                         <td>@item.Vendedor</td>
                                         <td class="text-end">@item.CantidadFacturas</td>
                                         <td class="text-end">@item.Subtotal.ToString("C", esEcCulture)</td>
@@ -186,7 +189,7 @@
 
             return reportData.Where(item =>
                 (item.Vendedor?.ToLowerInvariant().Contains(lowerSearchText) ?? false) ||
-                (TimeZoneHelper.ConvertUtcToEcuadorTime(item.Fecha).ToString("dd/MM/yyyy").ToLowerInvariant().Contains(lowerSearchText))
+                (TimeZoneHelper.ConvertUtcToEcuadorTime(DateTime.SpecifyKind(item.Fecha, DateTimeKind.Utc)).ToString("dd/MM/yyyy").Contains(lowerSearchText))
             );
         }
     }
@@ -273,9 +276,13 @@
             // Usamos la lógica centralizada para obtener el ID
             var queryUserId = GetQueryUserId();
 
+            // Manejo defensivo de fechas
+            var safeStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
+            var safeEndDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
+
             // Convert local selected dates to UTC (Ecuador's beginning/end of day)
-            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(startDate.Date);
-            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(endDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
+            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(safeStartDate.Date);
+            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(safeEndDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
 
             reportData = await ReportService.GetVentasPorPeriodoAsync(utcStartDate, utcEndDate, queryUserId);
         }
@@ -298,9 +305,13 @@
         {
             var queryUserId = GetQueryUserId();
 
+            // Manejo defensivo de fechas
+            var safeStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
+            var safeEndDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
+
             // Convert local selected dates to UTC (Ecuador's beginning/end of day)
-            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(startDate.Date);
-            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(endDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
+            var utcStartDate = TimeZoneHelper.ConvertEcuadorToUtc(safeStartDate.Date);
+            var utcEndDate = TimeZoneHelper.ConvertEcuadorToUtc(safeEndDate.Date.AddDays(1).AddTicks(-1)); // End of the selected day in Ecuador time
 
             var pdfBytes = await ReportService.GetVentasPorPeriodoAsPdfAsync(utcStartDate, utcEndDate, queryUserId);
 
