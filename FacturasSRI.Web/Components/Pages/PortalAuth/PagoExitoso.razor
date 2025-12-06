@@ -48,10 +48,6 @@
     private bool isSuccess = false;
     private string errorMessage = "";
 
-    // Inyectamos el Factory para buscar al vendedor
-    @inject Microsoft.EntityFrameworkCore.IDbContextFactory<FacturasSRI.Infrastructure.Persistence.FacturasSRIDbContext> ContextFactory 
-    @using Microsoft.EntityFrameworkCore
-
     protected override async Task OnInitializedAsync()
     {
         if (string.IsNullOrEmpty(session_id) || facturaId == null)
@@ -67,30 +63,20 @@
 
             if (session.PaymentStatus == "paid")
             {
-                // 1. Buscar el Usuario Vendedor (Dueño de la factura)
-                Guid usuarioVendedorId;
-                using (var context = await ContextFactory.CreateDbContextAsync())
-                {
-                    var facturaInfo = await context.Facturas
-                        .Where(f => f.Id == facturaId.Value)
-                        .Select(f => new { f.UsuarioIdCreador })
-                        .FirstOrDefaultAsync();
+                // CAMBIO FASE 2: Ya no buscamos al Usuario Vendedor en la BD.
+                // Creamos el cobro con UsuarioIdCreador = null.
 
-                    if (facturaInfo == null) throw new Exception("Factura no encontrada.");
-                    usuarioVendedorId = facturaInfo.UsuarioIdCreador;
-                }
-
-                // 2. Crear el cobro con el ID del Vendedor
                 var nuevoCobro = new RegistrarCobroDto
                 {
                     FacturaId = facturaId.Value,
                     Monto = (decimal)(session.AmountTotal ?? 0) / 100m,
                     MetodoDePago = "Tarjeta de Crédito/Débito",
                     Referencia = $"Stripe: {session.PaymentIntentId}", 
-                    UsuarioIdCreador = usuarioVendedorId, // <--- USAMOS EL ID DEL VENDEDOR
+                    UsuarioIdCreador = null, // <--- NULO (Autoservicio)
                     FechaCobro = DateTime.UtcNow
                 };
 
+                // Enviamos null en los archivos porque no hay comprobante físico aquí
                 await CobroService.RegistrarCobroAsync(nuevoCobro, null, null);
 
                 isSuccess = true;
@@ -104,7 +90,6 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error procesando retorno de Stripe");
-            // Si dice que ya está pagada, es un éxito (probablemente el Webhook ganó la carrera)
             if (ex.Message.Contains("totalmente pagada"))
             {
                 isSuccess = true;

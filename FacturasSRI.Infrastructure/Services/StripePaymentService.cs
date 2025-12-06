@@ -1,7 +1,7 @@
 using FacturasSRI.Application.Dtos;
 using FacturasSRI.Application.Interfaces;
-using FacturasSRI.Infrastructure.Persistence; // Acceso a DB
-using Microsoft.EntityFrameworkCore; // Entity Framework
+using FacturasSRI.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Stripe;
 using Stripe.Checkout;
@@ -11,7 +11,7 @@ namespace FacturasSRI.Infrastructure.Services
     public class StripePaymentService : IStripePaymentService
     {
         private readonly string _apiKey;
-        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory; // <--- Nuevo
+        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
 
         public StripePaymentService(IConfiguration configuration, IDbContextFactory<FacturasSRIDbContext> contextFactory)
         {
@@ -27,14 +27,16 @@ namespace FacturasSRI.Infrastructure.Services
         {
             using var context = await _contextFactory.CreateDbContextAsync();
             
-            // 1. Recuperamos la entidad Factura real de la BD para ver si ya tiene sesión
             var facturaDb = await context.Facturas.FindAsync(facturaDto.Id);
             if (facturaDb == null) throw new Exception("Factura no encontrada");
 
             var sessionService = new SessionService();
             Session? sessionExistente = null;
 
-            // 2. NIVEL NASA: Verificamos si ya hay una sesión guardada
+            // Calculamos cuánto DEBERÍA cobrar la sesión hoy
+            long montoActualRequeridoEnCentavos = (long)(facturaDto.SaldoPendiente * 100);
+
+            // 1. Verificar si ya hay sesión
             if (!string.IsNullOrEmpty(facturaDb.StripeSessionId))
             {
                 try 
@@ -43,28 +45,43 @@ namespace FacturasSRI.Infrastructure.Services
                 }
                 catch (StripeException) 
                 {
-                    // Si da error (ej. borraron datos en Stripe test), asumimos que no existe
                     sessionExistente = null; 
                 }
             }
 
-            // 3. Evaluamos la sesión existente
+            // 2. Evaluamos la sesión existente
             if (sessionExistente != null)
             {
-                // Si está ABIERTA (Open), devolvemos EL MISMO LINK. ¡No creamos uno nuevo!
-                if (sessionExistente.Status == "open")
-                {
-                    return sessionExistente.Url;
-                }
-                // Si ya está PAGADA (Complete), lanzamos error (o devolvemos successUrl)
+                // Si ya está pagada, error
                 if (sessionExistente.PaymentStatus == "paid")
                 {
                     throw new Exception("Esta factura ya tiene un pago procesado en Stripe.");
                 }
-                // Si expiró, dejamos que el código siga y cree una nueva
+
+                // VALIDACIÓN CRÍTICA (NUEVA): ¿El monto del link viejo coincide con la deuda actual?
+                if (sessionExistente.AmountTotal != montoActualRequeridoEnCentavos)
+                {
+                    // ¡EL MONTO CAMBIÓ! (Alguien pagó $1.00 por otro lado)
+                    // Expiramos la sesión vieja para que nadie la pague por error
+                    try 
+                    {
+                        if(sessionExistente.Status == "open") 
+                        {
+                            await sessionService.ExpireAsync(facturaDb.StripeSessionId);
+                        }
+                    }
+                    catch { /* Ignoramos si ya estaba expirada */ }
+
+                    sessionExistente = null; // Forzamos a crear una nueva abajo
+                }
+                else if (sessionExistente.Status == "open")
+                {
+                    // Si el monto es correcto y está abierta, devolvemos el mismo link (Persistencia)
+                    return sessionExistente.Url;
+                }
             }
 
-            // 4. Si no existe o expiró, CREAMOS UNA NUEVA (Tu código original)
+            // 3. Crear NUEVA sesión (si no existe, expiró o el monto cambió)
             var options = new SessionCreateOptions
             {
                 PaymentMethodTypes = new List<string> { "card" },
@@ -74,7 +91,7 @@ namespace FacturasSRI.Infrastructure.Services
                     {
                         PriceData = new SessionLineItemPriceDataOptions 
                         {
-                            UnitAmount = (long)(facturaDto.SaldoPendiente * 100), 
+                            UnitAmount = montoActualRequeridoEnCentavos, // Usamos el monto calculado
                             Currency = "usd",
                             ProductData = new SessionLineItemPriceDataProductDataOptions 
                             {
@@ -99,7 +116,6 @@ namespace FacturasSRI.Infrastructure.Services
 
             Session session = await sessionService.CreateAsync(options);
 
-            // 5. GUARDAMOS EL ID DE LA NUEVA SESIÓN EN LA DB
             facturaDb.StripeSessionId = session.Id;
             await context.SaveChangesAsync();
 

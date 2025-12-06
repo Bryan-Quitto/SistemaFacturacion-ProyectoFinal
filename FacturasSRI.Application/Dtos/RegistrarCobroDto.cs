@@ -17,7 +17,7 @@ namespace FacturasSRI.Application.Dtos
 
         public string? Referencia { get; set; }
 
-        public Guid UsuarioIdCreador { get; set; }
+        public Guid? UsuarioIdCreador { get; set; }
 
         public DateTime FechaCobro { get; set; } = DateTime.UtcNow;
 

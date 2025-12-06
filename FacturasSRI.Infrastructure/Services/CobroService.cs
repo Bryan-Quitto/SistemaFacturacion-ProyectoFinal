@@ -27,12 +27,12 @@ namespace FacturasSRI.Infrastructure.Services
             Client supabase, 
             ILogger<CobroService> logger,
             IEmailService emailService,
-            ITimeZoneHelper timeZoneHelper) // <--- 2. INYECTAR
+            ITimeZoneHelper timeZoneHelper)
         {
             _contextFactory = contextFactory;
             _supabase = supabase;
             _logger = logger;
-            _emailService = emailService; // <--- 3. ASIGNAR
+            _emailService = emailService;
             _timeZoneHelper = timeZoneHelper;
         }
 
@@ -65,7 +65,10 @@ namespace FacturasSRI.Infrastructure.Services
                     MetodoDePago = c.MetodoDePago,
                     Referencia = c.Referencia,
                     ComprobantePagoPath = c.ComprobantePagoPath,
-                    CreadoPor = c.UsuarioCreador != null ? $"{c.UsuarioCreador.PrimerNombre} {c.UsuarioCreador.PrimerApellido}" : "N/A"
+                    // CAMBIO VISUAL: Si es usuario interno, muestra su nombre. Si es NULL, muestra la Razón Social del cliente.
+                    CreadoPor = c.UsuarioCreador != null 
+                        ? $"{c.UsuarioCreador.PrimerNombre} {c.UsuarioCreador.PrimerApellido}" 
+                        : (c.Factura.Cliente != null ? c.Factura.Cliente.RazonSocial : "Cliente")
                 });
             
             return await PaginatedList<CobroDto>.CreateAsync(finalQuery, pageNumber, pageSize);
@@ -91,12 +94,14 @@ namespace FacturasSRI.Infrastructure.Services
                     MetodoDePago = c.MetodoDePago,
                     Referencia = c.Referencia,
                     ComprobantePagoPath = c.ComprobantePagoPath,
-                    CreadoPor = c.UsuarioCreador != null ? $"{c.UsuarioCreador.PrimerNombre} {c.UsuarioCreador.PrimerApellido}" : "N/A"
+                    // CAMBIO VISUAL: Muestra la Razón Social si no hay usuario creador (pago autoservicio)
+                    CreadoPor = c.UsuarioCreador != null 
+                        ? $"{c.UsuarioCreador.PrimerNombre} {c.UsuarioCreador.PrimerApellido}" 
+                        : (c.Factura.Cliente != null ? c.Factura.Cliente.RazonSocial : "Cliente")
                 })
                 .ToListAsync();
         }
 
-        // EL MÉTODO IMPORTANTE A MODIFICAR
         public async Task<CobroDto> RegistrarCobroAsync(RegistrarCobroDto cobroDto, Stream? fileStream, string? fileName)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
@@ -112,10 +117,9 @@ namespace FacturasSRI.Infrastructure.Services
                 if (cuentaPorCobrar.Pagada) throw new InvalidOperationException("La factura ya se encuentra totalmente pagada.");
                 if (cobroDto.Monto <= 0) throw new ArgumentException("El monto del cobro debe ser positivo.", nameof(cobroDto.Monto));
                 
-                // Pequeña tolerancia para errores de redondeo decimal
                 if (cobroDto.Monto > cuentaPorCobrar.SaldoPendiente + 0.01m)
                 {
-                     throw new ArgumentException($"El monto del cobro (${cobroDto.Monto}) no puede ser mayor al saldo pendiente (${cuentaPorCobrar.SaldoPendiente}).", nameof(cobroDto.Monto));
+                      throw new ArgumentException($"El monto del cobro (${cobroDto.Monto}) no puede ser mayor al saldo pendiente (${cuentaPorCobrar.SaldoPendiente}).", nameof(cobroDto.Monto));
                 }
 
                 string? bucketPath = null;
@@ -123,7 +127,12 @@ namespace FacturasSRI.Infrastructure.Services
                 {
                     var fileExtension = Path.GetExtension(fileName);
                     var newFileName = $"{Guid.NewGuid()}{fileExtension}";
-                    bucketPath = $"{cobroDto.UsuarioIdCreador}/{newFileName}";
+                    
+                    var folderName = cobroDto.UsuarioIdCreador.HasValue 
+                                     ? cobroDto.UsuarioIdCreador.ToString() 
+                                     : "portal-clientes";
+                                     
+                    bucketPath = $"{folderName}/{newFileName}";
 
                     await using var memoryStream = new MemoryStream();
                     await fileStream.CopyToAsync(memoryStream);
@@ -140,7 +149,7 @@ namespace FacturasSRI.Infrastructure.Services
                     MetodoDePago = cobroDto.MetodoDePago,
                     Referencia = cobroDto.Referencia,
                     ComprobantePagoPath = bucketPath,
-                    UsuarioIdCreador = cobroDto.UsuarioIdCreador,
+                    UsuarioIdCreador = cobroDto.UsuarioIdCreador, 
                     FechaCreacion = DateTime.UtcNow
                 };
 
@@ -156,8 +165,6 @@ namespace FacturasSRI.Infrastructure.Services
                 await context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                // 4. LOGICA NUEVA: ENVÍO DE CORREO (Fire and Forget)
-                // Ejecutamos en segundo plano para no hacer esperar al usuario en la UI
                 _ = Task.Run(async () => 
                 {
                     try
@@ -176,12 +183,16 @@ namespace FacturasSRI.Infrastructure.Services
                     }
                     catch (Exception ex)
                     {
-                        // Solo logueamos error de correo, no revertimos la transacción del cobro
                         _logger.LogError(ex, "Error enviando correo de confirmación para cobro {CobroId}", cobro.Id);
                     }
                 });
 
-                var creador = await context.Usuarios.FindAsync(cobro.UsuarioIdCreador);
+                Usuario? creador = null;
+                if(cobro.UsuarioIdCreador.HasValue)
+                {
+                    creador = await context.Usuarios.FindAsync(cobro.UsuarioIdCreador);
+                }
+
                 return new CobroDto
                 {
                     Id = cobro.Id,
@@ -193,7 +204,10 @@ namespace FacturasSRI.Infrastructure.Services
                     MetodoDePago = cobro.MetodoDePago,
                     Referencia = cobro.Referencia,
                     ComprobantePagoPath = cobro.ComprobantePagoPath,
-                    CreadoPor = creador != null ? $"{creador.PrimerNombre} {creador.PrimerApellido}" : "N/A"
+                    // CAMBIO VISUAL EN EL RETORNO TAMBIÉN
+                    CreadoPor = creador != null 
+                        ? $"{creador.PrimerNombre} {creador.PrimerApellido}" 
+                        : cuentaPorCobrar.Factura.Cliente.RazonSocial
                 };
             }
             catch (Exception ex)
@@ -203,7 +217,7 @@ namespace FacturasSRI.Infrastructure.Services
                 throw;
             }
         }
-        // ... (Resto de métodos GetAllCobros, etc... quedan igual)
+
         public async Task<PaginatedList<FacturasConPagosDto>> GetFacturasConPagosAsync(int pageNumber, int pageSize, string? searchTerm, FormaDePago? formaDePago, EstadoFactura? estadoFactura)
         {
              await using var context = await _contextFactory.CreateDbContextAsync();
@@ -259,11 +273,11 @@ namespace FacturasSRI.Infrastructure.Services
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
             var query = from f in context.Facturas
-                                    .Include(f => f.Cobros) // Explicitly include Cobros here
-                                    .Include(f => f.Cliente) // Explicitly include Cliente for ClienteNombre
+                                    .Include(f => f.Cobros) 
+                                    .Include(f => f.Cliente) 
                         join cpc in context.CuentasPorCobrar on f.Id equals cpc.FacturaId into cpcJoin
-                        from cuentaPorCobrar in cpcJoin.DefaultIfEmpty() // Left join with CuentasPorCobrar
-                        where f.ClienteId == clienteId // Filter by client ID
+                        from cuentaPorCobrar in cpcJoin.DefaultIfEmpty() 
+                        where f.ClienteId == clienteId 
                         select new
                         {
                             Factura = f,
@@ -292,9 +306,10 @@ namespace FacturasSRI.Infrastructure.Services
                 {
                     FacturaId = x.Factura.Id,
                     NumeroFactura = x.Factura.NumeroFactura,
-                    ClienteNombre = x.Factura.Cliente != null ? x.Factura.Cliente.RazonSocial : "N/A", // Cliente is now eagerly loaded
+                    ClienteNombre = x.Factura.Cliente != null ? x.Factura.Cliente.RazonSocial : "N/A", 
                     TotalFactura = x.Factura.Total,
-                    TotalPagado = x.Factura.Cobros.Sum(c => c.Monto), // Cobros are now eagerly loaded
+                    // CORRECCIÓN: Se agrega verificación de nulidad para Cobros antes de llamar a Sum()
+                    TotalPagado = x.Factura.Cobros != null ? x.Factura.Cobros.Sum(c => c.Monto) : 0, 
                     SaldoPendiente = x.CuentaPorCobrar != null ? x.CuentaPorCobrar.SaldoPendiente : 0,
                     FormaDePago = x.Factura.FormaDePago,
                     EstadoFactura = x.Factura.Estado,
@@ -313,7 +328,6 @@ namespace FacturasSRI.Infrastructure.Services
                 .Include(c => c.UsuarioCreador)
                 .AsQueryable();
 
-            // 1. Filtros de Fecha
             if (startDate.HasValue)
                 query = query.Where(c => c.FechaCobro >= startDate.Value);
 
@@ -323,14 +337,11 @@ namespace FacturasSRI.Infrastructure.Services
                 query = query.Where(c => c.FechaCobro < endOfDay);
             }
 
-            // 2. Filtro de Método de Pago (NUEVO)
             if (!string.IsNullOrEmpty(paymentMethod) && paymentMethod != "All")
             {
-                // Usamos Contains para que "Tarjeta" encuentre "Tarjeta de Crédito/Débito"
                 query = query.Where(c => c.MetodoDePago.Contains(paymentMethod));
             }
 
-            // 3. Filtro de Texto Inteligente
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 var term = searchTerm.Trim();
@@ -360,7 +371,10 @@ namespace FacturasSRI.Infrastructure.Services
                     MetodoDePago = c.MetodoDePago,
                     Referencia = c.Referencia,
                     ComprobantePagoPath = c.ComprobantePagoPath,
-                    CreadoPor = c.UsuarioCreador != null ? $"{c.UsuarioCreador.PrimerNombre} {c.UsuarioCreador.PrimerApellido}" : "N/A"
+                    // CAMBIO VISUAL
+                    CreadoPor = c.UsuarioCreador != null 
+                        ? $"{c.UsuarioCreador.PrimerNombre} {c.UsuarioCreador.PrimerApellido}" 
+                        : (c.Factura.Cliente != null ? c.Factura.Cliente.RazonSocial : "Cliente")
                 });
 
             return await PaginatedList<CobroDto>.CreateAsync(finalQuery, pageNumber, pageSize);
@@ -375,7 +389,6 @@ namespace FacturasSRI.Infrastructure.Services
                 .Include(c => c.UsuarioCreador)
                 .AsQueryable();
 
-            // 1. Filtros de Fecha
             if (startDate.HasValue)
                 query = query.Where(c => c.FechaCobro >= startDate.Value);
 
@@ -385,13 +398,11 @@ namespace FacturasSRI.Infrastructure.Services
                 query = query.Where(c => c.FechaCobro < endOfDay);
             }
 
-            // 2. Filtro de Método de Pago
             if (!string.IsNullOrEmpty(paymentMethod) && paymentMethod != "All")
             {
                 query = query.Where(c => c.MetodoDePago.Contains(paymentMethod));
             }
 
-            // 3. Filtro de Texto (Referencia)
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 var term = searchTerm.Trim();
@@ -413,8 +424,8 @@ namespace FacturasSRI.Infrastructure.Services
                     MetodoDePago = c.MetodoDePago,
                     Referencia = c.Referencia,
                     ComprobantePagoPath = c.ComprobantePagoPath,
-                    // For customer view, CreadoPor is not needed, so it can be "N/A" or omitted
-                    CreadoPor = "N/A" 
+                    // CAMBIO VISUAL (Aquí siempre es el cliente porque es su vista)
+                    CreadoPor = "N/A"
                 });
 
             return await PaginatedList<CobroDto>.CreateAsync(finalQuery, pageNumber, pageSize);

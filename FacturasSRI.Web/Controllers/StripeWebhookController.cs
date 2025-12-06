@@ -67,21 +67,6 @@ namespace FacturasSRI.Web.Controllers
             if (session.Metadata.TryGetValue("FacturaId", out string? facturaIdStr) &&
                 Guid.TryParse(facturaIdStr, out Guid facturaId))
             {
-                Guid usuarioVendedorId;
-                using (var context = await _contextFactory.CreateDbContextAsync())
-                {
-                    var facturaInfo = await context.Facturas
-                        .Where(f => f.Id == facturaId)
-                        .Select(f => new { f.UsuarioIdCreador })
-                        .FirstOrDefaultAsync();
-
-                    if (facturaInfo == null)
-                    {
-                        _logger.LogError($"Factura {facturaId} no encontrada al procesar pago.");
-                        return;
-                    }
-                    usuarioVendedorId = facturaInfo.UsuarioIdCreador;
-                }
 
                 var nuevoCobro = new RegistrarCobroDto
                 {
@@ -89,7 +74,7 @@ namespace FacturasSRI.Web.Controllers
                     Monto = (decimal)(session.AmountTotal ?? 0) / 100m,
                     MetodoDePago = "Tarjeta de Crédito/Débito",
                     Referencia = $"Stripe Webhook: {session.PaymentIntentId}",
-                    UsuarioIdCreador = usuarioVendedorId,
+                    UsuarioIdCreador = null, // <--- AHORA ES NULO (Indica Portal Cliente)
                     FechaCobro = DateTime.UtcNow
                 };
 
