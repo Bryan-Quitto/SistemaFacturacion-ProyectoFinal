@@ -126,7 +126,7 @@ namespace FacturasSRI.Infrastructure.Services
             return _pdfGeneratorService.GenerateVentasPorProductoPdf(data, fechaInicio, fechaFin);
         }
 
-        public async Task<IEnumerable<ClienteActividadDto>> GetActividadClientesAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
+        public async Task<IEnumerable<ClienteActividadDto>> GetActividadClientesAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId, bool hideZeroPurchases)
         {
             var startDate = DateTime.SpecifyKind(fechaInicio.Date, DateTimeKind.Utc);
             var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
@@ -161,16 +161,19 @@ namespace FacturasSRI.Infrastructure.Services
                     NumeroDeCompras = comprasCliente.Count,
                     TotalComprado = comprasCliente.Sum(f => f.Total)
                 };
-            })
-            .OrderByDescending(c => c.TotalComprado)
-            .ToList();
+            });
 
-            return reportData;
+            if (hideZeroPurchases)
+            {
+                reportData = reportData.Where(c => c.NumeroDeCompras > 0);
+            }
+            
+            return reportData.OrderByDescending(c => c.TotalComprado).ToList();
         }
 
-        public async Task<byte[]> GetActividadClientesAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
+        public async Task<byte[]> GetActividadClientesAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId, bool hideZeroPurchases)
         {
-            var data = await GetActividadClientesAsync(fechaInicio, fechaFin, userId);
+            var data = await GetActividadClientesAsync(fechaInicio, fechaFin, userId, hideZeroPurchases);
             if (data == null || !data.Any()) return Array.Empty<byte>();
             return _pdfGeneratorService.GenerateActividadClientesPdf(data, fechaInicio, fechaFin);
         }
