@@ -5,11 +5,13 @@
 @using FacturasSRI.Application.Dtos.Reports
 @using System.Security.Claims
 @using FacturasSRI.Application.Interfaces
+@using Microsoft.Extensions.Logging
 @inject IReportService ReportService
 @inject IUserService UserService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JSRuntime
 @inject ITimeZoneHelper TimeZoneHelper
+@inject ILogger<MovimientosInventarioReport> Logger
 
 @attribute [Authorize(Roles = "Administrador, Bodeguero")]
 
@@ -53,8 +55,8 @@
                 }
 
                 @* 4. Botones *@
-                <div class="@ColumnClass d-flex align-items-end">
-                    <button class="btn btn-primary me-2 w-100" @onclick="GenerateReport" disabled="@isLoading">
+                <div class="@ColumnClass d-flex align-items-end gap-2">
+                    <button class="btn btn-primary flex-grow-1 text-nowrap" @onclick="GenerateReport" disabled="@isLoading">
                         @if (isLoading)
                         {
                             <span class="spinner-border spinner-border-sm"></span>
@@ -67,14 +69,14 @@
                     </button>
                     @if (reportData != null && reportData.Any())
                     {
-                        <button class="btn btn-danger w-100" @onclick="DownloadPdf" disabled="@isDownloading">
+                        <button class="btn btn-danger flex-grow-1 text-nowrap" @onclick="DownloadPdf" disabled="@isDownloading">
                             @if (isDownloading)
                             {
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                             }
                             else
                             {
-                                <i class="bi bi-file-earmark-pdf me-2"></i><span>Descargar PDF</span>
+                                <i class="bi bi-file-earmark-pdf me-2"></i><span>Desc. PDF</span>
                             }
                         </button>
                     }
@@ -228,17 +230,22 @@
                         .ToList();
                 }
             }
+            Logger.LogInformation("MovimientosInventarioReport: IsAdmin = {IsAdmin}", isAdmin);
         }
         catch (Exception ex)
         {
             errorMessage = $"Error al cargar permisos: {ex.Message}";
+            Logger.LogError(ex, "MovimientosInventarioReport: Error en OnInitializedAsync");
         }
     }
 
     private Guid? GetQueryUserId()
     {
-        if (isAdmin) return selectedFilterUserId;
-        return null; // Bodegueros ven todo
+        // Si es Admin, retornamos lo que seleccionó (o null para todos).
+        // Si NO es Admin (es Bodeguero), retornamos NULL para que vea TODOS los registros.
+        var queryUserId = isAdmin ? selectedFilterUserId : null;
+        Logger.LogInformation("MovimientosInventarioReport: GetQueryUserId determined QueryUserId = {QueryUserId}", queryUserId);
+        return queryUserId;
     }
     
     private async Task GenerateReport()
@@ -257,6 +264,7 @@
         try
         {
             var queryUserId = GetQueryUserId();
+            Logger.LogInformation("MovimientosInventarioReport: Generating report with QueryUserId = {QueryUserId}", queryUserId);
 
             var safeStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
             var safeEndDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
@@ -270,6 +278,7 @@
         catch (Exception ex)
         {
             errorMessage = $"Ocurrió un error al generar el reporte: {ex.Message}";
+            Logger.LogError(ex, "MovimientosInventarioReport: Error in GenerateReport");
         }
         finally
         {

@@ -304,12 +304,18 @@ namespace FacturasSRI.Infrastructure.Services
             var endDate = DateTime.SpecifyKind(fechaFin.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
 
             // 1. Ventas
-            var salesMovements = await _context.FacturaDetalles
+            var salesQuery = _context.FacturaDetalles
                 .AsNoTracking()
                 .Include(d => d.Factura).ThenInclude(f => f.UsuarioCreador)
                 .Include(d => d.Producto)
-                .Where(d => d.Factura.FechaEmision >= startDate && d.Factura.FechaEmision <= endDate && d.Factura.Estado != EstadoFactura.Cancelada)
-                .Select(d => new MovimientoInventarioDto
+                .Where(d => d.Factura.FechaEmision >= startDate && d.Factura.FechaEmision <= endDate && d.Factura.Estado != EstadoFactura.Cancelada);
+
+            if (userId.HasValue)
+            {
+                salesQuery = salesQuery.Where(d => d.Factura.UsuarioIdCreador == userId.Value);
+            }
+            
+            var salesMovements = await salesQuery.Select(d => new MovimientoInventarioDto
                 {
                     Fecha = d.Factura.FechaEmision,
                     ProductoNombre = d.Producto.Nombre,
@@ -321,9 +327,16 @@ namespace FacturasSRI.Infrastructure.Services
                 }).ToListAsync();
 
             // 2. Compras
-            var purchaseMovements = await _context.CuentasPorPagar
+            var purchaseQuery = _context.CuentasPorPagar
                 .AsNoTracking()
-                .Where(c => c.FechaEmision >= startDate && c.FechaEmision <= endDate && c.Estado != EstadoCompra.Cancelada)
+                .Where(c => c.FechaEmision >= startDate && c.FechaEmision <= endDate && c.Estado != EstadoCompra.Cancelada);
+            
+            if(userId.HasValue)
+            {
+                purchaseQuery = purchaseQuery.Where(c => c.UsuarioIdCreador == userId.Value);
+            }
+
+            var purchaseMovements = await purchaseQuery
                 .GroupJoin(_context.Usuarios, c => c.UsuarioIdCreador, u => u.Id, (c, u) => new { c, u })
                 .SelectMany(x => x.u.DefaultIfEmpty(), (x, u) => new { x.c, u })
                 .Join(_context.Productos,
@@ -342,9 +355,16 @@ namespace FacturasSRI.Infrastructure.Services
                 .ToListAsync();
 
             // 3. Ajustes
-            var adjustmentQuery = await _context.AjustesInventario
+            var adjustmentBaseQuery = _context.AjustesInventario
                 .AsNoTracking()
-                .Where(a => a.Fecha >= startDate && a.Fecha <= endDate)
+                .Where(a => a.Fecha >= startDate && a.Fecha <= endDate);
+
+            if (userId.HasValue)
+            {
+                adjustmentBaseQuery = adjustmentBaseQuery.Where(a => a.UsuarioIdAutoriza == userId.Value);
+            }
+
+            var adjustmentQuery = await adjustmentBaseQuery
                 .Join(_context.Productos, a => a.ProductoId, p => p.Id, (a, p) => new { a, p })
                 .GroupJoin(_context.Usuarios, x => x.a.UsuarioIdAutoriza, u => u.Id, (x, u) => new { x.a, x.p, u })
                 .SelectMany(x => x.u.DefaultIfEmpty(), (x, u) => new { x.a, x.p, u })
@@ -402,20 +422,28 @@ namespace FacturasSRI.Infrastructure.Services
                         from l in lJoin.DefaultIfEmpty()
                         where c.FechaEmision >= startDate && c.FechaEmision <= endDate
                         && c.Estado != EstadoCompra.Cancelada
-                        select new ComprasPorPeriodoDto
-                        {
-                            Fecha = c.FechaEmision,
-                            ProductoNombre = p.Nombre,
-                            NombreProveedor = c.NombreProveedor,
-                            NumeroFacturaProveedor = c.NumeroFacturaProveedor,
-                            NumeroCompraInterno = c.NumeroCompraInterno,
-                            CantidadComprada = (decimal)c.Cantidad,
-                            CostoTotal = c.MontoTotal,
-                            CostoUnitario = l != null ? l.PrecioCompraUnitario : (c.Cantidad > 0 ? c.MontoTotal / c.Cantidad : 0),
-                            UsuarioResponsable = u != null ? u.PrimerNombre + " " + u.PrimerApellido : "Usuario no encontrado"
-                        };
+                        select new { c, p, u, l };
+            
+            if (userId.HasValue)
+            {
+                query = query.Where(x => x.c.UsuarioIdCreador == userId.Value);
+            }
 
-            return await query.OrderBy(c => c.Fecha).ToListAsync();
+            var result = await query.Select(x => new ComprasPorPeriodoDto
+                {
+                    Fecha = x.c.FechaEmision,
+                    ProductoNombre = x.p.Nombre,
+                    NombreProveedor = x.c.NombreProveedor,
+                    NumeroFacturaProveedor = x.c.NumeroFacturaProveedor,
+                    NumeroCompraInterno = x.c.NumeroCompraInterno,
+                    CantidadComprada = (decimal)x.c.Cantidad,
+                    CostoTotal = x.c.MontoTotal,
+                    CostoUnitario = x.l != null ? x.l.PrecioCompraUnitario : (x.c.Cantidad > 0 ? x.c.MontoTotal / x.c.Cantidad : 0),
+                    UsuarioResponsable = x.u != null ? x.u.PrimerNombre + " " + x.u.PrimerApellido : "Usuario no encontrado"
+                }).ToListAsync();
+
+
+            return result.OrderBy(c => c.Fecha).ToList();
         }
 
         public async Task<byte[]> GetComprasPorPeriodoAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)
@@ -467,17 +495,25 @@ namespace FacturasSRI.Infrastructure.Services
                         join usuario in _context.Usuarios on ajuste.UsuarioIdAutoriza equals usuario.Id into uJoin
                         from usuario in uJoin.DefaultIfEmpty()
                         where ajuste.Fecha >= startDate && ajuste.Fecha <= endDate
-                        select new AjusteInventarioReportDto
-                        {
-                            Fecha = ajuste.Fecha,
-                            ProductoNombre = producto.Nombre,
-                            TipoAjuste = ajuste.Tipo.ToString(),
-                            CantidadAjustada = ajuste.CantidadAjustada,
-                            Motivo = ajuste.Motivo,
-                            UsuarioResponsable = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado"
-                        };
+                        select new { ajuste, producto, usuario };
 
-            return await query.OrderBy(a => a.Fecha).ToListAsync();
+            if (userId.HasValue)
+            {
+                query = query.Where(x => x.ajuste.UsuarioIdAutoriza == userId.Value);
+            }
+
+            var result = await query.Select(x => new AjusteInventarioReportDto
+            {
+                Fecha = x.ajuste.Fecha,
+                ProductoNombre = x.producto.Nombre,
+                TipoAjuste = x.ajuste.Tipo.ToString(),
+                CantidadAjustada = x.ajuste.CantidadAjustada,
+                Motivo = x.ajuste.Motivo,
+                UsuarioResponsable = x.usuario != null ? x.usuario.PrimerNombre + " " + x.usuario.PrimerApellido : "Usuario no encontrado"
+            }).ToListAsync();
+
+
+            return result.OrderBy(a => a.Fecha).ToList();
         }
 
         public async Task<byte[]> GetAjustesInventarioAsPdfAsync(DateTime fechaInicio, DateTime fechaFin, Guid? userId)

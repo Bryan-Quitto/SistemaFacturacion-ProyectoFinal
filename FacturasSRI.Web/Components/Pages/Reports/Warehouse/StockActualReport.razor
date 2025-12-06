@@ -24,32 +24,34 @@
                         Ocultar Stock 0
                     </label>
                 </div>
-                <button class="btn btn-primary me-2" @onclick="GenerateReport" disabled="@isLoading">
-                    @if (isLoading)
-                    {
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        <span class="ms-1">Actualizando...</span>
-                    }
-                    else
-                    {
-                        <i class="bi bi-arrow-clockwise me-1"></i>
-                        <span>Actualizar</span>
-                    }
-                </button>
-                @if (reportData != null && reportData.Any())
-                {
-                    <button class="btn btn-danger" @onclick="DownloadPdf" disabled="@isDownloading">
-                        @if (isDownloading)
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary flex-grow-1 text-nowrap" @onclick="GenerateReport" disabled="@isLoading">
+                        @if (isLoading)
                         {
                             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            <span class="ms-1">Descargando...</span>
+                            <span class="ms-1">Actualizando...</span>
                         }
                         else
                         {
-                            <i class="bi bi-file-earmark-pdf me-2"></i><span>Descargar PDF</span>
+                            <i class="bi bi-arrow-clockwise me-1"></i>
+                            <span>Actualizar</span>
                         }
                     </button>
-                }
+                    @if (reportData != null && reportData.Any())
+                    {
+                        <button class="btn btn-danger flex-grow-1 text-nowrap" @onclick="DownloadPdf" disabled="@isDownloading">
+                            @if (isDownloading)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                <span class="ms-1">Descargando...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-file-earmark-pdf me-2"></i><span>Desc. PDF</span>
+                            }
+                        </button>
+                    }
+                </div>
             </div>
         </div>
         <div class="card-body">

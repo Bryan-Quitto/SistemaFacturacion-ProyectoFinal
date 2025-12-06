@@ -55,8 +55,8 @@
                 }
 
                 @* 4. Botones *@
-                <div class="@ColumnClass d-flex align-items-end">
-                    <button class="btn btn-primary me-2 w-100" @onclick="GenerateReport" disabled="@isLoading">
+                <div class="@ColumnClass d-flex align-items-end gap-2">
+                    <button class="btn btn-primary flex-grow-1 text-nowrap" @onclick="GenerateReport" disabled="@isLoading">
                         @if (isLoading)
                         {
                             <span class="spinner-border spinner-border-sm"></span>
@@ -69,14 +69,14 @@
                     </button>
                     @if (reportData != null && reportData.Any())
                     {
-                        <button class="btn btn-danger w-100" @onclick="DownloadPdf" disabled="@isDownloading">
+                        <button class="btn btn-danger flex-grow-1 text-nowrap" @onclick="DownloadPdf" disabled="@isDownloading">
                             @if (isDownloading)
                             {
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                             }
                             else
                             {
-                                <i class="bi bi-file-earmark-pdf me-2"></i><span>Descargar PDF</span>
+                                <i class="bi bi-file-earmark-pdf me-2"></i><span>Desc. PDF</span>
                             }
                         </button>
                     }

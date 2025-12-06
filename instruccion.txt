@@ -1,0 +1,55 @@
+Hola Gemini, ayudame con un proyecto que ocupa NET 8, blazor server y supabase, el problema que tengo es que en los reportes de:
+
+C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Web\Components\Pages\Reports
+
+El boton de Desc. PDF, se esta viendo con un tamaño en altura inconsistente, ya se arreglo:
+
+C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Web\Components\Pages\Reports\Sales\ClienteActividadReport.razor
+
+Aquí están los 3 cambios específicos que hice en el bloque de los botones (línea ~47):
+
+text-nowrap (La solución al alto):
+
+Agregué la clase text-nowrap a ambos botones.
+
+¿Por qué? Esto obliga al texto a mantenerse en una sola línea pase lo que pase. Si el espacio es muy pequeño, el botón no crecerá hacia abajo (haciéndose más alto), sino que mantendrá su altura estática alineada con el otro botón.
+
+flex-grow-1 en lugar de w-100:
+
+Quité w-100 (ancho 100%) y puse flex-grow-1.
+
+¿Por qué? w-100 fuerza a ambos botones a intentar ocupar todo el ancho, lo que causa conflictos visuales. flex-grow-1 les dice: "compartan el espacio disponible equitativamente".
+
+gap-2 en el contenedor:
+
+Agregué gap-2 al div padre y quité el me-2 del primer botón.
+
+¿Por qué? Es una forma más moderna y limpia de separar los botones en Bootstrap sin afectar los márgenes individuales.
+
+Antes (Tu código):
+
+<div class="@ColumnClass d-flex align-items-end">
+    <button class="btn btn-primary me-2 w-100" ...> 
+        ...
+    </button>
+    ...
+        <button class="btn btn-danger w-100" ...> 
+            ...
+        </button>
+    ...
+</div>
+
+Después (Mi corrección):
+
+<div class="@ColumnClass d-flex align-items-end gap-2"> <button class="btn btn-primary flex-grow-1 text-nowrap" ...> 
+        ...
+    </button>
+    ...
+        <button class="btn btn-danger flex-grow-1 text-nowrap" ...>
+            ...
+        </button>
+    ...
+</div>
+
+Ahora faltan los otros nueve reportes que hay en C:\Users\THINKPAD\Desktop\FacturasSRI\FacturasSRI.Web\Components\Pages\Reports
+, ayudame corrigiendo porfa
