@@ -20,13 +20,15 @@ namespace FacturasSRI.Infrastructure.Services
         private readonly ILogger<PurchaseService> _logger;
         private readonly Client _supabase;
         private readonly IAjusteInventarioService _ajusteInventarioService;
+        private readonly DataCacheService _dataCacheService;
 
-        public PurchaseService(IDbContextFactory<FacturasSRIDbContext> contextFactory, ILogger<PurchaseService> logger, Client supabase, IAjusteInventarioService ajusteInventarioService)
+        public PurchaseService(IDbContextFactory<FacturasSRIDbContext> contextFactory, ILogger<PurchaseService> logger, Client supabase, IAjusteInventarioService ajusteInventarioService, DataCacheService dataCacheService)
         {
             _contextFactory = contextFactory;
             _logger = logger;
             _supabase = supabase;
             _ajusteInventarioService = ajusteInventarioService;
+            _dataCacheService = dataCacheService;
         }
         
         public async Task MarcarComprasVencidasAsync()
@@ -145,6 +147,7 @@ namespace FacturasSRI.Infrastructure.Services
                 context.CuentasPorPagar.Add(cuenta);
                 await context.SaveChangesAsync();
                 await transaction.CommitAsync();
+                _dataCacheService.ClearProductsCache(); // Invalidate product cache
                 return true;
             }
             catch (Exception ex)
