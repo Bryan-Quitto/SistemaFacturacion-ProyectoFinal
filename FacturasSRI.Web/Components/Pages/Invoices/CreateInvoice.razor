@@ -388,11 +388,8 @@
     {
         try
         {
-            var baseUri = Navigation.ToAbsoluteUri(Navigation.BaseUri);
-            var cacheBuster = DateTime.Now.Ticks; 
-
-            var customersTask = Http.GetFromJsonAsync<List<CustomerDto>>(new Uri(baseUri, $"cache/customers.json?v={cacheBuster}"));
-            var productsTask = Http.GetFromJsonAsync<List<ProductDto>>(new Uri(baseUri, $"cache/products.json?v={cacheBuster}"));
+            var customersTask = CustomerService.GetActiveCustomersAsync();
+            var productsTask = ProductService.GetActiveProductsAsync();
 
             await Task.WhenAll(customersTask, productsTask);
 

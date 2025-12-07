@@ -1,130 +1,54 @@
 using FacturasSRI.Application.Dtos;
-using FacturasSRI.Domain.Entities;
-using FacturasSRI.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Caching.Memory;
 using System;
-using System.IO;
-using System.Linq;
-using System.Text.Json;
-using System.Threading;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace FacturasSRI.Infrastructure.Services
 {
-    public class DataCacheService : IHostedService, IDisposable
+    public class DataCacheService
     {
-        // Usamos la fábrica de contexto directamente para no depender de otros Servicios
-        private readonly IDbContextFactory<FacturasSRIDbContext> _contextFactory;
-        private Timer? _timer;
+        private readonly IMemoryCache _cache;
+        private const string KeyCustomers = "KEY_CUSTOMERS";
+        private const string KeyProducts = "KEY_PRODUCTS";
 
-        public DataCacheService(IDbContextFactory<FacturasSRIDbContext> contextFactory)
+        public DataCacheService(IMemoryCache cache)
         {
-            _contextFactory = contextFactory;
+            _cache = cache;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        public async Task<List<CustomerDto>> GetCustomersAsync(Func<Task<List<CustomerDto>>> fallback)
         {
-            // Mantenemos el timer como respaldo por si algo falla, cada 10 min es suficiente
-            _timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromMinutes(10));
-            return Task.CompletedTask;
+            return await GetOrSetAsync(KeyCustomers, fallback);
         }
 
-        private async void DoWork(object? state)
+        public async Task<List<ProductDto>> GetProductsAsync(Func<Task<List<ProductDto>>> fallback)
         {
-            try 
+            return await GetOrSetAsync(KeyProducts, fallback);
+        }
+
+        public void ClearCustomersCache()
+        {
+            _cache.Remove(KeyCustomers);
+        }
+
+        public void ClearProductsCache()
+        {
+            _cache.Remove(KeyProducts);
+        }
+
+        private async Task<List<T>> GetOrSetAsync<T>(string cacheKey, Func<Task<List<T>>> fallback) where T : class
+        {
+            if (!_cache.TryGetValue(cacheKey, out List<T>? cachedData) || cachedData == null)
             {
-                await GenerateProductCache();
-                await GenerateCustomerCache();
+                cachedData = await fallback() ?? new List<T>();
+                
+                var cacheEntryOptions = new MemoryCacheEntryOptions()
+                    .SetSlidingExpiration(TimeSpan.FromHours(1));
+
+                _cache.Set(cacheKey, cachedData, cacheEntryOptions);
             }
-            catch
-            {
-                // Ignorar errores en el background task para no tumbar la app
-            }
-        }
-
-        public async Task GenerateProductCache()
-        {
-            // Creamos un contexto ligero y efímero solo para leer y volcar a JSON
-            await using var context = await _contextFactory.CreateDbContextAsync();
-            
-            // Proyección directa a DTO (optimizada)
-            var products = await context.Productos
-                .AsNoTracking() // Importante para rendimiento
-                .Include(p => p.Lotes)
-                .Where(p => p.EstaActivo) // Solo activos
-                .OrderBy(p => p.Nombre)
-                .Select(p => new ProductDto 
-                { 
-                    Id = p.Id, 
-                    Nombre = p.Nombre, 
-                    CodigoPrincipal = p.CodigoPrincipal, 
-                    PrecioVentaUnitario = p.PrecioVentaUnitario, 
-                    IsActive = p.EstaActivo, 
-                    ManejaInventario = p.ManejaInventario, 
-                    ManejaLotes = p.ManejaLotes,
-                    // Calculamos el stock total directamente en la consulta
-                    StockTotal = p.ManejaLotes ? p.Lotes.Sum(l => l.CantidadDisponible) : p.StockTotal, 
-                    StockMinimo = p.StockMinimo,
-                    PrecioCompraPromedioPonderado = p.PrecioCompraPromedioPonderado 
-                })
-                .ToListAsync();
-
-            var json = JsonSerializer.Serialize(products);
-            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "cache", "products.json");
-            
-            // Nos aseguramos que el directorio exista
-            var directory = Path.GetDirectoryName(path);
-            if(directory != null && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            await File.WriteAllTextAsync(path, json);
-        }
-
-        public async Task GenerateCustomerCache()
-        {
-            await using var context = await _contextFactory.CreateDbContextAsync();
-
-            // Proyección directa a DTO (optimizada)
-            var customers = await context.Clientes
-                .AsNoTracking()
-                .Where(c => c.EstaActivo)
-                .Select(c => new CustomerDto
-                {
-                    Id = c.Id,
-                    TipoIdentificacion = c.TipoIdentificacion,
-                    NumeroIdentificacion = c.NumeroIdentificacion,
-                    RazonSocial = c.RazonSocial,
-                    Email = c.Email,
-                    Direccion = c.Direccion,
-                    Telefono = c.Telefono,
-                    EstaActivo = c.EstaActivo
-                })
-                .ToListAsync();
-
-            var json = JsonSerializer.Serialize(customers);
-            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "cache", "customers.json");
-            
-            var directory = Path.GetDirectoryName(path);
-            if(directory != null && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            await File.WriteAllTextAsync(path, json);
-        }
-
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            _timer?.Change(Timeout.Infinite, 0);
-            return Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
-            _timer?.Dispose();
+            return cachedData;
         }
     }
 }

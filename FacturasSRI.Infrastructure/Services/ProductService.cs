@@ -65,7 +65,7 @@ namespace FacturasSRI.Infrastructure.Services
             context.Productos.Add(product);
             await context.SaveChangesAsync();
             
-            await _dataCacheService.GenerateProductCache();
+            _dataCacheService.ClearProductsCache();
             
             productDto.Id = product.Id;
             return productDto;
@@ -182,44 +182,35 @@ namespace FacturasSRI.Infrastructure.Services
             return await PaginatedList<ProductDto>.CreateAsync(finalQuery, pageNumber, pageSize);
         }
 
-        public async Task<List<ProductDto>> GetAllProductsForCacheAsync()
-        {
-            // This method is now obsolete for large lists, but might be used by the cache.
-            // Keeping it simple, but for a real-world app, you might remove or refactor this.
-            await using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Productos
-                .AsNoTracking()
-                .OrderBy(p => p.Nombre)
-                .Select(p => new ProductDto { Id = p.Id, Nombre = p.Nombre, CodigoPrincipal = p.CodigoPrincipal, PrecioVentaUnitario = p.PrecioVentaUnitario, IsActive = p.EstaActivo, ManejaInventario = p.ManejaInventario, StockTotal = p.StockTotal, StockMinimo = p.StockMinimo, PrecioCompraPromedioPonderado = p.PrecioCompraPromedioPonderado })
-                .ToListAsync();
-        }
-
         public async Task<List<ProductDto>> GetActiveProductsAsync()
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
-            return await (from product in context.Productos
-                          join usuario in context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
-                          from usuario in usuarioJoin.DefaultIfEmpty()
-                          join categoria in context.Categorias on product.CategoriaId equals categoria.Id
-                          where product.EstaActivo == true // Filter for active products
-                          select new ProductDto
-                          {
-                              Id = product.Id,
-                              CodigoPrincipal = product.CodigoPrincipal,
-                              Nombre = product.Nombre,
-                              Descripcion = product.Descripcion,
-                              PrecioVentaUnitario = product.PrecioVentaUnitario,
-                              ManejaInventario = product.ManejaInventario,
-                              ManejaLotes = product.ManejaLotes,
-                              StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
-                              StockMinimo = product.StockMinimo,
-                              PrecioCompraPromedioPonderado = product.PrecioCompraPromedioPonderado,
-                              CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
-                              IsActive = product.EstaActivo,
-                              Marca = product.Marca,
-                              CategoriaId = product.CategoriaId,
-                              CategoriaNombre = categoria.Nombre
-                          }).ToListAsync();
+            return await _dataCacheService.GetProductsAsync(async () =>
+            {
+                await using var context = await _contextFactory.CreateDbContextAsync();
+                return await (from product in context.Productos
+                              join usuario in context.Usuarios on product.UsuarioIdCreador equals usuario.Id into usuarioJoin
+                              from usuario in usuarioJoin.DefaultIfEmpty()
+                              join categoria in context.Categorias on product.CategoriaId equals categoria.Id
+                              where product.EstaActivo == true // Filter for active products
+                              select new ProductDto
+                              {
+                                  Id = product.Id,
+                                  CodigoPrincipal = product.CodigoPrincipal,
+                                  Nombre = product.Nombre,
+                                  Descripcion = product.Descripcion,
+                                  PrecioVentaUnitario = product.PrecioVentaUnitario,
+                                  ManejaInventario = product.ManejaInventario,
+                                  ManejaLotes = product.ManejaLotes,
+                                  StockTotal = product.ManejaLotes ? product.Lotes.Sum(l => l.CantidadDisponible) : product.StockTotal,
+                                  StockMinimo = product.StockMinimo,
+                                  PrecioCompraPromedioPonderado = product.PrecioCompraPromedioPonderado,
+                                  CreadoPor = usuario != null ? usuario.PrimerNombre + " " + usuario.PrimerApellido : "Usuario no encontrado",
+                                  IsActive = product.EstaActivo,
+                                  Marca = product.Marca,
+                                  CategoriaId = product.CategoriaId,
+                                  CategoriaNombre = categoria.Nombre
+                              }).ToListAsync();
+            });
         }
 
         public async Task UpdateProductAsync(ProductDto productDto)
@@ -249,7 +240,7 @@ namespace FacturasSRI.Infrastructure.Services
                 product.CategoriaId = productDto.CategoriaId;
                 await context.SaveChangesAsync();
                 
-                await _dataCacheService.GenerateProductCache();
+                _dataCacheService.ClearProductsCache();
             }
         }
 
@@ -262,7 +253,7 @@ namespace FacturasSRI.Infrastructure.Services
                 product.EstaActivo = !product.EstaActivo; // Toggle the active status
                 await context.SaveChangesAsync();
                 
-                await _dataCacheService.GenerateProductCache();
+                _dataCacheService.ClearProductsCache();
             }
         }
 

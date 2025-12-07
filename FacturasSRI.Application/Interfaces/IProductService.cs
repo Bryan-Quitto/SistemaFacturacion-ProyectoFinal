@@ -8,7 +8,6 @@ namespace FacturasSRI.Application.Interfaces
     public interface IProductService
     {
         Task<PaginatedList<ProductDto>> GetProductsAsync(int pageNumber, int pageSize, string? searchTerm, Guid? categoryId, string? marca, string? stockStatus, string? inventoryType);
-        Task<List<ProductDto>> GetAllProductsForCacheAsync();
         Task<ProductDto?> GetProductByIdAsync(Guid id);
         Task<ProductDto> CreateProductAsync(ProductDto productDto);
         Task UpdateProductAsync(ProductDto productDto);

@@ -89,8 +89,8 @@ namespace FacturasSRI.Infrastructure.Services
             // Send welcome email with temporary password
             await _emailService.SendCustomerTemporaryPasswordEmailAsync(customer.Email, customer.RazonSocial, temporaryPassword);
 
-            // Regenerate cache
-            await _dataCacheService.GenerateCustomerCache();
+            // Invalidate cache
+            _dataCacheService.ClearCustomersCache();
 
             customerDto.Id = customer.Id;
             return customerDto;
@@ -105,8 +105,8 @@ namespace FacturasSRI.Infrastructure.Services
                 customer.EstaActivo = !customer.EstaActivo; // Toggle the active status
                 await context.SaveChangesAsync();
                 
-                // Regenerate cache
-                await _dataCacheService.GenerateCustomerCache();
+                // Invalidate cache
+                _dataCacheService.ClearCustomersCache();
             }
         }
 
@@ -188,28 +188,31 @@ namespace FacturasSRI.Infrastructure.Services
 
         public async Task<List<CustomerDto>> GetActiveCustomersAsync()
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
-            return await (from customer in context.Clientes
-                          join usuarioCreador in context.Usuarios on customer.UsuarioIdCreador equals usuarioCreador.Id into usuarioCreadorJoin
-                          from usuarioCreador in usuarioCreadorJoin.DefaultIfEmpty()
-                          join usuarioModificador in context.Usuarios on customer.UsuarioModificadorId equals usuarioModificador.Id into usuarioModificadorJoin
-                          from usuarioModificador in usuarioModificadorJoin.DefaultIfEmpty()
-                          where customer.EstaActivo == true // Filter for active customers
-                          select new CustomerDto
-                          {
-                              Id = customer.Id,
-                              TipoIdentificacion = customer.TipoIdentificacion,
-                              NumeroIdentificacion = customer.NumeroIdentificacion,
-                              RazonSocial = customer.RazonSocial,
-                              Email = customer.Email,
-                              Direccion = customer.Direccion,
-                              Telefono = customer.Telefono,
-                              EstaActivo = customer.EstaActivo,
-                              CreadoPor = usuarioCreador != null ? usuarioCreador.PrimerNombre + " " + usuarioCreador.PrimerApellido : "Registro propio",
-                              FechaCreacion = customer.FechaCreacion,
-                              FechaModificacion = customer.FechaModificacion,
-                              UltimaModificacionPor = usuarioModificador != null ? usuarioModificador.PrimerNombre + " " + usuarioModificador.PrimerApellido : "N/A"
-                          }).ToListAsync();
+            return await _dataCacheService.GetCustomersAsync(async () =>
+            {
+                await using var context = await _contextFactory.CreateDbContextAsync();
+                return await (from customer in context.Clientes
+                              join usuarioCreador in context.Usuarios on customer.UsuarioIdCreador equals usuarioCreador.Id into usuarioCreadorJoin
+                              from usuarioCreador in usuarioCreadorJoin.DefaultIfEmpty()
+                              join usuarioModificador in context.Usuarios on customer.UsuarioModificadorId equals usuarioModificador.Id into usuarioModificadorJoin
+                              from usuarioModificador in usuarioModificadorJoin.DefaultIfEmpty()
+                              where customer.EstaActivo == true // Filter for active customers
+                              select new CustomerDto
+                              {
+                                  Id = customer.Id,
+                                  TipoIdentificacion = customer.TipoIdentificacion,
+                                  NumeroIdentificacion = customer.NumeroIdentificacion,
+                                  RazonSocial = customer.RazonSocial,
+                                  Email = customer.Email,
+                                  Direccion = customer.Direccion,
+                                  Telefono = customer.Telefono,
+                                  EstaActivo = customer.EstaActivo,
+                                  CreadoPor = usuarioCreador != null ? usuarioCreador.PrimerNombre + " " + usuarioCreador.PrimerApellido : "Registro propio",
+                                  FechaCreacion = customer.FechaCreacion,
+                                  FechaModificacion = customer.FechaModificacion,
+                                  UltimaModificacionPor = usuarioModificador != null ? usuarioModificador.PrimerNombre + " " + usuarioModificador.PrimerApellido : "N/A"
+                              }).ToListAsync();
+            });
         }
 
         public async Task UpdateCustomerAsync(CustomerDto customerDto)
@@ -246,8 +249,8 @@ namespace FacturasSRI.Infrastructure.Services
                 customer.UltimaModificacionPor = customerDto.UltimaModificacionPor; // Assuming UltimaModificacionPor in DTO is the modifier's name
                 await context.SaveChangesAsync();
 
-                // Regenerate cache
-                await _dataCacheService.GenerateCustomerCache();
+                // Invalidate cache
+                _dataCacheService.ClearCustomersCache();
             }
         }
 
@@ -341,6 +344,7 @@ namespace FacturasSRI.Infrastructure.Services
             customer.EstaActivo = true;
             customer.EmailConfirmationToken = null; // Token is used, nullify it
             await context.SaveChangesAsync();
+            _dataCacheService.ClearCustomersCache();
             return true;
         }
 

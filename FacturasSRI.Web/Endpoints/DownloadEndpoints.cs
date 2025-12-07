@@ -351,7 +351,7 @@ namespace FacturasSRI.Web.Endpoints
                                 .RequireAuthorization("AdminPolicy")
                                 .IgnoreAntiforgeryToken();
 
-            adminGroup.MapPost("/refresh-cache", async (
+            adminGroup.MapPost("/refresh-cache", (
                 [FromServices] DataCacheService cacheService,
                 ILoggerFactory loggerFactory) =>
             {
@@ -359,10 +359,13 @@ namespace FacturasSRI.Web.Endpoints
                 logger.LogInformation("Solicitud manual para refrescar caché recibida.");
                 try
                 {
-                    await cacheService.GenerateProductCache();
-                    await cacheService.GenerateCustomerCache();
-                    logger.LogInformation("Caché de productos y clientes regenerada exitosamente.");
-                    return Results.Ok("Caché de productos y clientes actualizada.");
+                    // Como estos métodos no son asíncronos (no devuelven Task),
+                    // no necesitamos 'await' ni 'async' en la lambda.
+                    cacheService.ClearProductsCache();
+                    cacheService.ClearCustomersCache();
+                    
+                    logger.LogInformation("Caché de productos y clientes invalidada exitosamente.");
+                    return Results.Ok("Caché de productos y clientes invalidada. Se reconstruirá en la próxima solicitud.");
                 }
                 catch (Exception ex)
                 {

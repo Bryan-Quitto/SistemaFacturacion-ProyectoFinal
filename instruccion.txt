@@ -1,0 +1,25 @@
+Act as a Senior .NET 8 Developer specializing in Blazor Server and Clean Architecture.
+
+I need to refactor the caching mechanism in my project `FacturasSRI`. Currently, `FacturasSRI.Infrastructure/Services/DataCacheService.cs` is trying to write `.json` files to the `wwwroot` folder to cache Customers and Products. This is causing errors in my production environment (Render.com / Linux) because the file system is ephemeral and read-only.
+
+**Task:**
+Refactor `FacturasSRI.Infrastructure/Services/DataCacheService.cs` to use `Microsoft.Extensions.Caching.Memory.IMemoryCache` instead of `System.IO` file operations.
+
+**Requirements:**
+1.  **Remove File I/O:** Delete all logic related to checking, reading, or writing `customers.json` or `products.json`.
+2.  **Inject IMemoryCache:** Update the constructor to inject `IMemoryCache`.
+3.  **Implement Cache-Aside Pattern:**
+    Create generic or specific methods to retrieve data. The logic should be:
+    - Check if data exists in Memory Cache.
+    - If YES: Return data from cache.
+    - If NO: Execute a fallback function (passed as a parameter, e.g., `Func<Task<List<T>>>`) to fetch data from the Database, store it in Cache with a sliding expiration of 1 hour, and return it.
+4.  **Keys:** Use constants for cache keys (e.g., "KEY_CUSTOMERS", "KEY_PRODUCTS").
+5.  **Invalidation:** Provide methods to explicitly clear/remove the cache for Customers or Products (to be called when a new user or product is created).
+6.  **Thread Safety:** Ensure the implementation is thread-safe using standard .NET 8 practices.
+
+**Context:**
+- The project is Blazor Server .NET 8.
+- The service is located in the Infrastructure layer.
+- I need to cache lists of `CustomerDto` and `ProductDto`.
+
+Please provide the full, refactored code for `DataCacheService.cs`.

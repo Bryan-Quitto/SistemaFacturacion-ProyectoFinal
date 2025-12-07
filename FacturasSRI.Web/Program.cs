@@ -61,10 +61,8 @@ builder.Services.AddScoped<IValidationService, ValidationService>();
 builder.Services.AddScoped<ICobroService, CobroService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 
-builder.Services.AddSingleton<DataCacheService>();
 builder.Services.AddHostedService<VencimientoComprasService>();
 builder.Services.AddSingleton<DataCacheService>();
-builder.Services.AddHostedService<DataCacheService>(provider => provider.GetRequiredService<DataCacheService>());
 
 builder.Services.AddScoped<FacturasSRI.Core.Services.FirmaDigitalService>();
 builder.Services.AddScoped<FacturasSRI.Core.Services.XmlGeneratorService>();
@@ -150,9 +148,6 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim("UserType", "Cliente");
     });
 });
-
-builder.Services.AddHostedService<VencimientoComprasService>();
-builder.Services.AddHostedService<DataCacheService>();
 
 var app = builder.Build();
 
