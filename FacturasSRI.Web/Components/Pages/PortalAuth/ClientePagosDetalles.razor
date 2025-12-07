@@ -14,246 +14,76 @@
 
 @if (invoice == null && !isLoading && string.IsNullOrEmpty(errorMessage))
 {
-    <div class="alert alert-danger">No se encontró la factura especificada o no tiene pagos registrados.</div>
+<div class="alert alert-danger">No se encontró la factura especificada o no tiene pagos registrados.</div>
 }
 else if (isLoading)
 {
-    <div class="text-center p-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Cargando...</span>
-        </div>
-        <p class="mt-3">Cargando detalles de pagos...</p>
+<div class="text-center p-5">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Cargando...</span>
     </div>
+    <p class="mt-3">Cargando detalles de pagos...</p>
+</div>
 }
 else if (!string.IsNullOrEmpty(errorMessage))
 {
-    <div class="alert alert-danger">@errorMessage</div>
+<div class="alert alert-danger">@errorMessage</div>
 }
 else
 {
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="page-title mb-0">Detalles de Pagos de Factura</h1>
-        <div>
-            <button class="btn btn-outline-secondary me-2" @onclick="GoBack">
-                <i class="bi bi-arrow-left-circle me-2"></i>Volver a Mis Facturas
-            </button>
-            @* The customer might want to see the full invoice *@
-            <a href="@($"/cliente/facturas/{FacturaId}")" target="_blank" class="btn btn-outline-info" title="Ver Factura Completa">
-                <i class="bi bi-file-earmark-text"></i> Ver Factura
-            </a>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="page-title mb-0">Detalles de Pagos de Factura</h1>
+    <div>
+        <button class="btn btn-outline-secondary me-2" @onclick="GoBack">
+            <i class="bi bi-arrow-left-circle me-2"></i>Volver a Mis Facturas
+        </button>
+        @* The customer might want to see the full invoice *@
+        <a href="@($"/cliente/facturas/{FacturaId}")" target="_blank" class="btn btn-outline-info" title="Ver Factura Completa">
+            <i class="bi bi-file-earmark-text"></i> Ver Factura
+        </a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Información de la Factura</h5>
+        <div class="row">
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Número de Factura:</strong> @invoice!.NumeroFactura</p>
+                <p class="mb-1"><strong>Fecha Emisión:</strong> @TimeZoneHelper.ConvertUtcToEcuadorTime(invoice.FechaEmision).ToString("g")</p>
+            </div>
+            <div class="col-md-6">
+                <p class="mb-1"><strong>Total Factura:</strong> @invoice.Total.ToString("C")</p>
+                <p class="mb-1"><strong>Forma de Pago Inicial:</strong> @invoice.FormaDePago.ToString()</p>
+                <p class="mb-1"><strong>Saldo Pendiente:</strong> <span class="text-danger">@invoice.SaldoPendiente.ToString("C")</span></p>
+            </div>
         </div>
     </div>
+</div>
 
-    <div class="card mb-4">
+    <div class="card">
+
+        <div class="card-header">
+
+            <h5 class="card-title mb-0">Pagos Registrados</h5>
+
+        </div>
+
         <div class="card-body">
-            <h5 class="card-title">Información de la Factura</h5>
-            <div class="row">
-                <div class="col-md-6">
-                    <p class="mb-1"><strong>Número de Factura:</strong> @invoice!.NumeroFactura</p>
-                    <p class="mb-1"><strong>Fecha Emisión:</strong> @TimeZoneHelper.ConvertUtcToEcuadorTime(invoice.FechaEmision).ToString("g")</p>
-                </div>
-                <div class="col-md-6">
-                    <p class="mb-1"><strong>Total Factura:</strong> @invoice.Total.ToString("C")</p>
-                    <p class="mb-1"><strong>Forma de Pago Inicial:</strong> @invoice.FormaDePago.ToString()</p>
-                    <p class="mb-1"><strong>Saldo Pendiente:</strong> <span class="text-danger">@invoice.SaldoPendiente.ToString("C")</span></p>
-                </div>
-            </div>
-        </div>
-    </div>
 
-        <div class="card">
-
-            <div class="card-header">
-
-                <h5 class="card-title mb-0">Pagos Registrados</h5>
-
-            </div>
-
-            <div class="card-body">
-
-                @if (cobros == null)
-
-                {
-
-                    <p><em>Cargando pagos...</em></p>
-
-                }
-
-                else if (!cobros.Any())
-
-                {
-
-                    <p>No se han registrado pagos para esta factura.</p>
-
-                }
-
-                else
-
-                {
-
-                    <div class="table-responsive">
-
-                        <table class="table table-hover align-middle">
-
-                            <thead>
-
-                                <tr>
-
-                                    <th>Fecha</th>
-
-                                    <th>Método de Pago</th>
-
-                                    <th>Referencia</th>
-
-                                    <th class="text-end">Monto</th>
-
-                                    <th class="text-center">Documentos</th>
-
-                                </tr>
-
-                            </thead>
-
-                            <tbody>
-
-                                @foreach (var cobro in cobros)
-
-                                {
-
-                                    <tr>
-
-                                        <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(cobro.FechaCobro).ToString("g")</td>
-
-                                        <td>@cobro.MetodoDePago</td>
-
-                                        <td>
-
-                                            @if(cobro.Referencia != null && cobro.Referencia.StartsWith("Stripe"))
-
-                                            {
-
-                                                <span class="badge bg-primary">Stripe</span>
-
-                                            }
-
-                                            else
-
-                                            {
-
-                                                @(cobro.Referencia ?? "N/A")
-
-                                            }
-
-                                        </td>
-
-                                        <td class="text-end fw-bold">@cobro.Monto.ToString("C")</td>
-
-                                        <td class="text-center">
-
-                                            <div class="btn-group btn-group-sm" role="group">
-
-                                                @* Botón 1: Recibo generado por el Sistema (Siempre disponible) *@
-
-                                                <button class="btn btn-outline-primary" @onclick="() => DownloadSystemReceipt(cobro.Id)" title="Descargar Recibo del Sistema">
-
-                                                    <i class="bi bi-file-earmark-text"></i> Recibo
-
-                                                </button>
-
-    
-
-                                                @* Botón 2: Comprobante Adjunto (Solo si existe) *@
-
-                                                @if (!string.IsNullOrEmpty(cobro.ComprobantePagoPath))
-
-                                                {
-
-                                                    <button class="btn btn-outline-success" @onclick="() => DownloadUploadedProof(cobro.Id)" title="Ver Comprobante Adjunto/Original">
-
-                                                        <i class="bi bi-paperclip"></i> Adjunto
-
-                                                    </button>
-
-                                                }
-
-                                            </div>
-
-                                        </td>
-
-                                    </tr>
-
-                                }
-
-                            </tbody>
-
-                        </table>
-
-                    </div>
-
-                }
-
-            </div>
-
-        </div>
-
-    }
-
-    
-
-    @code {
-
-        [Parameter]
-
-        public Guid FacturaId { get; set; }
-
-    
-
-        private InvoiceDetailViewDto? invoice;
-
-        private List<CobroDto>? cobros;
-
-        private bool isLoading = true;
-
-        private string? errorMessage;
-
-        private Guid clienteId;
-
-        
-
-        [CascadingParameter]
-
-        private Task<AuthenticationState> authenticationStateTask { get; set; } = null!;
-
-    
-
-        protected override async Task OnInitializedAsync()
-
-        {
-
-            var authState = await authenticationStateTask;
-
-            var user = authState.User;
-
-            if (user.Identity != null && user.Identity.IsAuthenticated)
+            @if (cobros == null)
 
             {
 
-                var clienteIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+                <p><em>Cargando pagos...</em></p>
 
-                if(clienteIdClaim != null && Guid.TryParse(clienteIdClaim.Value, out clienteId))
+            }
 
-                {
+            else if (!cobros.Any())
 
-                    await LoadData();
+            {
 
-                }
-
-                else
-
-                {
-
-                    errorMessage = "No se pudo identificar su cuenta de cliente.";
-
-                }
+                <p>No se han registrado pagos para esta factura.</p>
 
             }
 
@@ -261,120 +91,287 @@ else
 
             {
 
-                errorMessage = "Debe iniciar sesión para ver sus pagos.";
+                <div class="table-responsive">
+
+                    <table class="table table-hover align-middle">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>Fecha</th>
+
+                                <th>Método de Pago</th>
+
+                                <th>Referencia</th>
+
+                                <th class="text-end">Monto</th>
+
+                                <th class="text-center">Documentos</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            @foreach (var cobro in cobros)
+
+                            {
+
+                                <tr>
+
+                                    <td>@TimeZoneHelper.ConvertUtcToEcuadorTime(cobro.FechaCobro).ToString("g")</td>
+
+                                    <td>@cobro.MetodoDePago</td>
+
+                                    <td>
+
+                                        @if(cobro.Referencia != null && cobro.Referencia.StartsWith("Stripe"))
+
+                                        {
+
+                                            <span class="badge bg-primary">Stripe</span>
+
+                                        }
+
+                                        else
+
+                                        {
+
+                                            @(cobro.Referencia ?? "N/A")
+
+                                        }
+
+                                    </td>
+
+                                    <td class="text-end fw-bold">@cobro.Monto.ToString("C")</td>
+
+                                    <td class="text-center">
+
+                                        <div class="btn-group btn-group-sm" role="group">
+
+                                            @* Botón 1: Recibo generado por el Sistema (Siempre disponible) *@
+
+                                            <button class="btn btn-outline-primary" @onclick="() => DownloadSystemReceipt(cobro.Id)" title="Descargar Recibo del Sistema">
+
+                                                <i class="bi bi-file-earmark-text"></i> Recibo
+
+                                            </button>
+
+
+
+                                            @* Botón 2: Comprobante Adjunto (Solo si existe) *@
+
+                                            @if (!string.IsNullOrEmpty(cobro.ComprobantePagoPath))
+
+                                            {
+
+                                                <button class="btn btn-outline-success" @onclick="() => DownloadUploadedProof(cobro.Id)" title="Ver Comprobante Adjunto/Original">
+
+                                                    <i class="bi bi-paperclip"></i> Adjunto
+
+                                                </button>
+
+                                            }
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
 
             }
 
-        }
+        </div>
+
+    </div>
+
+}
+
+
+
+@code {
+
+    [Parameter]
+
+    public Guid FacturaId { get; set; }
+
+
+
+    private InvoiceDetailViewDto? invoice;
+
+    private List<CobroDto>? cobros;
+
+    private bool isLoading = true;
+
+    private string? errorMessage;
+
+    private Guid clienteId;
 
     
 
-        private async Task LoadData()
+    [CascadingParameter]
+
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = null!;
+
+
+
+    protected override async Task OnInitializedAsync()
+
+    {
+
+        var authState = await authenticationStateTask;
+
+        var user = authState.User;
+
+        if (user.Identity != null && user.Identity.IsAuthenticated)
 
         {
 
-            try
+            var clienteIdClaim = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+
+            if(clienteIdClaim != null && Guid.TryParse(clienteIdClaim.Value, out clienteId))
 
             {
 
-                isLoading = true;
-
-                errorMessage = null;
-
-    
-
-                invoice = await InvoiceService.GetInvoiceDetailByIdAsync(FacturaId);
-
-    
-
-                if (invoice != null)
-
-                {
-
-                    // IMPORTANT: Verify the invoice belongs to the authenticated client
-
-                    if (invoice.ClienteId != clienteId)
-
-                    {
-
-                        errorMessage = "Acceso denegado: Esta factura no pertenece a su cuenta.";
-
-                        invoice = null; // Clear invoice data
-
-                        return;
-
-                    }
-
-                    
-
-                    cobros = await CobroService.GetCobrosByFacturaIdAndClientIdAsync(FacturaId, clienteId);
-
-                }
-
-                else
-
-                {
-
-                    errorMessage = "No se encontró la factura solicitada.";
-
-                }
+                await LoadData();
 
             }
 
-            catch (Exception ex)
+            else
 
             {
 
-                errorMessage = $"Error al cargar los detalles de pago: {ex.Message}";
-
-            }
-
-            finally
-
-            {
-
-                isLoading = false;
-
-                StateHasChanged();
+                errorMessage = "No se pudo identificar su cuenta de cliente.";
 
             }
 
         }
 
-    
-
-        private void GoBack()
+        else
 
         {
 
-            Navigation.NavigateTo("/cliente/pagos");
-
-        }
-
-    
-
-        private async Task DownloadSystemReceipt(Guid cobroId)
-
-        {
-
-            var url = $"/api/public/payment-receipt/{cobroId}";
-
-            await JSRuntime.InvokeVoidAsync("open", url, "_blank");
-
-        }
-
-    
-
-        private async Task DownloadUploadedProof(Guid cobroId)
-
-        {
-
-            var url = $"/api/public/invoice-receipt/{cobroId}"; // Changed "downloads" to "public"
-
-            await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+            errorMessage = "Debe iniciar sesión para ver sus pagos.";
 
         }
 
     }
 
-    
+
+
+    private async Task LoadData()
+
+    {
+
+        try
+
+        {
+
+            isLoading = true;
+
+            errorMessage = null;
+
+
+
+            invoice = await InvoiceService.GetInvoiceDetailByIdAsync(FacturaId);
+
+
+
+            if (invoice != null)
+
+            {
+
+                // IMPORTANT: Verify the invoice belongs to the authenticated client
+
+                if (invoice.ClienteId != clienteId)
+
+                {
+
+                    errorMessage = "Acceso denegado: Esta factura no pertenece a su cuenta.";
+
+                    invoice = null; // Clear invoice data
+
+                    return;
+
+                }
+
+                
+                cobros = await CobroService.GetCobrosByFacturaIdAndClientIdAsync(FacturaId, clienteId);
+
+            }
+
+            else
+
+            {
+
+                errorMessage = "No se encontró la factura solicitada.";
+
+            }
+
+        }
+
+        catch (Exception ex)
+
+        {
+
+            errorMessage = $"Error al cargar los detalles de pago: {ex.Message}";
+
+        }
+
+        finally
+
+        {
+
+            isLoading = false;
+
+            StateHasChanged();
+
+        }
+
+    }
+
+
+
+    private void GoBack()
+
+    {
+
+        Navigation.NavigateTo("/cliente/pagos");
+
+    }
+
+
+
+    private async Task DownloadSystemReceipt(Guid cobroId)
+
+    {
+
+        var url = $"/api/public/payment-receipt/{cobroId}";
+
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+
+    }
+
+
+
+    private async Task DownloadUploadedProof(Guid cobroId)
+
+    {
+
+        var url = $"/api/public/invoice-receipt/{cobroId}"; // Changed "downloads" to "public"
+
+        await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+
+    }
+
+}
