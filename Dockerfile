@@ -28,8 +28,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-# Librerías necesarias para manejo de imágenes/reportes en Linux (System.Drawing)
-RUN apt-get update && apt-get install -y libgdiplus
+# Instalar dependencias para SkiaSharp y Gráficos en Linux
+RUN apt-get update && apt-get install -y libgdiplus libfontconfig1 fontconfig libfreetype6
 
 # Configurar puerto para Render
 ENV ASPNETCORE_URLS=http://+:8080
