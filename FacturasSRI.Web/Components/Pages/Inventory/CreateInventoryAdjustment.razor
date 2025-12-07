@@ -126,8 +126,7 @@
     {
         try
         {
-            var baseUri = Navigation.ToAbsoluteUri(Navigation.BaseUri);
-            allProducts = await Http.GetFromJsonAsync<List<ProductDto>>(new Uri(baseUri, "cache/products.json")) ?? new List<ProductDto>();
+            allProducts = await ProductService.GetActiveProductsAsync();
         }
         catch (Exception ex)
         {

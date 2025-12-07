@@ -6,6 +6,7 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Forms
 @inject IPurchaseService PurchaseService
+@inject IProductService ProductService
 @inject HttpClient Http
 @inject ITaxService TaxService
 @inject NavigationManager Navigation
@@ -190,10 +191,7 @@
     {
         try
         {
-            var baseUri = Navigation.ToAbsoluteUri(Navigation.BaseUri);
-            var cacheBuster = DateTime.Now.Ticks;
-
-            var productsTask = Http.GetFromJsonAsync<List<ProductDto>>(new Uri(baseUri, $"cache/products.json?v={cacheBuster}"));
+            var productsTask = ProductService.GetActiveProductsAsync();
             var taxesTask = TaxService.GetActiveTaxesAsync();
 
             await Task.WhenAll(productsTask, taxesTask);
